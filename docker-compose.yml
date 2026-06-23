@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: toms_postgres
+    environment:
+      POSTGRES_USER: toms
+      POSTGRES_PASSWORD: toms_password
+      POSTGRES_DB: toms
+    ports:
+      - "5432:5432"
+    volumes:
+      - toms_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  toms_postgres_data:
