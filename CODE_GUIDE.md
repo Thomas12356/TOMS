@@ -83,8 +83,8 @@ Applied migrations have checksums: add a new migration instead of editing an old
 
 ## Your first frontend edits
 
-The first page is available at `/dashboard`. The browser prompts for username
-`api` and your `APP_API_KEY` as the password. It reads saved transactions;
+The first page is available at `/dashboard`. Sign in with your owner account
+at `/login` (see the README setup). It reads saved transactions;
 categorisation editing will be a later step.
 
 Read its three files in this order:
@@ -131,4 +131,33 @@ This is a view preference stored in the URL, not a persistent setup setting.
 All accounts remains available. No transaction, classification or income data is
 changed. Importing accounts still uses the existing sync flow; the dropdown does
 not import or delete anything. First-run setup and remembered user preferences
-can build on this once session login is available.
+can build on the owner session next.
+
+## Follow the browser login flow
+
+1. `routes/login.py` checks CSRF, counts attempts, verifies the password and
+   creates a browser session. Its numbered comments explain the sequence.
+2. `services/web/sessions.py` loads sessions, enforces expiry and protects the
+   dashboard. Flask-Login handles the current user; Flask-WTF validates CSRF.
+3. `templates/login.html` contains the plain HTML form, and the dashboard header
+   contains a POST logout form. Both send hidden CSRF tokens.
+4. `models.py` and migration `006_owner_login.sql` store the owner hash, revocable
+   browser sessions and the shared login-attempt counter.
+5. `app.py` configures cookies and registers the `flask owner-password` command.
+
+This application has one owner. API authentication stays in `services/web/auth.py`
+and does not accept browser cookies. Do not add session acceptance to write APIs
+without CSRF protection. Future dashboard POST forms are already checked by the
+blueprint guard and need `{{ csrf_token() }}` in a hidden `csrf_token` field.
+
+Use `tests/test_login.py` to see wrong-password, CSRF, throttling, cookie, expiry,
+logout-replay and password-reset checks. Database tests roll back their changes;
+they never create or replace your real owner account.
+
+## Security regression tests
+
+`tests/test_security.py` covers hostile credentials, CSRF, cookie replay,
+password-reset races and concurrent login throttling. See
+[SECURITY_TESTS.md](SECURITY_TESTS.md) for the findings, commands and scope.
+The concurrent tests use a temporary PostgreSQL schema and separate connections;
+they do not change your real owner account.

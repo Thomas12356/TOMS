@@ -38,7 +38,8 @@ withholding will be shown separately from calculated liability.
 | --- | --- |
 | Starling imports | Manual history imports and incremental updates, including active account spaces. |
 | Saved transactions | Filtered, paginated reads from PostgreSQL without contacting Starling. |
-| Transaction dashboard | An authenticated, read-only HTML table with pagination and existing classifications. |
+| Transaction dashboard | Owner login, account selection, live balances, and a read-only transaction table. |
+| Browser security | Hashed owner password, revocable sessions, login throttling, and CSRF-protected forms. |
 | Manual categorisation | Choose income, expense, internal transfer, refund, or other; add notes. |
 | Income records | Record source, gross amount, deductions, adjustments, and confirmed tax treatment. |
 | Review flags | Relevant bank corrections flag income details for review while preserving manual entries. |
@@ -64,14 +65,13 @@ does not automatically establish its tax treatment.
    incomplete records, and an export of the underlying income data.
 
 Each milestone should be delivered as small, understandable changes, with
-focused commits and explanations of the files involved. Browser authentication
-and protection for editing forms belong with the dashboard work.
+focused commits and explanations of the files involved. Owner login and CSRF
+protection are implemented; the next browser feature is manual categorisation.
 
 ## Open the dashboard
 
-With Flask running, visit `http://127.0.0.1:5000/dashboard`. Use username `api`
-and your `APP_API_KEY` as the password at the browser prompt. This first page
-uses the existing API authentication; a dedicated login page is a later step.
+With the server running, visit `/dashboard`. It redirects to `/login`, where
+you use your owner username and password. Follow the setup below first.
 
 The page shows 50 saved transactions at a time across all accounts, newest
 first, including manual or automatic classifications. Dates display in UTC.
@@ -182,18 +182,79 @@ requires a new migration because the database restricts allowed values.
 
 ## Caller authentication
 
-All `/starling`, `/sync`, `/transactions`, `/reports`, and `/dashboard` endpoints, plus
-`/health/db`, require `APP_API_KEY`. This is a different credential from
-`STARLING_ACCESS_TOKEN`: the bank token stays on the server.
+The API endpoints (`/starling`, `/sync`, `/transactions`, `/reports` and
+`/health/db`) require `APP_API_KEY`. This is separate from `STARLING_ACCESS_TOKEN`,
+which stays on the server. Read-only curl calls using `--user api` still work. State-changing calls
+(POST, PUT, PATCH, DELETE) require `Authorization: Bearer <APP_API_KEY>`;
+automatically attached browser Basic credentials cannot authorize writes.
+For the bearer examples below, set `APP_API_KEY` in your shell securely first
+(for example `read -rs -p "API key: " APP_API_KEY`, then press Enter).
 
-In a browser, use username **`api`** and the **`APP_API_KEY` value from `.env`**
-as the password when prompted. With curl, use `--user api` to enter the key at
-the password prompt. Programmatic clients can instead send
-`Authorization: Bearer <APP_API_KEY>`.
+The browser dashboard uses its own owner login and session cookie. Browser
+sessions do not grant API access. For scripts, `/dashboard` and its balances
+endpoint also accept an explicit bearer key; they no longer accept Basic auth.
+Missing credentials fail closed. `/` and `/health` remain public.
+Banking and login responses use `Cache-Control: no-store`.
 
-Unauthenticated calls return 401, and missing `APP_API_KEY` configuration returns
-503. `/` and `/health` are public. Banking responses, including errors and the
-account holder name, use `Cache-Control: no-store`.
+### Set up the owner login
+
+Install requirements, generate an independent signing key, and put it in `.env`
+as `SECRET_KEY` (keep it private; do not use your API key or bank token):
+
+```bash
+.venv/bin/pip install -r requirements.txt
+.venv/bin/python -c 'import secrets; print(secrets.token_hex(32))'
+.venv/bin/python -m flask db-upgrade
+.venv/bin/python -m flask owner-password
+```
+
+The owner command asks for a username and a password of at least 15 characters,
+with hidden password entry and confirmation. It stores a scrypt hash, never the
+password. Run it again to change/reset the password: this revokes all existing
+browser sessions. There is no public registration or email recovery.
+
+For **localhost HTTP development only**, launch with:
+
+```bash
+SESSION_COOKIE_SECURE=0 .venv/bin/python -m flask run --host 127.0.0.1
+```
+
+Visit `http://127.0.0.1:5000/dashboard`. The default `SESSION_COOKIE_SECURE=1`
+requires HTTPS; leaving it enabled on plain HTTP can prevent cookies from being
+sent and cause login to appear unsuccessful. Keep it enabled for tailnet hosting.
+
+Sessions expire after 30 minutes without an authenticated dashboard request or
+eight hours from sign-in. Logout revokes the current session in PostgreSQL, even
+if its old cookie is replayed. Only hashed session tokens are stored in the
+database. Login attempts are capped globally at 20 per fifteen-minute window;
+this deliberately works without trusting client IP headers from a proxy.
+The limit survives restarts and is shared by workers. A 429 response means wait
+fifteen minutes before retrying. Login/logout forms use CSRF tokens; future
+browser editing forms must include them too.
+
+### Host privately on your tailnet
+
+Run a production server bound to localhost, keeping `FLASK_DEBUG=0` and
+`SESSION_COOKIE_SECURE=1`:
+
+```bash
+.venv/bin/gunicorn --bind 127.0.0.1:5000 --workers 2 app:app
+```
+
+In another terminal on that host:
+
+```bash
+tailscale serve 5000
+```
+
+Open the HTTPS URL printed by Serve and append `/dashboard`. Serve handles TLS;
+the app keeps its own login and does not authenticate from proxy identity
+headers. No proxy middleware is needed for this setup. Limit dashboard access
+to your owner identity using tailnet policy rules, keep Funnel off, and keep
+PostgreSQL private. Use a service manager to keep Gunicorn and Serve running
+when deploying permanently. This repository does not change your tailnet policy
+or enable Serve for you. [Tailscale Serve documentation](https://tailscale.com/docs/features/tailscale-serve).
+
 
 ## PostgreSQL
 
@@ -242,10 +303,10 @@ is not deleted.
 Restart Flask, then start an import:
 
 ```bash
-curl --user api -X POST http://127.0.0.1:5000/sync/transactions
+curl -H "Authorization: Bearer $APP_API_KEY" -X POST http://127.0.0.1:5000/sync/transactions
 ```
 
-Enter `APP_API_KEY` at the password prompt. The first run discovers all accounts
+The first run discovers all accounts
 accessible to the token, their default categories, and active savings/spending
 spaces. It requests history from each account's `createdAt` to a fixed timestamp
 captured at the start of the run, following Starling's pagination cursors until
@@ -277,7 +338,7 @@ settled. If the checkpoint is almost a year old, or a change response has at lea
 To force a historical import from a chosen date:
 
 ```bash
-curl --user api -X POST http://127.0.0.1:5000/sync/transactions \
+curl -H "Authorization: Bearer $APP_API_KEY" -X POST http://127.0.0.1:5000/sync/transactions \
   -H 'Content-Type: application/json' \
   -d '{"mode":"history","start":"2020-01-01"}'
 ```
@@ -402,7 +463,7 @@ cashflow; it does not determine taxable income or deductible expenses.
 Example (replace the three UUID placeholders):
 
 ```bash
-curl --user api -X PUT \
+curl -H "Authorization: Bearer $APP_API_KEY" -X PUT \
   'http://127.0.0.1:5000/transactions/ACCOUNT_UUID/CATEGORY_UUID/FEED_ITEM_UUID/classification' \
   -H 'Content-Type: application/json' \
   -d '{"type":"internal_transfer","notes":"Transfer to my other bank account"}'
@@ -449,7 +510,7 @@ restore a non-income type.
 For roofing where deductions have not been confirmed:
 
 ```bash
-curl --user api --request PUT \
+curl -H "Authorization: Bearer $APP_API_KEY" --request PUT \
   'http://127.0.0.1:5000/transactions/ACCOUNT_UUID/CATEGORY_UUID/FEED_ITEM_UUID/income' \
   --header 'Content-Type: application/json' \
   --data '{"income_type":"roofing","tax_treatment":"unknown","source_name":"Roofing contractor"}'
@@ -685,7 +746,7 @@ Open `http://127.0.0.1:5000/starling/test` in a browser to run live read checks
 with `GET`. `POST /starling/test` runs the same checks and supports JSON options:
 
 ```bash
-curl --user api -X POST http://127.0.0.1:5000/starling/test
+curl -H "Authorization: Bearer $APP_API_KEY" -X POST http://127.0.0.1:5000/starling/test
 ```
 
 The report includes `summary` counts and one result per endpoint with `passed`,
