@@ -9,6 +9,11 @@
 <body>
     <header class="site-header">
         <a class="brand" href="{{ url_for('login.sign_in') if setup else url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+        {% if not setup %}
+        {% with navigation_page='settings', navigation_owner=true %}
+        {% include 'navigation.html' %}
+        {% endwith %}
+        {% endif %}
     </header>
     <main class="login-page">
         <div class="page-heading">
