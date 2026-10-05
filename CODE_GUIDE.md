@@ -81,9 +81,29 @@ Changing a label is a small first exercise. Adding a new stored income type also
 requires a new SQL migration because the database restricts allowed values.
 Applied migrations have checksums: add a new migration instead of editing an old one.
 
-For the first dashboard page, add `routes/dashboard.py`, a template under
-`templates/`, and CSS under `static/`, then register the blueprint in `app.py`.
-Those files are a next step; the dashboard has not been implemented yet.
+## Your first frontend edits
+
+The first page is available at `/dashboard`. The browser prompts for username
+`api` and your `APP_API_KEY` as the password. It reads saved transactions;
+categorisation editing will be a later step.
+
+Read its three files in this order:
+
+1. `routes/dashboard.py`: validates the page number, reads PostgreSQL, and
+   prepares plain display values. The numbered comments explain the flow.
+2. `templates/dashboard.html`: the HTML layout. `{{ ... }}` displays a value;
+   `{% for row in rows %}` repeats the table row for each payment.
+3. `static/css/dashboard.css`: colours, spacing, table styles, and mobile layout.
+
+Try changing “Transactions” in the template or `--accent` in the CSS.
+Reload the page to see your change. The stylesheet uses your system fonts and
+needs no build command. Restart Flask after Python edits when debug mode is off.
+
+`app.py` registers the dashboard blueprint and applies the same private-response
+headers as the API. `tests/test_dashboard.py` checks authentication, rendering,
+pagination, and safe failures. `static/js/balances.js` loads live account balances
+from `/dashboard/balances` after the table renders, then fills in the balance cards.
+That endpoint uses Starling's `balance:read` permission for each saved account.
 
 ## Check your changes
 
@@ -97,3 +117,18 @@ To run just the income tests, use `-p test_income.py`. To include the database
 tests after applying migrations, prefix the command with `RUN_POSTGRES_TESTS=1`.
 Their shared setup is explained at the top of `tests/support.py`; database
 changes made by those tests are rolled back.
+
+### Dashboard account selection
+
+The account dropdown automatically submits its form when changed, using
+`static/js/account-selector.js`. Without JavaScript, a View account button is
+available. The form submits a GET request with `account=<account UUID>`.
+`routes/dashboard.py` checks that the account exists and filters the transaction
+query. Pagination and the balance request retain that account ID. Switching via
+the dropdown omits `page`, so the new ledger starts on page one.
+
+This is a view preference stored in the URL, not a persistent setup setting.
+All accounts remains available. No transaction, classification or income data is
+changed. Importing accounts still uses the existing sync flow; the dropdown does
+not import or delete anything. First-run setup and remembered user preferences
+can build on this once session login is available.

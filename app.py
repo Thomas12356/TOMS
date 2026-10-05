@@ -9,6 +9,7 @@ from routes.starling import starling
 from routes.sync import sync
 from routes.transactions import transactions
 from routes.reports import reports
+from routes.dashboard import dashboard
 from services.web.auth import require_api_key
 from services.database.connection import check_database, db, init_database
 from models import Account, Category, Transaction, TransactionClassification, TransactionIncome, SyncRun, SyncTarget
@@ -25,6 +26,7 @@ app.register_blueprint(starling)
 app.register_blueprint(sync)
 app.register_blueprint(transactions)
 app.register_blueprint(reports)
+app.register_blueprint(dashboard)
 init_database(app)
 
 
@@ -42,8 +44,8 @@ def shell_context():
 
 @app.after_request
 def protect_banking_responses(response):
-    if (request.path.startswith(("/starling/", "/sync/", "/transactions/", "/reports/"))
-            or request.path in ("/health/db", "/transactions", "/reports")):
+    if (request.path.startswith(("/starling/", "/sync/", "/transactions/", "/reports/", "/dashboard/"))
+            or request.path in ("/health/db", "/transactions", "/reports", "/dashboard")):
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
     return response
