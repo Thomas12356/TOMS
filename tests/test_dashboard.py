@@ -14,6 +14,9 @@ from support import ApiTestCase
 
 def saved_payment(**changes):
     values = {
+        "account_uid": "11111111-1111-4111-8111-111111111111",
+        "category_uid": "22222222-2222-4222-8222-222222222222",
+        "feed_item_uid": "33333333-3333-4333-8333-333333333333",
         "transaction_time": datetime(2026, 10, 5, 12, tzinfo=timezone.utc),
         "counterparty_name": "Example shop", "reference": "Weekly supplies",
         "amount_minor": 1250, "currency": "GBP", "direction": "OUT",
@@ -34,6 +37,7 @@ def saved_page(items, *, number=1, total=1):
 class DashboardTests(ApiTestCase):
     def setUp(self):
         super().setUp()
+        self.enterContext(patch.dict(app.config, {"SECRET_KEY": "a" * 64, "SESSION_COOKIE_SECURE": False}))
         self.accounts = self.enterContext(patch.object(db.session, "scalars", return_value=[]))
         self.bank = self.enterContext(patch("services.banking.client.http_client.send",
             side_effect=AssertionError("The dashboard must not call Starling")))
@@ -116,7 +120,7 @@ class DashboardTests(ApiTestCase):
 
     def test_balances_require_authentication_and_head_does_not_call_bank(self):
         with patch.object(db.session, "scalars") as accounts, patch("routes.dashboard.starling_request") as bank:
-            self.assertEqual(self.client.get("/dashboard/balances").status_code, 503)
+            self.assertEqual(self.client.get("/dashboard/balances").status_code, 401)
             self.assertEqual(self.client.head("/dashboard/balances", headers=self.headers).status_code, 200)
             accounts.assert_not_called()
             bank.assert_not_called()

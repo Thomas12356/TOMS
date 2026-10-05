@@ -8,10 +8,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only, selectinload
 from werkzeug.exceptions import BadRequest, NotFound
 
-from models import Transaction, TransactionClassification, TransactionIncome
+from models import Transaction, TransactionIncome
 from routes.helpers import query_values
 from services.web.auth import require_api_key
-from services.transactions.classification import CLASSIFICATION_TYPES, classification_details, effective_type
+from services.transactions.classification import CLASSIFICATION_TYPES, classification_details, effective_type, save_classification, clear_classification as restore_classification
 from services.database.connection import db
 from services.error_logging import log_failure
 from services.transactions.income import INCOME_TYPES, TAX_TREATMENTS, income_body, income_details, validate_reconciliation
@@ -177,15 +177,10 @@ def put_classification(account_uid, category_uid, feed_item_uid):
     except ValueError as error:
         raise BadRequest(str(error)) from None
     transaction = saved_transaction(account_uid, category_uid, feed_item_uid, lock=True)
-    if transaction.direction not in CLASSIFICATION_TYPES[kind]["directions"]:
-        raise BadRequest("income requires IN; expense requires OUT.")
-    if transaction.income is not None and kind != "income":
-        raise BadRequest("Delete income details before changing this transaction to a different transfer type.")
-    if transaction.classification is None:
-        transaction.classification = TransactionClassification(type=kind, notes=notes)
-    else:
-        transaction.classification.type = kind
-        transaction.classification.notes = notes
+    try:
+        save_classification(transaction, kind, notes)
+    except ValueError as error:
+        raise BadRequest(str(error)) from None
     db.session.commit()
     return jsonify(classification=classification_details(transaction))
 
@@ -193,9 +188,10 @@ def put_classification(account_uid, category_uid, feed_item_uid):
 @transactions.delete(CLASSIFICATION_PATH)
 def clear_classification(account_uid, category_uid, feed_item_uid):
     transaction = saved_transaction(account_uid, category_uid, feed_item_uid, lock=True)
-    if transaction.income is not None and (transaction.direction != "IN" or transaction.source == "INTERNAL_TRANSFER"):
-        raise BadRequest("Delete income details before restoring a non-income automatic classification.")
-    transaction.classification = None
+    try:
+        restore_classification(transaction)
+    except ValueError as error:
+        raise BadRequest(str(error)) from None
     db.session.commit()
     return jsonify(classification=classification_details(transaction))
 

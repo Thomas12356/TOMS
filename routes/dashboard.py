@@ -1,21 +1,21 @@
-"""The first dashboard page: browse saved transactions, 50 at a time."""
+"""Browse saved transactions, view balances and edit local classifications."""
 
 import re
 from datetime import timezone
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, render_template, request, redirect, url_for, current_app
 from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only, selectinload
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, NotFound
 
 from models import Account, Transaction
 from routes.helpers import query_values
 from services.database.connection import db
 from services.error_logging import log_failure
-from services.transactions.classification import CLASSIFICATION_TYPES, classification_details
+from services.transactions.classification import CLASSIFICATION_TYPES, classification_details, save_classification, clear_classification
 from services.web.sessions import require_dashboard_login
-from services.validation import uid
+from services.validation import uid, optional_text
 from services.banking.client import StarlingError, starling_request
 
 
@@ -23,11 +23,12 @@ dashboard = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 dashboard.before_request(require_dashboard_login)
 
 
+@dashboard.errorhandler(NotFound)
 @dashboard.errorhandler(BadRequest)
 def invalid_request(error):
     if request.endpoint == "dashboard.account_balances":
         return jsonify(error=error.description), 400
-    return render_template("dashboard.html", error=error.description, page=None), 400
+    return render_template("dashboard.html", error=error.description, page=None), error.code
 
 
 @dashboard.errorhandler(SQLAlchemyError)
@@ -58,6 +59,14 @@ def requested_account(options):
         return uid(options["account"])
     except ValueError:
         raise BadRequest("account must be a valid account ID.") from None
+
+
+def requested_page(options):
+    """Keep pagination validation identical for the ledger and edit return links."""
+    value = options.get("page", "1")
+    if not re.fullmatch(r"[0-9]{1,10}", value) or not 1 <= int(value) <= 2**31 - 1:
+        raise BadRequest("page must be a positive integer up to 2147483647.")
+    return int(value)
 
 
 @dashboard.get("/balances")
@@ -104,9 +113,7 @@ def transactions_page():
     # 1. Read the requested page and reject invalid input before accessing PostgreSQL.
     options = query_values({"page", "account"})
     account_uid = requested_account(options)
-    page_number = options.get("page", "1")
-    if not re.fullmatch(r"[0-9]{1,10}", page_number) or not 1 <= int(page_number) <= 2**31 - 1:
-        raise BadRequest("page must be a positive integer up to 2147483647.")
+    page_number = requested_page(options)
 
     accounts = list(db.session.scalars(db.select(Account).options(
         load_only(Account.account_uid, Account.name, Account.currency)
@@ -125,7 +132,7 @@ def transactions_page():
                Transaction.category_uid, Transaction.feed_item_uid)
     if account_uid:
         query = query.where(Transaction.account_uid == account_uid)
-    page = db.paginate(query, page=int(page_number), per_page=50, error_out=False)
+    page = db.paginate(query, page=page_number, per_page=50, error_out=False)
 
     # 3. Give the template plain display values; database work stays in this route.
     rows = []
@@ -140,8 +147,67 @@ def transactions_page():
             "status": transaction.status,
             "classification": CLASSIFICATION_TYPES[classification["type"]]["label"],
             "origin": classification["origin"],
+            "edit_url": url_for("dashboard.edit_classification", account_uid=transaction.account_uid,
+                                category_uid=transaction.category_uid, feed_item_uid=transaction.feed_item_uid,
+                                account=account_uid, page=page_number),
         })
 
     return render_template("dashboard.html", page=page, rows=rows, error=None,
                            accounts=accounts, selected_account=selected_account, account_uid=account_uid,
                            current_user=current_user)
+
+
+@dashboard.route("/transactions/<uuid:account_uid>/<uuid:category_uid>/<uuid:feed_item_uid>/classification", methods=["GET", "POST"])
+def edit_classification(account_uid, category_uid, feed_item_uid):
+    if not current_app.secret_key or len(current_app.secret_key) < 32:
+        return render_template("dashboard.html", error="Set SECRET_KEY before using dashboard editing forms.", page=None), 503
+
+    # 1. Keep return navigation constrained to our dashboard, never arbitrary URLs.
+    options = query_values({"page", "account"})
+    selected_account = requested_account(options)
+    page_number = requested_page(options)
+    back_url = url_for("dashboard.transactions_page", account=selected_account, page=page_number)
+
+    # 2. Read the payment without its raw payload; lock the parent on saves.
+    query = db.select(Transaction).where(
+        Transaction.account_uid == str(account_uid), Transaction.category_uid == str(category_uid),
+        Transaction.feed_item_uid == str(feed_item_uid)).options(
+            load_only(Transaction.direction, Transaction.source, Transaction.amount_minor, Transaction.currency,
+                      Transaction.counterparty_name, Transaction.reference),
+            selectinload(Transaction.classification), selectinload(Transaction.income))
+    if request.method == "POST":
+        query = query.with_for_update(of=Transaction)
+    transaction = db.session.scalar(query)
+    if transaction is None:
+        raise NotFound("Saved transaction not found.")
+    details = classification_details(transaction)
+    kind, notes = details["type"], details["notes"] or ""
+    error = None
+
+    # 3. Validate the form and use the same rules as the JSON API.
+    if request.method == "POST":
+        kind, notes = request.form.get("type", ""), request.form.get("notes", "")
+        try:
+            if set(request.form) - {"csrf_token", "type", "notes", "action"} or any(len(request.form.getlist(key)) != 1 for key in request.form):
+                raise ValueError("Supply each form field once.")
+            action = request.form.get("action", "save")
+            if action == "automatic":
+                clear_classification(transaction)
+            elif action == "save":
+                clean_notes = optional_text(notes, field="notes", maximum=2000)
+                save_classification(transaction, kind, clean_notes)
+            else:
+                raise ValueError("Choose a valid action.")
+        except ValueError as invalid:
+            db.session.rollback()
+            error = str(invalid)
+        else:
+            db.session.commit()
+            return redirect(back_url, code=303)
+
+    choices = {key: value for key, value in CLASSIFICATION_TYPES.items()
+               if transaction.direction in value["directions"]}
+    return render_template("classification.html", transaction=transaction,
+                           amount=format_amount(transaction.amount_minor, transaction.currency),
+                           choices=choices, kind=kind, notes=notes, origin=details["origin"],
+                           back_url=back_url, error=error), 400 if error else 200

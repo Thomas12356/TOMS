@@ -16,6 +16,8 @@ from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
+from flask import g
+
 from app import app
 from models import Account, Category, Transaction
 from services.database.connection import db
@@ -33,6 +35,13 @@ class PostgreSQLTestCase(ApiTestCase):
     def setUp(self):
         super().setUp()
         self.enterContext(app.app_context())
+        # Real HTTP requests have fresh g state; our held app context needs
+        # these extension caches cleared between requests.
+        def clear_request_caches():
+            for key in ("_login_user", "csrf_token", "csrf_valid"):
+                g.pop(key, None)
+        app.before_request_funcs.setdefault(None, []).insert(0, clear_request_caches)
+        self.addCleanup(app.before_request_funcs[None].remove, clear_request_caches)
         self.engine = db.engine
         self.connection = self.engine.connect()
         self.addCleanup(self.connection.close)
@@ -42,7 +51,11 @@ class PostgreSQLTestCase(ApiTestCase):
         self.session = Session(bind=self.connection, join_transaction_mode="create_savepoint")
         self.addCleanup(self.session.close)
         # db.paginate calls the scoped session; other routes use its methods directly.
-        self.enterContext(patch.object(db, "session", Mock(return_value=self.session, wraps=self.session)))
+        session_proxy = Mock(return_value=self.session, wraps=self.session)
+        # Nested app contexts must not close the rollback-only fixture session.
+        # This fixture owns its lifetime through addCleanup(self.session.close).
+        session_proxy.remove = Mock()
+        self.enterContext(patch.object(db, "session", session_proxy))
         self.bank = self.enterContext(patch("services.banking.client.http_client.send",
             side_effect=AssertionError("Local database tests must not call Starling")))
 

@@ -34,3 +34,25 @@ def classification_details(transaction):
     else:
         inferred = "expense"
     return {"type": inferred, "origin": "automatic", "notes": None, "updated_at": None}
+
+
+def save_classification(transaction, kind, notes):
+    """Apply the same manual rules for API calls and dashboard forms."""
+    if kind not in CLASSIFICATION_TYPES:
+        raise ValueError("Choose a valid classification.")
+    if transaction.direction not in CLASSIFICATION_TYPES[kind]["directions"]:
+        raise ValueError("income requires IN; expense requires OUT.")
+    if transaction.income is not None and kind != "income":
+        raise ValueError("Delete income details before changing this transaction to a different transfer type.")
+    if transaction.classification is None:
+        transaction.classification = TransactionClassification(type=kind, notes=notes)
+    else:
+        transaction.classification.type = kind
+        transaction.classification.notes = notes
+
+
+def clear_classification(transaction):
+    """Restore bank inference without discarding incompatible income details."""
+    if transaction.income is not None and (transaction.direction != "IN" or transaction.source == "INTERNAL_TRANSFER"):
+        raise ValueError("Delete income details before restoring a non-income automatic classification.")
+    transaction.classification = None

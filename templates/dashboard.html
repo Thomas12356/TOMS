@@ -16,6 +16,7 @@
             <a href="{{ url_for('dashboard.transactions_page') }}" aria-current="page">Transactions</a>
         </nav>
         {% if not error and current_user.is_authenticated %}
+        <a class="settings-link" href="{{ url_for('login.change_password') }}">Password settings</a>
         <form class="logout-form" method="post" action="{{ url_for('login.sign_out') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit">Sign out</button>
@@ -67,7 +68,7 @@
                     <p class="classification-note">Classification describes the payment. It does not establish its tax treatment.</p>
                     <p>{{ "{:,}".format(page.total) }} saved transaction{{ '' if page.total == 1 else 's' }} · {{ (selected_account.name or 'Starling account') if selected_account else 'All accounts' }} · Dates in UTC</p>
                 </div>
-                <span class="read-only-label">Read-only view</span>
+                <span class="record-label">Local records</span>
             </div>
 
             {% if rows %}
@@ -96,6 +97,7 @@
                             <td>
                                 {{ row.classification }}
                                 <span class="secondary">{{ 'Manual' if row.origin == 'manual' else 'Automatic' }}</span>
+                                <a class="edit-classification" href="{{ row.edit_url }}">Edit classification</a>
                             </td>
                             <td class="amount {{ 'incoming' if row.direction == 'IN' else 'outgoing' }}">
                                 {{ '+' if row.direction == 'IN' else '−' }}{{ row.amount }}

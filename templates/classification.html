@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Edit classification · TOMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{{ back_url }}">TOMS<span>The Organised Money System</span></a>
+        <nav aria-label="Main navigation"><a href="{{ back_url }}">← Transactions</a></nav>
+    </header>
+    <main class="classification-page">
+        <div class="page-heading">
+            <p class="eyebrow">TOMS / CLASSIFICATION</p>
+            <h1>Edit classification</h1>
+            <p class="description">Classification describes the payment. It does not establish its tax treatment.</p>
+        </div>
+        <section class="payment-summary">
+            <h2>{{ transaction.counterparty_name or 'Unnamed payment' }}</h2>
+            <p class="amount">{{ '+' if transaction.direction == 'IN' else '−' }}{{ amount }}</p>
+            {% if transaction.reference %}<p class="secondary">{{ transaction.reference }}</p>{% endif %}
+            <p class="secondary">Current classification: {{ 'Manual' if origin == 'manual' else 'Automatic' }}</p>
+        </section>
+        {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+        <form class="login-form classification-form" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="type">Classification</label>
+            <select id="type" name="type" required>
+                {% for value, details in choices.items() %}
+                <option value="{{ value }}" {{ 'selected' if kind == value else '' }}>{{ details.label }}</option>
+                {% endfor %}
+            </select>
+            <label for="notes">Notes <span class="secondary">Optional · up to 2,000 characters</span></label>
+            <textarea id="notes" name="notes" rows="4" maxlength="2000">{{ notes }}</textarea>
+            <button type="submit" name="action" value="save">Save classification</button>
+            <button class="secondary-button" type="submit" name="action" value="automatic" formnovalidate>Use automatic classification</button>
+            <a href="{{ back_url }}">Cancel</a>
+        </form>
+    </main>
+</body>
+</html>
