@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Transactions · TOMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <script src="{{ url_for('static', filename='js/balances.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/account-selector.js') }}" defer></script>
+</head>
+<body>
+    <!-- Start here to change the page heading and introductory text. -->
+    <header class="site-header">
+        <a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+        <nav aria-label="Main navigation">
+            <a href="{{ url_for('dashboard.transactions_page') }}" aria-current="page">Transactions</a>
+        </nav>
+    </header>
+
+    <main>
+        <div class="page-heading">
+            <p class="eyebrow">TOMS / LEDGER</p>
+            <h1>Transactions</h1>
+            <p class="description">Local transaction ledger. Newest entries first.</p>
+        </div>
+
+        {% if error %}
+        <section class="message" role="alert">
+            <h2>We couldn't load this page</h2>
+            <p>{{ error }}</p>
+            <a href="{{ url_for('dashboard.transactions_page') }}">Try again</a>
+        </section>
+        {% else %}
+        <!-- GET filters the view. No page field means switching returns to page one. -->
+        <form class="account-selector" action="{{ url_for('dashboard.transactions_page') }}" method="get">
+            <label for="account">Account</label>
+            <select id="account" name="account">
+                <option value="all" {{ 'selected' if not account_uid else '' }}>All accounts</option>
+                {% for account in accounts %}
+                <option value="{{ account.account_uid }}" {{ 'selected' if account.account_uid == account_uid else '' }}>{{ account.name or 'Starling account' }} / {{ account.currency }}</option>
+                {% endfor %}
+            </select>
+            <noscript><button type="submit">View account</button></noscript>
+            <p class="secondary">Selecting an account reloads this page. All saved records are kept.</p>
+        </form>
+
+        <section class="balance-section" aria-labelledby="balance-heading">
+            <h2 id="balance-heading">Account balances</h2>
+            <p class="secondary">Live main-account balances from Starling.</p>
+            <div id="account-balances" class="balance-cards" aria-live="polite"
+                 data-url="{{ url_for('dashboard.account_balances', account=account_uid) }}">
+                <p>Loading balances…</p>
+            </div>
+            <noscript><p>Enable JavaScript to load live account balances.</p></noscript>
+        </section>
+
+        <section class="transactions-panel" aria-labelledby="table-heading">
+            <div class="panel-heading">
+                <div>
+                    <h2 id="table-heading">Transaction history</h2>
+                    <p class="classification-note">Classification describes the payment. It does not establish its tax treatment.</p>
+                    <p>{{ "{:,}".format(page.total) }} saved transaction{{ '' if page.total == 1 else 's' }} · {{ (selected_account.name or 'Starling account') if selected_account else 'All accounts' }} · Dates in UTC</p>
+                </div>
+                <span class="read-only-label">Read-only view</span>
+            </div>
+
+            {% if rows %}
+            <!-- The route supplies rows; this loop creates one table row per payment. -->
+            <div class="table-scroll" tabindex="0" role="region" aria-label="Transaction history table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">Date</th>
+                            <th scope="col">Payment</th>
+                            <th scope="col">Classification</th>
+                            <th scope="col" class="amount">Amount</th>
+                            <th scope="col">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                        <tr>
+                            <td class="date">{{ row.date }}</td>
+                            <td>
+                                <span class="payment-name">{{ row.counterparty }}</span>
+                                {% if row.reference %}
+                                <span class="secondary">{{ row.reference }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {{ row.classification }}
+                                <span class="secondary">{{ 'Manual' if row.origin == 'manual' else 'Automatic' }}</span>
+                            </td>
+                            <td class="amount {{ 'incoming' if row.direction == 'IN' else 'outgoing' }}">
+                                {{ '+' if row.direction == 'IN' else '−' }}{{ row.amount }}
+                            </td>
+                            <td>
+                                <span class="status">{{ row.status | replace('_', ' ') | title }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                {% if page.total == 0 %}
+                <h3>No saved transactions</h3>
+                <p>Import your Starling transactions to see them on this page.</p>
+                {% else %}
+                <h3>No transactions on this page</h3>
+                <p><a href="{{ url_for('dashboard.transactions_page', account=account_uid) }}">Return to the first page</a> to browse your saved payments.</p>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if page.pages > 0 %}
+            <nav class="pagination" aria-label="Transaction pages">
+                <span>Page {{ page.page }} of {{ page.pages }}</span>
+                <div>
+                    {% if page.has_prev %}
+                    <a href="{{ url_for('dashboard.transactions_page', account=account_uid, page=page.prev_num) }}" rel="prev">← Previous</a>
+                    {% endif %}
+                    {% if page.has_next %}
+                    <a href="{{ url_for('dashboard.transactions_page', account=account_uid, page=page.next_num) }}" rel="next">Next →</a>
+                    {% endif %}
+                </div>
+            </nav>
+            {% endif %}
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>

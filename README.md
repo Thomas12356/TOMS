@@ -6,8 +6,9 @@ an annual tax calculation. The goal is to make it clear where income came from,
 which records need attention, and how a tax estimate was calculated.
 
 **Current stage:** a working Flask JSON API with PostgreSQL storage and automated
-tests. Manual categorisation is available through the API. The web dashboard
-and annual tax calculator are planned and have not been implemented yet.
+tests and an initial transaction dashboard at `/dashboard`. Manual categorisation
+is available through the API; dashboard editing forms and the annual tax
+calculator are planned and have not been implemented yet.
 
 For a short map of the code and a walkthrough of an income edit, start with
 [Getting into the code](CODE_GUIDE.md).
@@ -37,6 +38,7 @@ withholding will be shown separately from calculated liability.
 | --- | --- |
 | Starling imports | Manual history imports and incremental updates, including active account spaces. |
 | Saved transactions | Filtered, paginated reads from PostgreSQL without contacting Starling. |
+| Transaction dashboard | An authenticated, read-only HTML table with pagination and existing classifications. |
 | Manual categorisation | Choose income, expense, internal transfer, refund, or other; add notes. |
 | Income records | Record source, gross amount, deductions, adjustments, and confirmed tax treatment. |
 | Review flags | Relevant bank corrections flag income details for review while preserving manual entries. |
@@ -50,8 +52,8 @@ does not automatically establish its tax treatment.
 
 ## Next milestones
 
-1. **Transaction dashboard:** a Flask/Jinja page for browsing and filtering saved
-   payments, with small HTMX enhancements where useful.
+1. **Transaction dashboard:** the first Flask/Jinja page is implemented; add
+   filters next, with small HTMX enhancements where useful.
 2. **Income review:** manual categorisation forms and a queue for unclassified,
    incomplete, or flagged incoming payments.
 3. **Complete income inputs:** record income outside the connected account and
@@ -64,6 +66,30 @@ does not automatically establish its tax treatment.
 Each milestone should be delivered as small, understandable changes, with
 focused commits and explanations of the files involved. Browser authentication
 and protection for editing forms belong with the dashboard work.
+
+## Open the dashboard
+
+With Flask running, visit `http://127.0.0.1:5000/dashboard`. Use username `api`
+and your `APP_API_KEY` as the password at the browser prompt. This first page
+uses the existing API authentication; a dedicated login page is a later step.
+
+The page shows 50 saved transactions at a time across all accounts, newest
+first, including manual or automatic classifications. Dates display in UTC.
+The transaction table reads PostgreSQL. Live main-account balances load
+separately from Starling above the table, using `balance:read` permission.
+Each saved account gets its own balance card; a failed balance request leaves
+the table usable. Reloading the page requests fresh balances.
+If no transactions are saved,
+use the manual sync endpoint described below, then reload the page.
+
+The dashboard's **Account** dropdown filters transactions and live balances to
+one saved account. Switching returns to page one and preserves all saved records.
+Choose **All accounts** to view the combined ledger. Selection stays in the URL;
+it is not yet a saved first-run preference or a tax-report inclusion setting.
+
+Layout lives in `templates/dashboard.html`; styling lives in
+`static/css/dashboard.css`. See the frontend walkthrough in
+[CODE_GUIDE.md](CODE_GUIDE.md) for small edits you can make yourself.
 
 ## Local setup
 
@@ -113,6 +139,8 @@ WSGI server if you deploy beyond your local machine.
 app.py                      Flask setup, route registration, health checks, CLI
 models.py                   Database tables and relationships
 routes/                     HTTP inputs, endpoint handlers, JSON responses
+templates/dashboard.html    First dashboard page layout
+static/css/dashboard.css    Dashboard colours, spacing, and mobile styles
 services/                   Business rules, bank client, sync and database logic
     banking/                Starling client, feed parsing, diagnostics, rate limits
     transactions/           Classification, income rules, sync orchestration, storage
@@ -154,7 +182,7 @@ requires a new migration because the database restricts allowed values.
 
 ## Caller authentication
 
-All `/starling`, `/sync`, `/transactions`, and `/reports` endpoints, plus
+All `/starling`, `/sync`, `/transactions`, `/reports`, and `/dashboard` endpoints, plus
 `/health/db`, require `APP_API_KEY`. This is a different credential from
 `STARLING_ACCESS_TOKEN`: the bank token stays on the server.
 
