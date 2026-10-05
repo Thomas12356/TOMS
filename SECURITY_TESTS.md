@@ -1,6 +1,6 @@
 # Security checks — 5 October 2026
 
-The full suite passed: **177 tests**, with PostgreSQL checks enabled. This
+The full suite passed: **195 tests**, with PostgreSQL checks enabled. This
 includes **24 adversarial tests** in `tests/test_security.py`, plus the
 existing login, API protection, request-boundary and bank-client tests.
 Ten classification-form tests also cover saves, automatic reset, income
@@ -106,7 +106,7 @@ and specifies 08:00/20:00 Europe/London. A live scheduled bank import has not be
 
 ## Mobile UI and latest changes — 5 October 2026
 
-- The full PostgreSQL suite passed: **177 tests**. New cases exercise signed
+- The full PostgreSQL suite passed: **195 tests**. New cases exercise signed
   currency totals, unavailable balances, UTC day labels, configurable server
   binding, the exact 60-second freshness boundary and preserving the last
   successful timestamp after a failure.
@@ -139,3 +139,83 @@ Chromium also needs its native Linux libraries. In this environment those were
 extracted into `/tmp/toms-browser-libs/root` without changing system packages;
 the successful run additionally used
 `LD_LIBRARY_PATH=/tmp/toms-browser-libs/root/usr/lib/x86_64-linux-gnu`.
+
+## Live bank verification — 5 October 2026
+
+The real `sync-transactions` command and a manually triggered
+`toms-sync.service` both completed successfully with the configured bank token.
+Each completed one account/category target, received zero new items and changed
+zero rows. The ledger remained at 19 transactions, with all four manual
+classifications unchanged and no duplicate transaction identifiers. There were
+no income-detail records in this live dataset, so preservation of those records
+continues to be established by the isolated tests rather than this live run.
+
+The dashboard rendered successfully, `/dashboard/sync-status` returned the
+successful full-import timestamp, and real balance requests returned complete
+all-account totals for the one accessible account. No credential values,
+transaction descriptions or balance amounts were printed during verification.
+
+The user timer remains enabled/active for 08:00 and 20:00 Europe/London and the
+service exited with status 0. User lingering is enabled so the timer can run
+after logout. This verifies the actual scheduled service command, but an
+08:00/20:00 clock-triggered execution was not observed during this session.
+No newly occurring bank payment was available, so event-to-ledger latency was
+not measured. Live browser authentication over tailnet HTTPS also remains a
+separate deployment check.
+
+## Transaction confirmation
+
+Five new PostgreSQL tests cover explicit confirmation and idempotent retries,
+account-scoped pending lists, missing CSRF/API-key rejection, stale-detail
+conflicts, re-review after classification edits and invalid version input.
+A sync test also verifies identical bank data preserves confirmation while a
+pending-to-settled update clears it. Browser coverage now includes dismissing
+the mobile popup without confirming, reopening it, individually confirming each
+record and updating the visible ledger labels. The initial feature suite contained 183
+passing tests; the deeper review below expands it to 195. Migration 008 adds nullable confirmation
+storage and a partial index for unconfirmed transactions; existing records are
+initially unconfirmed.
+
+## Deeper confirmation review — 5 October 2026
+
+The full suite passed **195 tests** with PostgreSQL enabled. Fifteen dedicated
+review tests now cover anonymous/expired sessions, CSRF, malformed requests,
+missing records, stale versions, record-specific fingerprints, income currency,
+income API edits/deletion, account/page context, persistence in another client
+and rollback after failed confirmation commits. Two additional concurrent tests
+use disposable PostgreSQL schemas: simultaneous confirmations remain idempotent,
+and a bank correction waits for the confirmation lock then clears confirmation.
+No live owner records are changed by these tests.
+
+`tests/review_browser_checks.py` adds Chromium scenarios at 320, 390 and 1280px:
+close/Escape, reopening, long text and modal bounds, HTML escaping, stale-detail
+conflicts, server failures, duplicate clicks, closing during an in-flight save,
+next-list failures after a successful save, empty lists, retry controls, login
+redirects and responses without explicit confirmation acknowledgement.
+The broader five-width layout checks also remain in `tests/browser_checks.py`.
+Both use synthetic bank data and intercepted requests.
+
+Issues fixed during this review:
+
+- Closing during an in-flight confirmation could reopen the next review. The
+  user's dismissal is now retained for the current page.
+- Income amounts could be labelled with the current bank currency after a
+  currency correction. They now use their recorded income currency.
+- Failed loading after a saved confirmation could leave the old confirm action
+  enabled. The UI now disables it and offers an explicit retry for the next list.
+- An expired session's login redirect could be mistaken for success. Browser
+  JSON endpoints return 401, and the UI rejects redirects and requires the exact
+  acknowledgement `confirmed: true` before changing a ledger label.
+- Fingerprints now bind to the transaction identity so two otherwise identical
+  payments cannot share a confirmation version.
+
+Ruff, whitespace checks and the application Bandit scan passed with no findings.
+A read-only call loaded the real 19 pending transactions and verified that their
+confirmation count was unchanged. This is tested behaviour rather than a proof
+that every possible browser, network or deployment condition is bug-free.
+
+To run the additional browser checks with the existing temporary installation:
+
+```bash
+LD_LIBRARY_PATH=/tmp/toms-browser-libs/root/usr/lib/x86_64-linux-gnu PYTHONPATH=/tmp/toms-browser-check .venv/bin/python tests/review_browser_checks.py
+```

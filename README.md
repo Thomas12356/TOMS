@@ -956,3 +956,19 @@ port 5000 from another device. For a plain HTTP development session, run
 `SESSION_COOKIE_SECURE=0 .venv/bin/python -m flask run`; secure cookies require
 HTTPS for login over a LAN address. Keep secure cookies enabled with Tailscale
 Serve HTTPS. An explicit `--host` or Gunicorn `--bind` overrides this setting.
+
+## Confirming imported transactions
+
+Opening the ledger shows a dismissible review popup when the selected account
+view has unconfirmed transactions, including those on other pages. Review each
+transaction and choose **Confirm details**, or edit its classification first.
+Closing the popup or pressing Escape leaves everything unconfirmed; use
+**Review transactions** to reopen it. The table separately labels owner review
+as **Confirmed** or **Unconfirmed**, alongside the bank's payment status.
+
+Existing transactions also begin unconfirmed when migration 008 is applied.
+Confirmation is saved in PostgreSQL. Changes to important bank details, including
+pending/settled status, and edits to classification or income details require
+confirmation again. Identical syncs preserve it. Confirmation does not establish
+tax treatment. If details change while the popup is open, it refreshes them and
+requires another review before accepting confirmation.

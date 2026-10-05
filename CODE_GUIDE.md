@@ -202,3 +202,10 @@ controls are in `static/js/transaction-sync.js`. The `sync-transactions` Flask
 command reuses the importer for the systemd timer installed by
 `deployment/install_sync_timer.py`. The one-minute freshness check runs inside
 the existing PostgreSQL import lock in `run_sync()`.
+
+Transaction confirmation is separate from bank status: `confirmed_at` lives on
+`Transaction`. `routes/review.py` lists unconfirmed records and saves a browser
+owner's confirmation. `services/transactions/review.py` fingerprints the reviewed
+details so stale popups cannot confirm changed records. The popup behaviour is
+in `static/js/transaction-review.js`, and its markup/styles share the dashboard.
+The importer and classification/income edits clear confirmation when details change.
