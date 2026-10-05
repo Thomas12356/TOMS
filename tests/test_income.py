@@ -1,26 +1,19 @@
 """Income annotations, validation and rollback-only persistence checks."""
 
-import os
-import unittest
 from datetime import timedelta
 from unittest.mock import patch
 from uuid import uuid4
 
-from app import app
 from models import Transaction
 from services.database import db
 from services.starling_feed import normalize_feed_item
 from services.sync_store import SyncStore
-import test_classification as classification_tests
+from support import ApiTestCase, SavedTransactionTestCase
 
 
-class IncomeProtectionTests(unittest.TestCase):
+class IncomeProtectionTests(ApiTestCase):
     def setUp(self):
-        config = patch.dict(app.config, {"APP_API_KEY": "test-key"})
-        config.start()
-        self.addCleanup(config.stop)
-        self.client = app.test_client()
-        self.headers = {"Authorization": "Bearer test-key"}
+        super().setUp()
         self.path = "/transactions/" + "/".join(str(uuid4()) for _ in range(3)) + "/income"
 
     def test_auth_and_discovery(self):
@@ -66,10 +59,7 @@ class IncomeProtectionTests(unittest.TestCase):
             paginate.assert_not_called()
 
 
-@unittest.skipUnless(os.getenv("RUN_POSTGRES_TESTS") == "1", "Set RUN_POSTGRES_TESTS=1 for rollback-only tests.")
-class PostgreSQLIncomeTests(unittest.TestCase):
-    setUp = classification_tests.PostgreSQLClassificationTests.setUp
-
+class PostgreSQLIncomeTests(SavedTransactionTestCase):
     def path(self, item=None):
         return f"/transactions/{self.account}/{self.category}/{item or self.incoming}/income"
 

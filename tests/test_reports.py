@@ -1,27 +1,19 @@
 """Monthly report protections and rollback-only PostgreSQL aggregation checks."""
 
-import os
 import unittest
 from datetime import datetime
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from uuid import uuid4
 
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
 
 from app import app
 from models import Account, Category, Transaction
 from services.database import db
+from support import ApiTestCase, PostgreSQLTestCase
 
 
-class ReportProtectionTests(unittest.TestCase):
-    def setUp(self):
-        config = patch.dict(app.config, {"APP_API_KEY": "test-key"})
-        config.start()
-        self.addCleanup(config.stop)
-        self.client = app.test_client()
-        self.headers = {"Authorization": "Bearer test-key"}
-
+class ReportProtectionTests(ApiTestCase):
     def test_authentication_precedes_database_access(self):
         with patch.object(db.session, "execute") as execute:
             response = self.client.get("/reports/monthly?month=2000-02")
@@ -60,29 +52,9 @@ class ReportProtectionTests(unittest.TestCase):
         self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
 
 
-@unittest.skipUnless(os.getenv("RUN_POSTGRES_TESTS") == "1", "Set RUN_POSTGRES_TESTS=1 for rollback-only database tests.")
-class PostgreSQLReportTests(unittest.TestCase):
+class PostgreSQLReportTests(PostgreSQLTestCase):
     def setUp(self):
-        context = app.app_context()
-        context.push()
-        self.addCleanup(context.pop)
-        connection = db.engine.connect()
-        self.addCleanup(connection.close)
-        outer = connection.begin()
-        self.addCleanup(outer.rollback)
-        self.session = Session(bind=connection, join_transaction_mode="create_savepoint")
-        self.addCleanup(self.session.close)
-        session_patch = patch.object(db, "session", Mock(return_value=self.session, wraps=self.session))
-        session_patch.start()
-        self.addCleanup(session_patch.stop)
-        config = patch.dict(app.config, {"APP_API_KEY": "test-key"})
-        config.start()
-        self.addCleanup(config.stop)
-        bank = patch("services.starling.http_client.send", side_effect=AssertionError("Reports must not call Starling"))
-        self.bank = bank.start()
-        self.addCleanup(bank.stop)
-        self.client = app.test_client()
-        self.headers = {"Authorization": "Bearer test-key"}
+        super().setUp()
         self.account, self.other, self.main, self.space = (str(uuid4()) for _ in range(4))
         self.session.add_all([
             Account(account_uid=self.account, default_category_uid=self.main, currency="GBP", raw_payload={}),

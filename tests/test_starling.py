@@ -5,7 +5,7 @@ from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 
 from app import app
-from services.starling import StarlingError, starling_request
+from services.starling import starling_request
 
 
 ACCOUNT = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa"

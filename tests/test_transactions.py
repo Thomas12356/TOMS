@@ -1,27 +1,19 @@
 """Validation tests and opt-in rollback-only PostgreSQL browsing tests."""
 
-import os
 import unittest
 from datetime import datetime, timezone
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 from uuid import uuid4
 
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
 
 from app import app
 from models import Account, Category, Transaction
 from services.database import db
+from support import ApiTestCase, PostgreSQLTestCase
 
 
-class TransactionProtectionTests(unittest.TestCase):
-    def setUp(self):
-        config = patch.dict(app.config, {"APP_API_KEY": "test-key"})
-        config.start()
-        self.addCleanup(config.stop)
-        self.client = app.test_client()
-        self.headers = {"Authorization": "Bearer test-key"}
-
+class TransactionProtectionTests(ApiTestCase):
     def test_authentication_precedes_database_access(self):
         with patch.object(db, "paginate") as paginate:
             self.assertEqual(self.client.get("/transactions").status_code, 401)
@@ -63,30 +55,9 @@ class TransactionProtectionTests(unittest.TestCase):
         self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
 
 
-@unittest.skipUnless(os.getenv("RUN_POSTGRES_TESTS") == "1", "Set RUN_POSTGRES_TESTS=1 for rollback-only database tests.")
-class PostgreSQLTransactionTests(unittest.TestCase):
+class PostgreSQLTransactionTests(PostgreSQLTestCase):
     def setUp(self):
-        context = app.app_context()
-        context.push()
-        self.addCleanup(context.pop)
-        connection = db.engine.connect()
-        self.addCleanup(connection.close)
-        outer = connection.begin()
-        self.addCleanup(outer.rollback)
-        self.session = Session(bind=connection, join_transaction_mode="create_savepoint")
-        self.addCleanup(self.session.close)
-        # db.paginate uses the scoped session's callable interface.
-        session_patch = patch.object(db, "session", Mock(return_value=self.session))
-        session_patch.start()
-        self.addCleanup(session_patch.stop)
-        config = patch.dict(app.config, {"APP_API_KEY": "test-key"})
-        config.start()
-        self.addCleanup(config.stop)
-        bank = patch("services.starling.http_client.send", side_effect=AssertionError("Browsing must not call Starling"))
-        self.bank = bank.start()
-        self.addCleanup(bank.stop)
-        self.client = app.test_client()
-        self.headers = {"Authorization": "Bearer test-key"}
+        super().setUp()
         self.account, self.other_account, self.category = str(uuid4()), str(uuid4()), str(uuid4())
         for account in (self.account, self.other_account):
             self.session.add(Account(account_uid=account, default_category_uid=self.category,
