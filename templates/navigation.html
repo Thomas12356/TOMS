@@ -1,4 +1,7 @@
-<nav aria-label="Main navigation">
+<button type="button" class="navigation-toggle" id="navigation-toggle" aria-label="Toggle navigation" aria-controls="main-navigation" aria-expanded="false" hidden>
+    <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+</button>
+<nav id="main-navigation" class="main-navigation" aria-label="Main navigation">
     <a href="{{ url_for('dashboard.transactions_page') }}"{% if navigation_page == 'transactions' %} aria-current="page"{% endif %}>Transactions</a>
     {% if navigation_owner %}
     <a href="{{ url_for('login.change_password') }}"{% if navigation_page == 'settings' %} aria-current="page"{% endif %}>Password settings</a>
@@ -8,3 +11,5 @@
     </form>
     {% endif %}
 </nav>
+
+<script src="{{ url_for('static', filename='js/navigation.js') }}" defer></script>

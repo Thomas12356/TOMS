@@ -1,0 +1,6 @@
+{% macro classification_tip(identifier) -%}
+<span class="classification-help">
+    <button type="button" class="tip-trigger" aria-label="About classification" aria-describedby="{{ identifier }}"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6"/><circle cx="12" cy="7" r=".8" fill="currentColor" stroke="none"/></svg></button>
+    <span class="classification-tooltip" id="{{ identifier }}" role="tooltip">Classification describes the payment. It does not establish its tax treatment.</span>
+</span>
+{%- endmacro %}

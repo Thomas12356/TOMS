@@ -1,7 +1,7 @@
 """Browse saved transactions, view balances and edit local classifications."""
 
 import re
-from datetime import timezone
+from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, current_app
 from flask_login import current_user
@@ -153,11 +153,14 @@ def transactions_page():
 
     # 3. Give the template plain display values; database work stays in this route.
     rows = []
+    today = datetime.now(timezone.utc).date()
     for number, transaction in enumerate(page.items, start=(page_number - 1) * 50 + 1):
         classification = classification_details(transaction)
+        transaction_date = transaction.transaction_time.astimezone(timezone.utc)
         rows.append({
             "number": number,
-            "date": transaction.transaction_time.astimezone(timezone.utc).strftime("%d %b %Y"),
+            "date": transaction_date.strftime("%d %b %Y"),
+            "day": "Today" if transaction_date.date() == today else transaction_date.strftime("%A"),
             "counterparty": transaction.counterparty_name or "Unnamed payment",
             "reference": transaction.reference,
             "amount": format_amount(transaction.amount_minor, transaction.currency),
