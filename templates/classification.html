@@ -15,7 +15,6 @@
         <div class="page-heading">
             <p class="eyebrow">TOMS / CLASSIFICATION</p>
             <h1>Edit classification</h1>
-            <p class="description">Classification describes the payment. It does not establish its tax treatment.</p>
         </div>
         <section class="payment-summary">
             <h2>{{ transaction.counterparty_name or 'Unnamed payment' }}</h2>
@@ -26,6 +25,7 @@
         {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
         <form class="login-form classification-form" method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <p class="classification-explanation">Classification describes the payment. It does not establish its tax treatment.</p>
             <label for="type">Classification</label>
             <select id="type" name="type" required>
                 {% for value, details in choices.items() %}

@@ -10,6 +10,8 @@
     <script src="{{ url_for('static', filename='js/transaction-sync.js') }}" defer></script>
 </head>
 <body class="ledger-page">
+    {% from "classification_tip.html" import classification_tip %}
+    {% from "icons.html" import sync_icon %}
     <!-- Start here to change the page heading and introductory text. -->
     <header class="site-header">
         <a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
@@ -46,8 +48,15 @@
         </form>
 
         <section class="balance-section" aria-labelledby="balance-heading">
-            <h2 id="balance-heading">Account balances</h2>
-            <p class="secondary">Live main-account balances from Starling.</p>
+            <div class="balance-heading">
+                <div>
+                    <h2 id="balance-heading">Account balances</h2>
+                    <p class="secondary">Live main-account balances from Starling.</p>
+                </div>
+                {% if current_user.is_authenticated %}
+                <button type="button" class="sync-button" data-sync-now title="Syncs transactions from your bank account provider." aria-description="Syncs transactions from your bank account provider.">{{ sync_icon() }}<span>Sync now</span></button>
+                {% endif %}
+            </div>
             <div id="account-balances" class="balance-cards" aria-live="polite"
                  data-url="{{ url_for('dashboard.account_balances', account=account_uid) }}">
                 <p>Loading balances…</p>
@@ -58,15 +67,13 @@
         <section class="transactions-panel" aria-labelledby="table-heading">
             <div class="panel-heading">
                 <div>
-                    <h2 id="table-heading">Transaction history</h2>
-                    <p class="classification-note">Classification describes the payment. It does not establish its tax treatment.</p>
+                    <h2 id="table-heading">Transaction History</h2>
                     <p>{{ "{:,}".format(page.total) }} saved transaction{{ '' if page.total == 1 else 's' }} · {{ (selected_account.name or 'Starling account') if selected_account else 'All accounts' }} · Dates in UTC</p>
                 </div>
                 <div class="ledger-controls">
-                    <span class="record-label">Local records</span>
                     {% if current_user.is_authenticated %}
                     <div class="sync-controls" data-sync-url="{{ url_for('dashboard.trigger_sync') }}" data-status-url="{{ url_for('dashboard.sync_status') }}" data-csrf="{{ csrf_token() }}">
-                        <button type="button" id="sync-now">Sync now</button>
+                        <button type="button" id="sync-now" data-sync-now title="Syncs transactions from your bank account provider." aria-description="Syncs transactions from your bank account provider.">{{ sync_icon() }}<span>Sync now</span></button>
                     </div>
                     {% endif %}
                 </div>
@@ -75,37 +82,38 @@
             {% if rows %}
             <!-- The route supplies rows; this loop creates one table row per payment. -->
             <div class="table-scroll" tabindex="0" role="region" aria-label="Transaction history table">
-                <table>
-                    <thead>
-                        <tr>
-                            <th scope="col" class="row-number" aria-label="Row number">#</th>
-                            <th scope="col">Date</th>
-                            <th scope="col">Payment</th>
-                            <th scope="col">Classification</th>
-                            <th scope="col" class="amount">Amount</th>
-                            <th scope="col">Status</th>
+                <table class="transaction-ledger" role="table">
+                    <thead role="rowgroup">
+                        <tr role="row">
+                            <th role="columnheader" scope="col" class="row-number" aria-label="Row number">#</th>
+                            <th role="columnheader" scope="col">Date</th>
+                            <th role="columnheader" scope="col">Payment</th>
+                            <th role="columnheader" scope="col">Classification {{ classification_tip("classification-tip") }}</th>
+                            <th role="columnheader" scope="col" class="amount">Amount</th>
+                            <th role="columnheader" scope="col">Status</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody role="rowgroup">
                         {% for row in rows %}
-                        <tr class="{{ 'transaction-in' if row.direction == 'IN' else 'transaction-out' }}">
-                            <td class="row-number">{{ row.number }}</td>
-                            <td class="date">{{ row.date }}</td>
-                            <td>
+                        <tr role="row" class="{{ 'transaction-in' if row.direction == 'IN' else 'transaction-out' }}">
+                            <td role="cell" class="row-number" data-label="Row">{{ row.number }}</td>
+                            <td role="cell" class="date" data-label="Date"><span class="transaction-day">{{ row.day }}</span>{{ row.date }}</td>
+                            <td role="cell" class="payment-cell" data-label="Payment">
                                 <span class="payment-name">{{ row.counterparty }}</span>
                                 {% if row.reference %}
                                 <span class="secondary">{{ row.reference }}</span>
                                 {% endif %}
                             </td>
-                            <td>
-                                {{ row.classification }}
-                                <span class="secondary">{{ 'Manual' if row.origin == 'manual' else 'Automatic' }}</span>
+                            <td role="cell" class="classification-cell" data-label="Classification">
+                                <span class="mobile-classification-tip">{{ classification_tip("classification-tip-" ~ row.number) }}</span>
+                                <span class="classification-value">{{ row.classification }}</span>
+                                <span class="secondary classification-origin">{{ 'Manual' if row.origin == 'manual' else 'Automatic' }}</span>
                                 <a class="edit-classification{{ ' is-manual' if row.origin == 'manual' else '' }}" href="{{ row.edit_url }}">Edit classification</a>
                             </td>
-                            <td class="amount {{ 'incoming' if row.direction == 'IN' else 'outgoing' }}">
+                            <td role="cell" data-label="Amount" class="amount {{ 'incoming' if row.direction == 'IN' else 'outgoing' }}">
                                 {{ '+' if row.direction == 'IN' else '−' }}{{ row.amount }}
                             </td>
-                            <td>
+                            <td role="cell" class="status-cell" data-label="Status">
                                 <span class="status">{{ row.status | replace('_', ' ') | title }}</span>
                             </td>
                         </tr>

@@ -2,7 +2,7 @@
 (() => {
     const controls = document.querySelector('.sync-controls');
     if (!controls) return;
-    const button = document.getElementById('sync-now');
+    const buttons = document.querySelectorAll('[data-sync-now]');
     const message = document.getElementById('sync-message');
     const timestamp = document.getElementById('last-synced');
     let busy = false;
@@ -24,7 +24,7 @@
     async function sync(force) {
         if (busy) return;
         busy = true;
-        button.disabled = true;
+        buttons.forEach(button => { button.disabled = true; });
         try {
             const before = await status();
             if (!force && before?.status === 'completed' && Date.now() - Date.parse(before.finished_at) < 60000) {
@@ -57,9 +57,9 @@
             message.textContent = error.message;
         } finally {
             busy = false;
-            button.disabled = false;
+            buttons.forEach(button => { button.disabled = false; });
         }
     }
-    button.addEventListener('click', () => sync(true));
+    buttons.forEach(button => button.addEventListener('click', () => sync(true)));
     sync(false);
 })();
