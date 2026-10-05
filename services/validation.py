@@ -33,8 +33,6 @@ def money(value):
     return amount, currency.upper()
 
 
-
-
 def optional_text(value, *, field, maximum):
     """Validate optional user text before PostgreSQL receives it."""
     if value is None:

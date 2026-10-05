@@ -31,7 +31,7 @@ class InputValidationTests(unittest.TestCase):
 
     def test_out_of_range_utc_timestamps_are_validation_errors(self):
         invalid = ("0001-01-01T00:00:00+01:00", "9999-12-31T23:59:59-01:00")
-        with patch("routes.sync.store") as store, patch("routes.starling.starling_request") as bank:
+        with patch("routes.sync.SyncStore") as store, patch("routes.starling.starling_request") as bank:
             for value in invalid:
                 with self.subTest(value=value):
                     with self.assertRaises(ValueError):
@@ -73,7 +73,7 @@ class InputValidationTests(unittest.TestCase):
     def test_exact_size_streamed_body_is_not_rejected_or_truncated(self):
         body = b'{"mode":"history"}'
         with patch.dict(app.config, {"MAX_CONTENT_LENGTH": len(body)}), \
-                patch("routes.sync.store"), \
+                patch("routes.sync.SyncStore"), \
                 patch("routes.sync.run_sync", return_value={"status": "completed"}) as run:
             for streamed in (False, True):
                 if streamed:
@@ -89,7 +89,7 @@ class InputValidationTests(unittest.TestCase):
     def test_request_size_cap_rejects_declared_and_streamed_bodies(self):
         self.assertEqual(app.config["MAX_CONTENT_LENGTH"], 1024 * 1024)
         with patch.dict(app.config, {"MAX_CONTENT_LENGTH": 128}), \
-                patch("routes.sync.store") as store, \
+                patch("routes.sync.SyncStore") as store, \
                 patch("routes.transactions.saved_transaction") as lookup, \
                 patch("routes.starling.starling_request") as bank:
             body = b'{"padding":"' + b"x" * 200 + b'"}'
@@ -144,7 +144,7 @@ class ErrorLoggingTests(unittest.TestCase):
             for target, path in (("app.check_database", "/health/db"),
                                  ("routes.transactions.db.paginate", "/transactions"),
                                  ("routes.reports.db.session.execute", "/reports/monthly?month=2000-02"),
-                                 ("routes.sync.store", "/sync/runs")):
+                                 ("routes.sync.SyncStore", "/sync/runs")):
                 with self.subTest(path=path), patch(target, side_effect=error), self.assertLogs("toms.errors") as logs:
                     response = client.get(path, headers=headers)
                     self.assertEqual(response.status_code, 503)

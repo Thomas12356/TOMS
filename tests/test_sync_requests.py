@@ -21,7 +21,7 @@ class SyncRequestTests(unittest.TestCase):
                                                         "wsgi.input": io.BytesIO(body)})
 
     def test_streamed_options_are_forwarded_and_empty_body_uses_defaults(self):
-        with patch("routes.sync.store"), patch("routes.sync.run_sync", return_value={"status": "completed"}) as run:
+        with patch("routes.sync.SyncStore"), patch("routes.sync.run_sync", return_value={"status": "completed"}) as run:
             response = self.streamed_post(b'{"start":"2026-09-01","mode":"history"}')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(run.call_args.args[1], {"start": "2026-09-01", "mode": "history"})
@@ -31,7 +31,7 @@ class SyncRequestTests(unittest.TestCase):
                 self.assertEqual(run.call_args.args[1], {})
 
     def test_invalid_streamed_bodies_never_start_sync(self):
-        with patch("routes.sync.store") as store, patch("routes.sync.run_sync") as run:
+        with patch("routes.sync.SyncStore") as store, patch("routes.sync.run_sync") as run:
             for body, content_type in ((b'{"start":"2026-09-01"}', "text/plain"),
                                        (b"{broken", "application/json"),
                                        (b"null", "application/json"),

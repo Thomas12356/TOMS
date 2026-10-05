@@ -141,7 +141,7 @@ class PostgreSQLSyncTests(unittest.TestCase):
         report = self.import_rows([normalize_feed_item(feed_item(), ACCOUNT, CATEGORY)])
         client = app.test_client()
         with patch.dict(app.config, {"APP_API_KEY": "test-key"}):
-            with patch("routes.sync.store", return_value=self.store):
+            with patch("routes.sync.SyncStore", return_value=self.store):
                 headers = {"Authorization": "Bearer test-key"}
                 response = client.get("/sync/runs/" + report["run_uid"], headers=headers)
                 recent = client.get("/sync/runs", headers=headers)

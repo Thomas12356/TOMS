@@ -3,22 +3,21 @@
 import re
 from datetime import date, datetime, time, timedelta, timezone
 
-from flask import Blueprint, jsonify, request
-from sqlalchemy.exc import SQLAlchemyError
+from flask import jsonify, request
 from sqlalchemy.orm import load_only, selectinload
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, NotFound
 
 from models import Transaction, TransactionClassification, TransactionIncome
-from services.auth import require_api_key
+from routes import json_error, private_blueprint, query_values
 from services.classification import CLASSIFICATION_TYPES, classification_details, effective_type
 from services.income import INCOME_TYPES, TAX_TREATMENTS, income_body, income_details, validate_reconciliation
 from services.database import db
-from services.error_logging import log_failure
 from services.validation import uid, optional_text
 
 
-transactions = Blueprint("transactions", __name__, url_prefix="/transactions")
-transactions.before_request(require_api_key)
+transactions = private_blueprint("transactions", database_error=
+    "Unable to read saved transactions. Check PostgreSQL and run flask db-upgrade.")
+transactions.register_error_handler(NotFound, json_error)
 
 # Explicitly select public fields; raw bank JSON is neither loaded nor returned.
 FIELDS = (
@@ -31,14 +30,7 @@ FIELDS = (
 
 def filters():
     allowed = {"start", "end", "accountUid", "direction", "status", "page", "per_page", "classification", "income_type", "tax_treatment"}
-    if set(request.args) - allowed:
-        raise BadRequest("Unknown query parameter.")
-    values = {}
-    for key in request.args:
-        entries = request.args.getlist(key)
-        if len(entries) != 1 or not entries[0].strip():
-            raise BadRequest(f"Supply {key} once with a nonempty value.")
-        values[key] = entries[0].strip()
+    values = query_values(allowed)
 
     for key, default, maximum in (("page", 1, 2**31 - 1), ("per_page", 50, 100)):
         value = values.get(key, str(default))
@@ -77,17 +69,6 @@ def filters():
     if "start" in values and "end" in values and values["start"] >= values["end"]:
         raise BadRequest("start must be on or before end.")
     return values
-
-
-@transactions.errorhandler(BadRequest)
-def invalid_request(error):
-    return jsonify(error=error.description), 400
-
-
-@transactions.errorhandler(SQLAlchemyError)
-def database_error(error):
-    log_failure("transactions.database", error)
-    return jsonify(error="Unable to read saved transactions. Check PostgreSQL and run flask db-upgrade."), 503
 
 
 @transactions.get("")
@@ -145,7 +126,10 @@ def saved_transaction(account_uid, category_uid, feed_item_uid, *, lock=False):
     # Serialize edits on the parent row to prevent competing inserts for the same key.
     if lock:
         query = query.with_for_update(of=Transaction)
-    return db.session.scalar(query)
+    transaction = db.session.scalar(query)
+    if transaction is None:
+        raise NotFound("Saved transaction not found.")
+    return transaction
 
 
 CLASSIFICATION_PATH = "/<uuid:account_uid>/<uuid:category_uid>/<uuid:feed_item_uid>/classification"
@@ -154,8 +138,6 @@ CLASSIFICATION_PATH = "/<uuid:account_uid>/<uuid:category_uid>/<uuid:feed_item_u
 @transactions.get(CLASSIFICATION_PATH)
 def get_classification(account_uid, category_uid, feed_item_uid):
     transaction = saved_transaction(account_uid, category_uid, feed_item_uid)
-    if transaction is None:
-        return jsonify(error="Saved transaction not found."), 404
     return jsonify(classification=classification_details(transaction))
 
 
@@ -174,8 +156,6 @@ def put_classification(account_uid, category_uid, feed_item_uid):
     except ValueError as error:
         raise BadRequest(str(error)) from None
     transaction = saved_transaction(account_uid, category_uid, feed_item_uid, lock=True)
-    if transaction is None:
-        return jsonify(error="Saved transaction not found."), 404
     if transaction.direction not in CLASSIFICATION_TYPES[kind]["directions"]:
         raise BadRequest("income requires IN; expense requires OUT.")
     if transaction.income is not None and kind != "income":
@@ -192,8 +172,6 @@ def put_classification(account_uid, category_uid, feed_item_uid):
 @transactions.delete(CLASSIFICATION_PATH)
 def clear_classification(account_uid, category_uid, feed_item_uid):
     transaction = saved_transaction(account_uid, category_uid, feed_item_uid, lock=True)
-    if transaction is None:
-        return jsonify(error="Saved transaction not found."), 404
     if transaction.income is not None and (transaction.direction != "IN" or transaction.source == "INTERNAL_TRANSFER"):
         raise BadRequest("Delete income details before restoring a non-income automatic classification.")
     transaction.classification = None
@@ -213,8 +191,6 @@ INCOME_PATH = "/<uuid:account_uid>/<uuid:category_uid>/<uuid:feed_item_uid>/inco
 @transactions.get(INCOME_PATH)
 def get_income(account_uid, category_uid, feed_item_uid):
     transaction = saved_transaction(account_uid, category_uid, feed_item_uid)
-    if transaction is None:
-        return jsonify(error="Saved transaction not found."), 404
     return jsonify(income=income_details(transaction))
 
 
@@ -224,8 +200,6 @@ def put_income(account_uid, category_uid, feed_item_uid):
         raise BadRequest("Send income details as a JSON object.")
     values = income_body(request.get_json())
     transaction = saved_transaction(account_uid, category_uid, feed_item_uid, lock=True)
-    if transaction is None:
-        return jsonify(error="Saved transaction not found."), 404
     if transaction.direction != "IN" or classification_details(transaction)["type"] != "income":
         raise BadRequest("Income details require an incoming transaction classified as income.")
     validate_reconciliation(values, transaction.amount_minor)
@@ -242,8 +216,6 @@ def put_income(account_uid, category_uid, feed_item_uid):
 @transactions.delete(INCOME_PATH)
 def clear_income(account_uid, category_uid, feed_item_uid):
     transaction = saved_transaction(account_uid, category_uid, feed_item_uid, lock=True)
-    if transaction is None:
-        return jsonify(error="Saved transaction not found."), 404
     transaction.income = None
     db.session.commit()
     return jsonify(income=None)
