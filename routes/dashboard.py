@@ -155,7 +155,7 @@ def transactions_page():
     query = db.select(Transaction).options(
         load_only(Transaction.transaction_time, Transaction.counterparty_name,
                   Transaction.reference, Transaction.amount_minor, Transaction.currency,
-                  Transaction.direction, Transaction.status, Transaction.source),
+                  Transaction.direction, Transaction.status, Transaction.source, Transaction.confirmed_at),
         selectinload(Transaction.classification),
     ).order_by(Transaction.transaction_time.desc(), Transaction.account_uid,
                Transaction.category_uid, Transaction.feed_item_uid)
@@ -178,8 +178,11 @@ def transactions_page():
             "amount": format_amount(transaction.amount_minor, transaction.currency),
             "direction": transaction.direction,
             "status": transaction.status,
+            "confirmed": getattr(transaction, "confirmed_at", None) is not None,
             "classification": CLASSIFICATION_TYPES[classification["type"]]["label"],
             "origin": classification["origin"],
+            "confirm_url": url_for("review.confirm_transaction", account_uid=transaction.account_uid,
+                                   category_uid=transaction.category_uid, feed_item_uid=transaction.feed_item_uid),
             "edit_url": url_for("dashboard.edit_classification", account_uid=transaction.account_uid,
                                 category_uid=transaction.category_uid, feed_item_uid=transaction.feed_item_uid,
                                 account=account_uid, page=page_number),

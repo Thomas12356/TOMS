@@ -39,7 +39,7 @@ class SyncFreshnessTests(unittest.TestCase):
 class DashboardSyncTests(OwnerLoginFixture):
     def test_sync_requires_browser_login_and_csrf(self):
         with patch('routes.dashboard.start_dashboard_sync') as start:
-            self.assertEqual(self.client.post('/dashboard/sync').status_code, 302)
+            self.assertEqual(self.client.post('/dashboard/sync').status_code, 401)
             self.assertEqual(self.client.post('/dashboard/sync', headers=self.headers).status_code, 401)
             self.sign_in()
             self.assertEqual(self.client.post('/dashboard/sync').status_code, 400)

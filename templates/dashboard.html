@@ -8,6 +8,7 @@
     <script src="{{ url_for('static', filename='js/balances.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/account-selector.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/transaction-sync.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/transaction-review.js') }}" defer></script>
 </head>
 <body class="ledger-page">
     {% from "classification_tip.html" import classification_tip %}
@@ -72,6 +73,7 @@
                 </div>
                 <div class="ledger-controls">
                     {% if current_user.is_authenticated %}
+                    <button type="button" class="review-open sync-button" id="review-open" hidden>Review transactions</button>
                     <div class="sync-controls" data-sync-url="{{ url_for('dashboard.trigger_sync') }}" data-status-url="{{ url_for('dashboard.sync_status') }}" data-csrf="{{ csrf_token() }}">
                         <button type="button" id="sync-now" data-sync-now title="Syncs transactions from your bank account provider." aria-description="Syncs transactions from your bank account provider.">{{ sync_icon() }}<span>Sync now</span></button>
                     </div>
@@ -95,7 +97,7 @@
                     </thead>
                     <tbody role="rowgroup">
                         {% for row in rows %}
-                        <tr role="row" class="{{ 'transaction-in' if row.direction == 'IN' else 'transaction-out' }}">
+                        <tr role="row" data-confirm-url="{{ row.confirm_url }}" class="{{ 'transaction-in' if row.direction == 'IN' else 'transaction-out' }}">
                             <td role="cell" class="row-number" data-label="Row">{{ row.number }}</td>
                             <td role="cell" class="date" data-label="Date"><span class="transaction-day">{{ row.day }}</span>{{ row.date }}</td>
                             <td role="cell" class="payment-cell" data-label="Payment">
@@ -115,6 +117,7 @@
                             </td>
                             <td role="cell" class="status-cell" data-label="Status">
                                 <span class="status">{{ row.status | replace('_', ' ') | title }}</span>
+                                <span class="review-state {{ 'is-confirmed' if row.confirmed else 'is-unconfirmed' }}">{{ 'Confirmed' if row.confirmed else 'Unconfirmed' }}</span>
                             </td>
                         </tr>
                         {% endfor %}
@@ -150,6 +153,23 @@
         {% endif %}
     </main>
     {% if not error and current_user.is_authenticated %}
+    <dialog id="transaction-review" class="review-dialog" aria-labelledby="review-heading"
+            data-url="{{ url_for('review.next_transaction', account=account_uid, page=page.page) }}" data-csrf="{{ csrf_token() }}">
+        <div class="review-heading">
+            <div><p class="eyebrow">TRANSACTION REVIEW</p><h2 id="review-heading">Check transaction details</h2></div>
+            <button type="button" id="review-close" aria-label="Close transaction review">×</button>
+        </div>
+        <p id="review-count" class="secondary"></p>
+        <p>Confirm these details are correct, or edit the classification first. You can close this window and review later.</p>
+        <dl id="review-details" class="review-details"></dl>
+        <p class="classification-explanation">Confirmation records your review. Classification does not establish tax treatment.</p>
+        <p id="review-error" role="alert"></p>
+        <div class="review-actions">
+            <a id="review-edit">Edit classification</a>
+            <button type="button" id="review-retry" hidden>Try again</button>
+            <button type="button" id="review-confirm" disabled>Confirm details</button>
+        </div>
+    </dialog>
     <footer class="sync-footer" aria-label="Transaction sync status">
         <span id="last-synced">Last synced: checking…</span>
         <span id="sync-message" role="status"></span>

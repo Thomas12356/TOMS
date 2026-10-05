@@ -45,17 +45,21 @@ def load_owner(token):
 
 
 def require_dashboard_login():
+    json_response = request.endpoint in {
+        "dashboard.account_balances", "dashboard.trigger_sync", "dashboard.sync_status",
+        "review.next_transaction", "review.confirm_transaction",
+    }
     # Only explicitly supplied bearer credentials can bypass browser sessions.
     auth = request.authorization
     if auth is not None and auth.type == "bearer":
         return require_api_key()
     if not current_app.secret_key or len(current_app.secret_key) < 32:
         message = "Set a random SECRET_KEY of at least 32 characters in .env, then restart Flask."
-        if request.endpoint == "dashboard.account_balances":
+        if json_response:
             return jsonify(error=message), 503
         return render_template("login.html", error=message, ready=False), 503
     if not current_user.is_authenticated:
-        if request.endpoint == "dashboard.account_balances":
+        if json_response:
             return jsonify(error="Please sign in again."), 401
         return redirect(url_for("login.sign_in"))
     csrf.protect()

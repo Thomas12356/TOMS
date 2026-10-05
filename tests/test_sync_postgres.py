@@ -49,6 +49,19 @@ class PostgreSQLSyncTests(PostgreSQLTestCase):
             Transaction.account_uid == ACCOUNT)).all()
         self.assertEqual(rows, [("SETTLED", 1250)])
 
+    def test_bank_detail_changes_reopen_confirmation_but_identical_sync_does_not(self):
+        item = normalize_feed_item(feed_item(), ACCOUNT, CATEGORY)
+        self.import_rows([item])
+        transaction = self.session.get(Transaction, (ACCOUNT, CATEGORY, ITEM))
+        transaction.confirmed_at = NOW
+        self.session.commit()
+        self.import_rows([item])
+        self.assertIsNotNone(transaction.confirmed_at)
+        later = NOW + timedelta(hours=1)
+        changed = normalize_feed_item(feed_item(status="SETTLED", updated=later), ACCOUNT, CATEGORY)
+        self.import_rows([changed], now=later)
+        self.assertIsNone(transaction.confirmed_at)
+
     def test_failure_retains_page_and_checkpoint_then_rerun_completes(self):
         item = normalize_feed_item(feed_item(), ACCOUNT, CATEGORY)
         def pages(*args):

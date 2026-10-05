@@ -18,7 +18,8 @@ rows = [dict(number=i + 1, date='05 Oct 2026', day='Today',
              counterparty='Example payment with a longer merchant name',
              reference='A long reference which should wrap without breaking the mobile layout',
              classification='Transfer between your own accounts or spaces',
-             origin='manual' if i else 'automatic', edit_url='/classification',
+             origin='manual' if i else 'automatic', edit_url='/classification', confirmed=False,
+             confirm_url=f'/dashboard/transactions/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/00000000-0000-4000-8000-{i:012d}/confirm',
              direction='IN' if i else 'OUT', amount='GBP 1,234.56', status='Settled') for i in range(3)]
 pagination = SimpleNamespace(total=3, pages=1, page=1, has_prev=False, has_next=False)
 account = SimpleNamespace(account_uid='11111111-1111-4111-8111-111111111111', name='Current account', currency='GBP')
@@ -40,6 +41,19 @@ with sync_playwright() as playwright:
             if path.startswith('/static/'):
                 file = ROOT / path.lstrip('/')
                 route.fulfill(path=str(file))
+            elif path == '/dashboard/review':
+                remaining = state.get('review_remaining', 0)
+                record = None if not remaining else {
+                    'version': 'a' * 64, 'confirm_url': rows[3 - remaining]['confirm_url'],
+                    'edit_url': '/classification', 'details': [['Payment', 'Example payment'], ['Amount', 'GBP 1,234.56']],
+                }
+                route.fulfill(json={'remaining': remaining, 'transaction': record})
+            elif path.endswith('/confirm'):
+                assert route.request.method == 'POST'
+                assert route.request.headers.get('x-csrftoken')
+                assert route.request.post_data_json == {'version': 'a' * 64}
+                state['review_remaining'] -= 1
+                route.fulfill(json={'confirmed': True})
             elif path == '/dashboard/sync-status':
                 now = datetime.now(timezone.utc)
                 last = now - timedelta(minutes=2) if state['stale'] and not state['synced'] else now
@@ -99,6 +113,26 @@ with sync_playwright() as playwright:
         page.wait_for_function("document.querySelector('#sync-message').textContent === 'Up to date.'", timeout=10000)
         assert any('force=0' in url for url in state['posts'])
         assert not errors, errors
+        if width == 390:
+            state['review_remaining'] = 3
+            page.reload()
+            dialog = page.locator('#transaction-review')
+            page.wait_for_function("document.querySelector('#transaction-review').open")
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            page.keyboard.press('Escape')
+            assert not dialog.is_visible() and state['review_remaining'] == 3
+            assert page.locator('.is-unconfirmed').count() == 3
+            page.locator('#review-open').click()
+            page.wait_for_function("document.querySelector('#transaction-review').open")
+            for remaining in (2, 1, 0):
+                with page.expect_response(lambda response: response.url.endswith('/confirm')):
+                    page.locator('#review-confirm').click()
+                if remaining:
+                    page.wait_for_function('(count) => document.querySelector("#review-count").textContent.startsWith(String(count))', arg=remaining)
+                else:
+                    page.wait_for_function("!document.querySelector('#transaction-review').open")
+            assert page.locator('.is-confirmed').count() == 3
+            print('PASS: dismissible mobile popup, individual confirmation and persistent labels')
         print(f'PASS: {width}px layout, navigation, totals, tooltip, footer and sync flow')
         context.close()
     browser.close()

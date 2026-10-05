@@ -223,6 +223,7 @@ def put_income(account_uid, category_uid, feed_item_uid):
     validate_reconciliation(values, transaction.amount_minor)
     # Only a successful edit against the current bank amount clears the review flag.
     values.update(recorded_currency=transaction.currency, needs_review=False)
+    transaction.confirmed_at = None
     if transaction.income is None:
         transaction.income = TransactionIncome(**values)
     else:
@@ -236,5 +237,6 @@ def put_income(account_uid, category_uid, feed_item_uid):
 def clear_income(account_uid, category_uid, feed_item_uid):
     transaction = saved_transaction(account_uid, category_uid, feed_item_uid, lock=True)
     transaction.income = None
+    transaction.confirmed_at = None
     db.session.commit()
     return jsonify(income=None)

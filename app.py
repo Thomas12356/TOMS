@@ -11,6 +11,7 @@ from routes.sync import sync
 from routes.transactions import transactions
 from routes.reports import reports
 from routes.dashboard import dashboard
+from routes.review import review
 from routes.login import login
 from services.web.sessions import login_manager, csrf, SESSION_LIFETIME, lock_owner_setup, validate_owner_credentials
 from flask_wtf.csrf import CSRFError
@@ -49,6 +50,7 @@ app.register_blueprint(sync)
 app.register_blueprint(transactions)
 app.register_blueprint(reports)
 app.register_blueprint(dashboard)
+app.register_blueprint(review)
 init_database(app)
 
 

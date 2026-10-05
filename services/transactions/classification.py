@@ -44,6 +44,7 @@ def save_classification(transaction, kind, notes):
         raise ValueError("income requires IN; expense requires OUT.")
     if transaction.income is not None and kind != "income":
         raise ValueError("Delete income details before changing this transaction to a different transfer type.")
+    transaction.confirmed_at = None
     if transaction.classification is None:
         transaction.classification = TransactionClassification(type=kind, notes=notes)
     else:
@@ -56,3 +57,4 @@ def clear_classification(transaction):
     if transaction.income is not None and (transaction.direction != "IN" or transaction.source == "INTERNAL_TRANSFER"):
         raise ValueError("Delete income details before restoring a non-income automatic classification.")
     transaction.classification = None
+    transaction.confirmed_at = None
