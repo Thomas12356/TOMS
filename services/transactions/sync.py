@@ -128,7 +128,7 @@ def sync_category(store, run_uid, account, category_uid, state, options, snapsho
                         plan.mode, plan.start, plan.end, snapshot)
 
 
-def run_sync(store, raw_options, *, now=None):
+def run_sync(store, raw_options, *, now=None, minimum_age_seconds=0):
     """Main import flow: validate, lock, discover accounts, save pages, finish, unlock.
 
     `store` handles database writes; this function decides the order of the work.
@@ -142,6 +142,8 @@ def run_sync(store, raw_options, *, now=None):
     run_uid = str(uuid4())
     started = False
     try:
+        if minimum_age_seconds and store.recently_synced(snapshot, minimum_age_seconds):
+            return {"status": "fresh"}
         store.start_run(run_uid, raw_options, snapshot)
         started = True
         for account in discover_accounts(options.get("accountUid")):

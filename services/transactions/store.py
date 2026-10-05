@@ -67,6 +67,13 @@ class SyncStore:
             connection, self._lock_connection = self._lock_connection, None
             connection.close()
 
+    def recently_synced(self, snapshot, seconds):
+        """Called under the import lock; only complete, unfiltered runs count."""
+        last = self.session.scalar(db.select(SyncRun.finished_at).where(
+            SyncRun.status == "completed", SyncRun.requested_options == {},
+        ).order_by(SyncRun.finished_at.desc()).limit(1))
+        return last is not None and (snapshot - last).total_seconds() < seconds
+
     def start_run(self, run_uid, options, snapshot):
         with self.commit():
             # Owning the lock proves previous running imports were interrupted.

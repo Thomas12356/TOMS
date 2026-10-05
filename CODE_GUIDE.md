@@ -196,3 +196,9 @@ password. It locks the owner row, updates the hash and revokes every session.
 Both forms share `templates/owner_settings.html`, CSRF protection and the existing
 login attempt limit. `tests/test_owner_setup.py` covers setup and password changes;
 `tests/test_security.py` includes a simultaneous first-owner creation test.
+
+Dashboard syncing lives in `services/transactions/automatic_sync.py`; the browser
+controls are in `static/js/transaction-sync.js`. The `sync-transactions` Flask
+command reuses the importer for the systemd timer installed by
+`deployment/install_sync_timer.py`. The one-minute freshness check runs inside
+the existing PostgreSQL import lock in `run_sync()`.
