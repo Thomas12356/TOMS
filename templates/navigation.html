@@ -1,0 +1,10 @@
+<nav aria-label="Main navigation">
+    <a href="{{ url_for('dashboard.transactions_page') }}"{% if navigation_page == 'transactions' %} aria-current="page"{% endif %}>Transactions</a>
+    {% if navigation_owner %}
+    <a href="{{ url_for('login.change_password') }}"{% if navigation_page == 'settings' %} aria-current="page"{% endif %}>Password settings</a>
+    <form class="logout-form" method="post" action="{{ url_for('login.sign_out') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit">Sign out</button>
+    </form>
+    {% endif %}
+</nav>

@@ -12,16 +12,9 @@
     <!-- Start here to change the page heading and introductory text. -->
     <header class="site-header">
         <a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
-        <nav aria-label="Main navigation">
-            <a href="{{ url_for('dashboard.transactions_page') }}" aria-current="page">Transactions</a>
-        </nav>
-        {% if not error and current_user.is_authenticated %}
-        <a class="settings-link" href="{{ url_for('login.change_password') }}">Password settings</a>
-        <form class="logout-form" method="post" action="{{ url_for('login.sign_out') }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit">Sign out</button>
-        </form>
-        {% endif %}
+        {% with navigation_page='transactions', navigation_owner=not error and current_user.is_authenticated %}
+        {% include 'navigation.html' %}
+        {% endwith %}
     </header>
 
     <main>

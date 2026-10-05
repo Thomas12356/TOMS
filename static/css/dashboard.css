@@ -80,7 +80,8 @@ a:focus-visible, .table-scroll:focus-visible {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 24px;
+    flex-wrap: wrap;
+    gap: 16px 24px;
     padding: 18px max(24px, calc((100vw - 1200px) / 2));
     background: var(--header);
     border-bottom: 3px solid var(--highlight);
@@ -104,14 +105,55 @@ a:focus-visible, .table-scroll:focus-visible {
     letter-spacing: .6px;
 }
 
-.site-header nav a {
-    color: #f5f0e5;
-    font-family: var(--mono);
-    font-size: 12px;
+/* Links and the logout button share one rule so browser defaults cannot differ. */
+.site-header nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-left: auto;
+}
+
+.site-header nav a, .site-header nav button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    margin: 0;
+    padding: 9px 14px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: transparent;
+    color: #bcc5bb;
+    font: 500 12px/20px var(--mono);
     text-decoration: none;
-    border: 1px solid #59645b;
-    border-left: 3px solid var(--highlight);
-    padding: 8px 12px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.site-header nav a[aria-current="page"] {
+    background: #364139;
+    color: #f5f0e5;
+    border-color: #59645b;
+    box-shadow: inset 0 -2px var(--highlight);
+}
+
+.site-header nav a:hover, .site-header nav button:hover {
+    background: #364139;
+    color: #f5f0e5;
+}
+
+.site-header nav a:focus-visible, .site-header nav button:focus-visible {
+    outline: 2px solid var(--highlight);
+    outline-offset: 3px;
+}
+
+.logout-form {
+    display: flex;
+    margin: 0 0 0 8px;
+    padding-left: 12px;
+    border-left: 1px solid #59645b;
 }
 
 main {
@@ -249,11 +291,8 @@ td.amount {
 }
 
 .status {
-    display: inline-block;
-    border: 1px solid var(--border);
-    padding: 2px 8px;
-    border-radius: 2px;
-    font-size: 11px;
+    color: var(--muted);
+    font-size: 12px;
     white-space: nowrap;
 }
 
@@ -417,7 +456,7 @@ td.amount {
     font-size: 12px;
 }
 
-.login-form input, .login-form button, .logout-form button {
+.login-form input, .login-form button {
     min-width: 0;
     min-height: 42px;
     padding: 8px 12px;
@@ -439,23 +478,20 @@ td.amount {
     cursor: pointer;
 }
 
-.logout-form button {
-    background: transparent;
-    color: #f5f0e5;
-    border-color: #59645b;
-    font-family: var(--mono);
-    cursor: pointer;
-}
-
-.login-form input:focus-visible, .login-form button:focus-visible, .logout-form button:focus-visible {
+.login-form input:focus-visible, .login-form button:focus-visible {
     outline: 3px solid var(--highlight);
     outline-offset: 3px;
 }
 
 @media (max-width: 640px) {
     .site-header {
-        flex-wrap: wrap;
         gap: 12px;
+    }
+
+    .site-header nav {
+        width: 100%;
+        justify-content: flex-start;
+        margin-left: 0;
     }
 }
 
@@ -503,9 +539,4 @@ td.amount {
 .classification-form select:focus-visible, .classification-form textarea:focus-visible {
     outline: 3px solid var(--highlight);
     outline-offset: 3px;
-}
-
-.settings-link {
-    color: #f5f0e5;
-    font: 12px var(--mono);
 }
