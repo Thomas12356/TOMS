@@ -167,10 +167,10 @@ class SyncTests(unittest.TestCase):
     def test_sync_routes_require_auth_and_return_safe_reports(self):
         client = app.test_client()
         with patch.dict(app.config, {"APP_API_KEY": "test-key"}):
-            with patch("routes.sync.store") as repository:
+            with patch("routes.sync.SyncStore") as repository:
                 self.assertEqual(client.post("/sync/transactions").status_code, 401)
                 repository.assert_not_called()
-            with patch("routes.sync.store", return_value=MemoryStore()):
+            with patch("routes.sync.SyncStore", return_value=MemoryStore()):
                 with patch("services.transaction_sync.history_pages", return_value=[[]]):
                     response = client.post("/sync/transactions", headers={"Authorization": "Bearer test-key"})
         self.assertEqual(response.status_code, 200)
@@ -180,7 +180,7 @@ class SyncTests(unittest.TestCase):
     def test_invalid_sync_options_never_connect_to_database(self):
         client = app.test_client()
         with patch.dict(app.config, {"APP_API_KEY": "test-key"}):
-            with patch("routes.sync.store") as repository:
+            with patch("routes.sync.SyncStore") as repository:
                 response = client.post("/sync/transactions", json={"start": "invalid"},
                                        headers={"Authorization": "Bearer test-key"})
                 self.assertEqual(response.status_code, 400)

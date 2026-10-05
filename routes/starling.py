@@ -4,17 +4,16 @@ import math
 import re
 from datetime import date
 
-from flask import Blueprint, Response, current_app, jsonify, request
+from flask import Response, current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
 
+from routes import private_blueprint
 from services.starling import StarlingError, get_account_holder_name, starling_request
 from services.starling_diagnostics import run_diagnostics
-from services.auth import require_api_key
 from services.validation import timestamp
 
 
-starling = Blueprint("starling", __name__, url_prefix="/starling")
-starling.before_request(require_api_key)
+starling = private_blueprint("starling")
 
 
 @starling.get("/account-holder/name")
@@ -44,11 +43,6 @@ def test_all():
 def upstream_error(error):
     headers = {"Retry-After": str(error.retry_after)} if error.retry_after is not None else {}
     return jsonify(error=str(error)), error.status_code, headers
-
-
-@starling.errorhandler(BadRequest)
-def invalid_request(error):
-    return jsonify(error=error.description), 400
 
 
 def query_params(required=(), optional=(), *, dates=(), timestamps=(), integers=()):

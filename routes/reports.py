@@ -3,29 +3,23 @@
 import re
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify, request
-from sqlalchemy.exc import SQLAlchemyError
+from flask import jsonify
 from werkzeug.exceptions import BadRequest
 
 from models import Transaction, TransactionIncome
-from services.error_logging import log_failure
-from services.auth import require_api_key
+from routes import private_blueprint, query_values
 from services.classification import effective_type
 from services.database import db
 from services.validation import uid
 
 
-reports = Blueprint("reports", __name__, url_prefix="/reports")
-reports.before_request(require_api_key)
+reports = private_blueprint("reports", database_error=
+    "Unable to read the monthly report. Check PostgreSQL and run flask db-upgrade.")
 
 
 def monthly_options():
-    if set(request.args) - {"month", "accountUid"}:
-        raise BadRequest("Use month and optional accountUid.")
-    for key in request.args:
-        if len(request.args.getlist(key)) != 1 or not request.args[key].strip():
-            raise BadRequest(f"Supply {key} once with a nonempty value.")
-    month = request.args.get("month", "").strip()
+    values = query_values({"month", "accountUid"}, unknown_error="Use month and optional accountUid.")
+    month = values.get("month", "")
     try:
         if not re.fullmatch(r"[0-9]{4}-[0-9]{2}", month):
             raise ValueError
@@ -34,24 +28,13 @@ def monthly_options():
         end = datetime(year + 1, 1, 1, tzinfo=timezone.utc) if number == 12 else datetime(year, number + 1, 1, tzinfo=timezone.utc)
     except ValueError:
         raise BadRequest("Supply a valid month in YYYY-MM format.") from None
-    account = request.args.get("accountUid")
+    account = values.get("accountUid")
     if account is not None:
         try:
-            account = uid(account.strip())
+            account = uid(account)
         except ValueError:
             raise BadRequest("accountUid must be a UUID.") from None
     return month, start, end, account
-
-
-@reports.errorhandler(BadRequest)
-def invalid_request(error):
-    return jsonify(error=error.description), 400
-
-
-@reports.errorhandler(SQLAlchemyError)
-def database_error(error):
-    log_failure("reports.database", error)
-    return jsonify(error="Unable to read the monthly report. Check PostgreSQL and run flask db-upgrade."), 503
 
 
 @reports.get("/monthly")
