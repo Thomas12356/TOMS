@@ -70,6 +70,7 @@
                 <table>
                     <thead>
                         <tr>
+                            <th scope="col" class="row-number" aria-label="Row number">#</th>
                             <th scope="col">Date</th>
                             <th scope="col">Payment</th>
                             <th scope="col">Classification</th>
@@ -79,7 +80,8 @@
                     </thead>
                     <tbody>
                         {% for row in rows %}
-                        <tr>
+                        <tr class="{{ 'transaction-in' if row.direction == 'IN' else 'transaction-out' }}">
+                            <td class="row-number">{{ row.number }}</td>
                             <td class="date">{{ row.date }}</td>
                             <td>
                                 <span class="payment-name">{{ row.counterparty }}</span>
@@ -90,7 +92,7 @@
                             <td>
                                 {{ row.classification }}
                                 <span class="secondary">{{ 'Manual' if row.origin == 'manual' else 'Automatic' }}</span>
-                                <a class="edit-classification" href="{{ row.edit_url }}">Edit classification</a>
+                                <a class="edit-classification{{ ' is-manual' if row.origin == 'manual' else '' }}" href="{{ row.edit_url }}">Edit classification</a>
                             </td>
                             <td class="amount {{ 'incoming' if row.direction == 'IN' else 'outgoing' }}">
                                 {{ '+' if row.direction == 'IN' else '−' }}{{ row.amount }}

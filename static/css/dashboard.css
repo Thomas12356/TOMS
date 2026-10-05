@@ -9,6 +9,7 @@
     --header: #242c29;
     --highlight: #e8b976;
     --income: #286445;
+    --outgoing: #a33232;
     --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
@@ -254,8 +255,20 @@ td {
     font-size: 14px;
 }
 
-tbody tr:hover {
-    background: #f0f1e8;
+tbody tr.transaction-in {
+    background: #f1f5ee;
+}
+
+tbody tr.transaction-out {
+    background: #faf1ee;
+}
+
+tbody tr.transaction-in:hover {
+    background: #e8efe3;
+}
+
+tbody tr.transaction-out:hover {
+    background: #f4e7e2;
 }
 
 .date {
@@ -288,6 +301,10 @@ td.amount {
 
 .incoming {
     color: var(--income);
+}
+
+.outgoing {
+    color: var(--outgoing);
 }
 
 .status {
@@ -502,6 +519,10 @@ td.amount {
     font-size: 12px;
 }
 
+.edit-classification.is-manual {
+    color: #315d78;
+}
+
 .classification-page {
     max-width: 680px;
 }
@@ -539,4 +560,13 @@ td.amount {
 .classification-form select:focus-visible, .classification-form textarea:focus-visible {
     outline: 3px solid var(--highlight);
     outline-offset: 3px;
+}
+
+/* Row numbers describe positions in the current account view. */
+.row-number {
+    width: 1%;
+    color: var(--muted);
+    font: 12px/1.5 var(--mono);
+    text-align: right;
+    white-space: nowrap;
 }

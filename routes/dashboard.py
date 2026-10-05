@@ -136,9 +136,10 @@ def transactions_page():
 
     # 3. Give the template plain display values; database work stays in this route.
     rows = []
-    for transaction in page.items:
+    for number, transaction in enumerate(page.items, start=(page_number - 1) * 50 + 1):
         classification = classification_details(transaction)
         rows.append({
+            "number": number,
             "date": transaction.transaction_time.astimezone(timezone.utc).strftime("%d %b %Y"),
             "counterparty": transaction.counterparty_name or "Unnamed payment",
             "reference": transaction.reference,
