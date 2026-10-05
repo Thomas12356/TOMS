@@ -1,6 +1,6 @@
 # Security checks — 5 October 2026
 
-The full suite passed: **171 tests**, with PostgreSQL checks enabled. This
+The full suite passed: **177 tests**, with PostgreSQL checks enabled. This
 includes **24 adversarial tests** in `tests/test_security.py`, plus the
 existing login, API protection, request-boundary and bank-client tests.
 Ten classification-form tests also cover saves, automatic reset, income
@@ -85,8 +85,9 @@ run time, rather than proving those packages have no vulnerabilities.
 ## What these checks do not establish
 
 This is application-level verification, not a live deployment penetration test.
-No browser automation, live TLS/certificate validation, tailnet policy review,
-host/firewall review or backup restoration test was performed. Tailscale Serve
+Chromium checks use synthetic bank data and intercepted HTTP responses.
+No live TLS/certificate validation, tailnet policy review, host/firewall review
+or backup restoration test was performed. Tailscale Serve
 and production cookie behaviour still need checking on the actual hosting setup.
 
 The application remains single-owner. The tests do not establish isolation
@@ -101,5 +102,40 @@ lock, importing stale data, rejecting unauthenticated/CSRF-free browser syncs,
 and distinguishing automatic freshness checks from forced button clicks.
 The complete PostgreSQL suite passed after these additions. The installed user
 systemd service/timer passed `systemd-analyze --user verify`; the timer is active
-and specifies 08:00/20:00 Europe/London. Browser automation and a live scheduled
-bank import have not been exercised by these tests.
+and specifies 08:00/20:00 Europe/London. A live scheduled bank import has not been exercised by these tests.
+
+## Mobile UI and latest changes — 5 October 2026
+
+- The full PostgreSQL suite passed: **177 tests**. New cases exercise signed
+  currency totals, unavailable balances, UTC day labels, configurable server
+  binding, the exact 60-second freshness boundary and preserving the last
+  successful timestamp after a failure.
+- Chromium checks in `tests/browser_checks.py` exercise widths of 320, 390, 640,
+  768 and 1280 pixels with synthetic data. They verify no page overflow,
+  collapsible navigation/Escape, matching mobile button sizes, transaction gaps,
+  tooltip visibility and bounds, fixed footer position, displayed balance totals,
+  forced syncs and automatic stale refresh. No bank requests are made.
+- Browser review found and fixed a freshness bug: a recent filtered import could
+  suppress a needed full import. JavaScript now checks `last_success_at`, the
+  server's timestamp for a completed unfiltered sync.
+- A temporary HTTP health server bound to all interfaces responded on both
+  `127.0.0.1` and `192.168.1.222`. This does not verify access from another device.
+- Ruff, dependency compatibility and whitespace checks passed. The 24 installed
+  application dependencies had no known advisories in the repeated pip-audit.
+- Bandit reported no application-server findings. Including the deployment
+  installer produces low-severity subprocess/PATH notices: its argument lists
+  invoke fixed local `systemctl` commands without shell interpolation or external
+  input. Those calls were reviewed rather than hidden with suppressions.
+
+Playwright is optional and was installed outside the application virtualenv:
+
+```bash
+.venv/bin/pip install --target /tmp/toms-browser-check playwright
+PYTHONPATH=/tmp/toms-browser-check .venv/bin/python -m playwright install chromium
+PYTHONPATH=/tmp/toms-browser-check .venv/bin/python tests/browser_checks.py
+```
+
+Chromium also needs its native Linux libraries. In this environment those were
+extracted into `/tmp/toms-browser-libs/root` without changing system packages;
+the successful run additionally used
+`LD_LIBRARY_PATH=/tmp/toms-browser-libs/root/usr/lib/x86_64-linux-gnu`.
