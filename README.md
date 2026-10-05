@@ -7,7 +7,7 @@ which records need attention, and how a tax estimate was calculated.
 
 **Current stage:** a working Flask JSON API with PostgreSQL storage and automated
 tests and an initial transaction dashboard at `/dashboard`. Manual categorisation
-is available through the API; dashboard editing forms and the annual tax
+is available through the API and dashboard; income editing forms and the annual tax
 calculator are planned and have not been implemented yet.
 
 For a short map of the code and a walkthrough of an income edit, start with
@@ -38,9 +38,9 @@ withholding will be shown separately from calculated liability.
 | --- | --- |
 | Starling imports | Manual history imports and incremental updates, including active account spaces. |
 | Saved transactions | Filtered, paginated reads from PostgreSQL without contacting Starling. |
-| Transaction dashboard | Owner login, account selection, live balances, and a read-only transaction table. |
+| Transaction dashboard | Owner login, account selection, live balances, and a transaction table with classification editing. |
 | Browser security | Hashed owner password, revocable sessions, login throttling, and CSRF-protected forms. |
-| Manual categorisation | Choose income, expense, internal transfer, refund, or other; add notes. |
+| Manual categorisation | Edit classification and notes through the dashboard or API; restore automatic inference. |
 | Income records | Record source, gross amount, deductions, adjustments, and confirmed tax treatment. |
 | Review flags | Relevant bank corrections flag income details for review while preserving manual entries. |
 | Monthly reports | Summarise settled cash flow by currency, spending category, and income source. |
@@ -53,10 +53,9 @@ does not automatically establish its tax treatment.
 
 ## Next milestones
 
-1. **Transaction dashboard:** the first Flask/Jinja page is implemented; add
-   filters next, with small HTMX enhancements where useful.
-2. **Income review:** manual categorisation forms and a queue for unclassified,
-   incomplete, or flagged incoming payments.
+1. **Income review:** add dashboard forms for income details and a queue for
+   incomplete or flagged incoming payments.
+2. **First-run setup:** choose and remember the working account.
 3. **Complete income inputs:** record income outside the connected account and
    prevent it from being counted twice.
 4. **Annual tax calculation:** select a supported jurisdiction and tax year,
@@ -64,17 +63,17 @@ does not automatically establish its tax treatment.
 5. **Tax summary:** show the calculation breakdown, recorded deductions,
    incomplete records, and an export of the underlying income data.
 
-Each milestone should be delivered as small, understandable changes, with
-focused commits and explanations of the files involved. Owner login and CSRF
-protection are implemented; the next browser feature is manual categorisation.
+Deliver each milestone as a small change with focused commits and an explanation
+of the files involved.
 
 ## Open the dashboard
 
-With the server running, visit `/dashboard`. It redirects to `/login`, where
+With the server running, visit `/` (the root URL) or `/dashboard`. It redirects to `/login`, where
 you use your owner username and password. Follow the setup below first.
 
 The page shows 50 saved transactions at a time across all accounts, newest
-first, including manual or automatic classifications. Dates display in UTC.
+first, including manual or automatic classifications. The account selector
+filters both the saved transactions and live balances. Dates display in UTC.
 The transaction table reads PostgreSQL. Live main-account balances load
 separately from Starling above the table, using `balance:read` permission.
 Each saved account gets its own balance card; a failed balance request leaves
@@ -86,6 +85,12 @@ The dashboard's **Account** dropdown filters transactions and live balances to
 one saved account. Switching returns to page one and preserves all saved records.
 Choose **All accounts** to view the combined ledger. Selection stays in the URL;
 it is not yet a saved first-run preference or a tax-report inclusion setting.
+
+Use **Edit classification** beside a payment to change its classification and
+notes. **Use automatic classification** removes the manual override. Saves
+return to the same account and page. Existing income details are preserved;
+incompatible classification changes are blocked. These are local edits and
+do not change bank records or establish tax treatment.
 
 Layout lives in `templates/dashboard.html`; styling lives in
 `static/css/dashboard.css`. See the frontend walkthrough in
@@ -138,24 +143,25 @@ WSGI server if you deploy beyond your local machine.
 ```text
 app.py                      Flask setup, route registration, health checks, CLI
 models.py                   Database tables and relationships
-routes/                     HTTP inputs, endpoint handlers, JSON responses
-templates/dashboard.html    First dashboard page layout
-static/css/dashboard.css    Dashboard colours, spacing, and mobile styles
+routes/                     HTTP inputs, browser pages and JSON endpoints
+templates/                  Dashboard, login and classification forms
+static/                     Shared CSS and small browser scripts
 services/                   Business rules, bank client, sync and database logic
     banking/                Starling client, feed parsing, diagnostics, rate limits
     transactions/           Classification, income rules, sync orchestration, storage
     database/               PostgreSQL connection and migration runner
-    web/                    API authentication and request body limits
+    web/                    API keys, browser sessions, CSRF and request limits
     validation.py           Shared validation for IDs, dates, money, and text
     error_logging.py        Safe error diagnostics
 migrations/                 Versioned PostgreSQL schema changes
-tests/                      Validation, API and opt-in database tests
+tests/                      API, browser, security and opt-in database tests
 CODE_GUIDE.md               Reading order and places to make your own changes
+SECURITY_TESTS.md           Security findings, verification and remaining scope
 .env.example                Configuration template without credentials
 ```
 
-Start with `routes/transactions.py` and `services/transactions/income.py` for categorisation
-and income edits. `routes/reports.py` contains the monthly report.
+Start with `templates/dashboard.html` for the UI, `routes/dashboard.py` for
+browser edits, and `services/transactions/` for classification and income rules. `routes/reports.py` contains the monthly report.
 `services/transactions/sync.py` coordinates bank imports, while
 `services/transactions/store.py` handles their database writes.
 
@@ -193,7 +199,8 @@ For the bearer examples below, set `APP_API_KEY` in your shell securely first
 The browser dashboard uses its own owner login and session cookie. Browser
 sessions do not grant API access. For scripts, `/dashboard` and its balances
 endpoint also accept an explicit bearer key; they no longer accept Basic auth.
-Missing credentials fail closed. `/` and `/health` remain public.
+Missing credentials fail closed. `/` redirects into the protected dashboard
+flow; `/health` remains public.
 Banking and login responses use `Cache-Control: no-store`.
 
 ### Set up the owner login
@@ -205,13 +212,22 @@ as `SECRET_KEY` (keep it private; do not use your API key or bank token):
 .venv/bin/pip install -r requirements.txt
 .venv/bin/python -c 'import secrets; print(secrets.token_hex(32))'
 .venv/bin/python -m flask db-upgrade
-.venv/bin/python -m flask owner-password
 ```
 
-The owner command asks for a username and a password of at least 15 characters,
-with hidden password entry and confirmation. It stores a scrypt hash, never the
-password. Run it again to change/reset the password: this revokes all existing
-browser sessions. There is no public registration or email recovery.
+Starting Flask or Gunicorn from the project directory prints a private one-time
+setup token in the server terminal when no owner exists. It is valid for one hour. Open
+`/`, `/dashboard` or `/login`: if no owner exists, you are directed to `/setup`.
+Enter the token there and choose your username and password (at least 8
+characters). Only the token hash is stored. Restarting the server generates a replacement token and invalidates the previous
+one. `flask owner-setup-token` remains available if you need a fresh token without
+restarting. Setup closes permanently once an owner exists.
+
+While signed in, use **Password settings** in the dashboard header to change
+your password. It requires the current password and revokes all browser sessions,
+including yours, so sign in again afterward. Forgotten passwords can still be
+reset locally with `.venv/bin/python -m flask owner-password`; the command uses
+hidden password entry and confirmation. There is no public registration or
+email recovery. Existing owners go straight to the normal login page.
 
 For **localhost HTTP development only**, launch with:
 
@@ -249,7 +265,9 @@ tailscale serve 5000
 
 Open the HTTPS URL printed by Serve and append `/dashboard`. Serve handles TLS;
 the app keeps its own login and does not authenticate from proxy identity
-headers. No proxy middleware is needed for this setup. Limit dashboard access
+headers. No proxy middleware is needed for this setup. Gunicorn automatically loads
+`gunicorn.conf.py` from the project directory to announce setup once before its
+workers start. Limit dashboard access
 to your owner identity using tailnet policy rules, keep Funnel off, and keep
 PostgreSQL private. Use a service manager to keep Gunicorn and Serve running
 when deploying permanently. This repository does not change your tailnet policy
@@ -845,7 +863,7 @@ For interactive queries, start the Flask shell:
 .venv/bin/flask shell
 ```
 
-The shell already includes `db` and all models. For example:
+The shell already includes `db` and the banking models listed above. For example:
 
 ```python
 transactions = db.session.scalars(

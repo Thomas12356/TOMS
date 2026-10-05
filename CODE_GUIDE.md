@@ -8,7 +8,7 @@ Starling importer before working on categorisation or income forms.
 | Location | Responsibility |
 | --- | --- |
 | `app.py` | Creates Flask, registers route groups, configures the database, and exposes health checks. |
-| `routes/` | Receives HTTP requests, validates their inputs, calls the relevant logic, and returns JSON. |
+| `routes/` | Receives HTTP requests, validates their inputs, calls the relevant logic, and returns HTML or JSON. |
 | `services/` | Business rules, bank requests, and database operations used by routes. |
 | `models.py` | Describes the database tables and their relationships. |
 
@@ -35,7 +35,8 @@ services/
         connection.py       Creates the shared db object and configures PostgreSQL
         migrations.py       Applies the SQL files in the root migrations/ folder
     web/
-        auth.py             Checks the API key
+        auth.py             Checks API keys
+        sessions.py         Browser sessions, CSRF and login attempt limits
         request_limits.py   Bounds incoming request bodies
     validation.py           Shared UUID, date, money, and text validation
     error_logging.py        Logs safe diagnostic details
@@ -55,7 +56,7 @@ Read these functions in order:
 3. `routes/transactions.py` → `saved_transaction`: loads the bank payment.
 4. `services/transactions/income.py` → `validate_reconciliation`: checks entered amounts
    against the deposit.
-5. Back in `put_income`: updates `TransactionIncome`, commits, and returns JSON.
+5. Back in `put_income`: updates `TransactionIncome`, commits, and returns HTML or JSON.
 
 `Transaction` stores what the bank reported. `TransactionClassification` stores
 your choice of income, expense, transfer, refund, or other.
@@ -71,6 +72,7 @@ income amounts but does not yet calculate annual tax.
 | Change | Start here | Relevant tests |
 | --- | --- | --- |
 | Change an income source's display label | `services/transactions/income.py`: `INCOME_TYPES` | `tests/test_income.py` |
+| Edit the classification form | `templates/classification.html` and `routes/dashboard.py`: `edit_classification` | `tests/test_dashboard_classification.py` |
 | Change classification rules | `services/transactions/classification.py` and `routes/transactions.py` | `tests/test_classification.py` |
 | Change transaction filters or returned fields | `routes/transactions.py`: `filters`, `FIELDS`, `list_transactions` | `tests/test_transactions.py` |
 | Change monthly totals | `routes/reports.py`: `monthly_report` | `tests/test_reports.py` |
@@ -83,9 +85,9 @@ Applied migrations have checksums: add a new migration instead of editing an old
 
 ## Your first frontend edits
 
-The first page is available at `/dashboard`. Sign in with your owner account
+The transaction page is available at `/dashboard`. Sign in with your owner account
 at `/login` (see the README setup). It reads saved transactions;
-categorisation editing will be a later step.
+classification editing is available beside each payment.
 
 Read its three files in this order:
 
@@ -115,8 +117,8 @@ Run the normal tests; bank calls are mocked and PostgreSQL tests are skipped:
 
 To run just the income tests, use `-p test_income.py`. To include the database
 tests after applying migrations, prefix the command with `RUN_POSTGRES_TESTS=1`.
-Their shared setup is explained at the top of `tests/support.py`; database
-changes made by those tests are rolled back.
+Their shared setup is explained at the top of `tests/support.py`. Database
+fixtures roll back changes; concurrency tests create and remove temporary schemas.
 
 ### Dashboard account selection
 
@@ -161,3 +163,36 @@ password-reset races and concurrent login throttling. See
 [SECURITY_TESTS.md](SECURITY_TESTS.md) for the findings, commands and scope.
 The concurrent tests use a temporary PostgreSQL schema and separate connections;
 they do not change your real owner account.
+
+## Follow a classification edit
+
+1. `routes/dashboard.py` builds the row's edit link with its three transaction
+   IDs, account filter and page number.
+2. `templates/classification.html` displays the payment, valid classification
+   choices, notes and a hidden CSRF token. Start here to change form wording.
+3. `edit_classification()` in `routes/dashboard.py` loads the payment, locks it
+   on POST, validates the form, commits and returns to the original ledger page.
+4. `services/transactions/classification.py` contains `save_classification()` and
+   `clear_classification()`. The dashboard and API share these rules, including
+   preserving income details and rejecting incompatible changes.
+
+`tests/test_dashboard_classification.py` checks real PostgreSQL saves, reset,
+CSRF rejection, escaped notes, invalid input and database failures. No bank API
+calls are made when editing classifications.
+
+## First-run setup and password settings
+
+Server startup calls `services/web/setup.py` to print a one-hour setup token
+and store its hash in `OwnerSetup` (migration `007_owner_setup.sql`). Flask run
+and `python app.py` announce it once; `gunicorn.conf.py` does this in the master
+process before its workers start. CLI imports for migrations and tests do not
+generate tokens. `flask owner-setup-token` is still available for manual rotation. The browser's
+`/setup` page in `routes/login.py` requires that token, creates the single owner
+and consumes the token. A PostgreSQL advisory lock serializes setup, token
+rotation and CLI recovery so two requests cannot claim different owners.
+
+`/settings/password` requires an authenticated browser session and the current
+password. It locks the owner row, updates the hash and revokes every session.
+Both forms share `templates/owner_settings.html`, CSRF protection and the existing
+login attempt limit. `tests/test_owner_setup.py` covers setup and password changes;
+`tests/test_security.py` includes a simultaneous first-owner creation test.
