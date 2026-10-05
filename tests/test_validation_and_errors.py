@@ -8,9 +8,9 @@ from unittest.mock import patch
 from sqlalchemy.exc import OperationalError
 
 from app import app
-from services.database import db
+from services.database.connection import db
 from services.error_logging import log_failure
-from services.transaction_sync import SyncError, run_sync
+from services.transactions.sync import SyncError, run_sync
 from services.validation import timestamp
 from support import ApiTestCase
 from test_transaction_sync import MemoryStore, NOW
@@ -150,7 +150,7 @@ class ErrorLoggingTests(unittest.TestCase):
         for error in (self.database_error(), RuntimeError("private upstream payload")):
             with self.subTest(error_type=type(error).__name__):
                 store = MemoryStore()
-                with patch("services.transaction_sync.discover_accounts", side_effect=error), \
+                with patch("services.transactions.sync.discover_accounts", side_effect=error), \
                         self.assertLogs("toms.errors") as logs:
                     with self.assertRaises(SyncError) as raised:
                         run_sync(store, {}, now=NOW)
@@ -163,7 +163,7 @@ class ErrorLoggingTests(unittest.TestCase):
 
     def test_sync_recording_and_unlock_failures_are_logged(self):
         store = MemoryStore()
-        with patch("services.transaction_sync.discover_accounts", side_effect=RuntimeError("private payload")), \
+        with patch("services.transactions.sync.discover_accounts", side_effect=RuntimeError("private payload")), \
                 patch.object(store, "finish_run", side_effect=self.database_error()), \
                 patch.object(store, "unlock", side_effect=self.database_error()), \
                 self.assertLogs("toms.errors") as logs:

@@ -2,7 +2,7 @@
 
 from urllib.parse import parse_qs, urlsplit
 
-from services.starling import StarlingError, starling_request
+from services.banking.client import StarlingError, starling_request
 from services.validation import money, timestamp, uid
 
 

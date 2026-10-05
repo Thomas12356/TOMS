@@ -9,7 +9,7 @@ from sqlalchemy.exc import OperationalError
 
 from app import app
 from models import Account, Category, Transaction
-from services.database import db
+from services.database.connection import db
 from support import ApiTestCase, PostgreSQLTestCase
 
 

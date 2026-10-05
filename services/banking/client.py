@@ -7,10 +7,11 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
-from services.rate_limit import RateLimitError, acquire_slot
+from services.banking.rate_limit import RateLimitError, acquire_slot
 
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+# This module is in services/banking; configuration lives at the repository root.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 # HTTPX clients reuse connections and can be shared between request threads.
 # Credentials are supplied per request, never attached to an arbitrary URL.

@@ -7,9 +7,9 @@ from urllib.parse import urlencode
 from werkzeug.exceptions import BadRequest
 
 from app import app
-from services.starling import StarlingError
-from services.starling_feed import history_pages, normalize_feed_item
-from services.transaction_sync import SyncError, parse_options, run_sync
+from services.banking.client import StarlingError
+from services.banking.feed import history_pages, normalize_feed_item
+from services.transactions.sync import SyncError, parse_options, run_sync
 
 
 ACCOUNT = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa"
@@ -66,7 +66,7 @@ class FeedTests(unittest.TestCase):
             "maxTransactionTimestamp": NOW.isoformat()})
         replies = [{"feedItems": [feed_item()], "links": {"next": link}},
                    {"feedItems": [feed_item(CURSOR)], "links": {}}]
-        with patch("services.starling_feed.starling_request", side_effect=replies) as request:
+        with patch("services.banking.feed.starling_request", side_effect=replies) as request:
             pages = list(history_pages(ACCOUNT, CATEGORY, OPENED, NOW))
         self.assertEqual([len(page) for page in pages], [1, 1])
         params = request.call_args_list[1].kwargs["params"]
@@ -81,11 +81,11 @@ class FeedTests(unittest.TestCase):
                      path + "?cursor=" + CURSOR + "&pageToFetch=PREVIOUS",
                      path + "?cursor=" + CURSOR + "&minTransactionTimestamp=2020-01-01T00:00:00Z"):
             with self.subTest(link=link):
-                with patch("services.starling_feed.starling_request", return_value={"feedItems": [], "links": {"next": link}}):
+                with patch("services.banking.feed.starling_request", return_value={"feedItems": [], "links": {"next": link}}):
                     with self.assertRaises(StarlingError):
                         list(history_pages(ACCOUNT, CATEGORY, OPENED, NOW))
         repeated = {"feedItems": [], "links": {"next": path + "?cursor=" + CURSOR}}
-        with patch("services.starling_feed.starling_request", return_value=repeated):
+        with patch("services.banking.feed.starling_request", return_value=repeated):
             with self.assertRaises(StarlingError):
                 list(history_pages(ACCOUNT, CATEGORY, OPENED, NOW))
 
@@ -95,20 +95,20 @@ class FeedTests(unittest.TestCase):
             with self.subTest(change=change):
                 with self.assertRaises(StarlingError):
                     normalize_feed_item({**feed_item(), **change}, ACCOUNT, CATEGORY)
-        with patch("services.starling_feed.starling_request", return_value={}):
+        with patch("services.banking.feed.starling_request", return_value={}):
             with self.assertRaises(StarlingError):
                 list(history_pages(ACCOUNT, CATEGORY, OPENED, NOW))
 
 
 class SyncTests(unittest.TestCase):
     def setUp(self):
-        patcher = patch("services.transaction_sync.starling_request", side_effect=discovery)
+        patcher = patch("services.transactions.sync.starling_request", side_effect=discovery)
         patcher.start()
         self.addCleanup(patcher.stop)
 
     def test_initial_import_uses_opening_date_and_commits_each_page(self):
         store = MemoryStore()
-        with patch("services.transaction_sync.history_pages", return_value=[[{}], [{}]]) as pages:
+        with patch("services.transactions.sync.history_pages", return_value=[[{}], [{}]]) as pages:
             result = run_sync(store, {}, now=NOW)
         pages.assert_called_once_with(ACCOUNT, CATEGORY, OPENED, NOW)
         self.assertEqual(len(store.pages), 2)
@@ -120,7 +120,7 @@ class SyncTests(unittest.TestCase):
             yield [{}]
             raise StarlingError("Starling returned HTTP 429.", 429, 10)
         store = MemoryStore()
-        with patch("services.transaction_sync.history_pages", side_effect=pages):
+        with patch("services.transactions.sync.history_pages", side_effect=pages):
             with self.assertRaises(SyncError) as error:
                 run_sync(store, {}, now=NOW)
         self.assertEqual(error.exception.status_code, 429)
@@ -135,7 +135,7 @@ class SyncTests(unittest.TestCase):
         store = MemoryStore()
         previous = NOW - timedelta(days=1)
         store.state = {"history_from": OPENED, "changes_through": previous}
-        with patch("services.transaction_sync.changed_items", return_value=[{}]) as changes:
+        with patch("services.transactions.sync.changed_items", return_value=[{}]) as changes:
             result = run_sync(store, {}, now=NOW)
         changes.assert_called_once_with(ACCOUNT, CATEGORY, previous - timedelta(minutes=5))
         self.assertEqual(store.target[3], "incremental")
@@ -146,8 +146,8 @@ class SyncTests(unittest.TestCase):
             with self.subTest(stale=stale):
                 store = MemoryStore()
                 store.state = {"history_from": OPENED, "changes_through": NOW - timedelta(days=400 if stale else 1)}
-                with patch("services.transaction_sync.changed_items", return_value=[{}] * 1000) as changes:
-                    with patch("services.transaction_sync.history_pages", return_value=[[]]) as pages:
+                with patch("services.transactions.sync.changed_items", return_value=[{}] * 1000) as changes:
+                    with patch("services.transactions.sync.history_pages", return_value=[[]]) as pages:
                         run_sync(store, {}, now=NOW)
                 pages.assert_called_once_with(ACCOUNT, CATEGORY, OPENED, NOW)
                 self.assertEqual(changes.call_count, 0 if stale else 1)
@@ -171,7 +171,7 @@ class SyncTests(unittest.TestCase):
                 self.assertEqual(client.post("/sync/transactions").status_code, 401)
                 repository.assert_not_called()
             with patch("routes.sync.SyncStore", return_value=MemoryStore()):
-                with patch("services.transaction_sync.history_pages", return_value=[[]]):
+                with patch("services.transactions.sync.history_pages", return_value=[[]]):
                     response = client.post("/sync/transactions", headers={"Authorization": "Bearer test-key"})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["status"], "completed")

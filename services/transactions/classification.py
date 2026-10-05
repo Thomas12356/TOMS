@@ -3,7 +3,7 @@
 from datetime import timezone
 
 from models import Transaction, TransactionClassification
-from services.database import db
+from services.database.connection import db
 
 
 CLASSIFICATION_TYPES = {

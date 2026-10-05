@@ -6,7 +6,7 @@ from sqlalchemy import event, text
 from sqlalchemy.exc import OperationalError
 
 from app import app
-from services.database import db, init_database
+from services.database.connection import db, init_database
 
 
 class DatabaseTests(unittest.TestCase):

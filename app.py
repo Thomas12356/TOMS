@@ -9,12 +9,12 @@ from routes.starling import starling
 from routes.sync import sync
 from routes.transactions import transactions
 from routes.reports import reports
-from services.auth import require_api_key
-from services.database import check_database, db, init_database
+from services.web.auth import require_api_key
+from services.database.connection import check_database, db, init_database
 from models import Account, Category, Transaction, TransactionClassification, TransactionIncome, SyncRun, SyncTarget
-from services.migrations import upgrade_database
+from services.database.migrations import upgrade_database
 from services.error_logging import log_failure
-from services.request_limits import BoundedRequest
+from services.web.request_limits import BoundedRequest
 
 
 app = Flask(__name__)

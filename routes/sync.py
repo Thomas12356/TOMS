@@ -6,10 +6,10 @@ from flask import Blueprint, jsonify, request
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest
 
-from services.auth import require_api_key
+from services.web.auth import require_api_key
 from services.error_logging import log_failure
-from services.sync_store import SyncStore
-from services.transaction_sync import SyncError, parse_options, run_sync
+from services.transactions.store import SyncStore
+from services.transactions.sync import SyncError, parse_options, run_sync
 
 
 # A blueprint groups these URLs; every matched route requires the API key.

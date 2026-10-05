@@ -10,11 +10,11 @@ from werkzeug.exceptions import BadRequest, NotFound
 
 from models import Transaction, TransactionClassification, TransactionIncome
 from routes.helpers import query_values
-from services.auth import require_api_key
-from services.classification import CLASSIFICATION_TYPES, classification_details, effective_type
-from services.database import db
+from services.web.auth import require_api_key
+from services.transactions.classification import CLASSIFICATION_TYPES, classification_details, effective_type
+from services.database.connection import db
 from services.error_logging import log_failure
-from services.income import INCOME_TYPES, TAX_TREATMENTS, income_body, income_details, validate_reconciliation
+from services.transactions.income import INCOME_TYPES, TAX_TREATMENTS, income_body, income_details, validate_reconciliation
 from services.validation import uid, optional_text
 
 

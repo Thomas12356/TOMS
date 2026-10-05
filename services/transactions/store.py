@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import text
 
 from models import Account, Category, Transaction, SyncRun, SyncTarget
-from services.database import db
+from services.database.connection import db
 
 
 LOCK_ID = 6075157141257144322

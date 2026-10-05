@@ -114,19 +114,25 @@ app.py                      Flask setup, route registration, health checks, CLI
 models.py                   Database tables and relationships
 routes/                     HTTP inputs, endpoint handlers, JSON responses
 services/                   Business rules, bank client, sync and database logic
+    banking/                Starling client, feed parsing, diagnostics, rate limits
+    transactions/           Classification, income rules, sync orchestration, storage
+    database/               PostgreSQL connection and migration runner
+    web/                    API authentication and request body limits
+    validation.py           Shared validation for IDs, dates, money, and text
+    error_logging.py        Safe error diagnostics
 migrations/                 Versioned PostgreSQL schema changes
 tests/                      Validation, API and opt-in database tests
 CODE_GUIDE.md               Reading order and places to make your own changes
 .env.example                Configuration template without credentials
 ```
 
-Start with `routes/transactions.py` and `services/income.py` for categorisation
+Start with `routes/transactions.py` and `services/transactions/income.py` for categorisation
 and income edits. `routes/reports.py` contains the monthly report.
-`services/transaction_sync.py` coordinates bank imports, while
-`services/sync_store.py` handles their database writes.
+`services/transactions/sync.py` coordinates bank imports, while
+`services/transactions/store.py` handles their database writes.
 
 To make a small first edit, change a display label in `INCOME_TYPES` in
-`services/income.py`, then run the income tests. Adding a new stored type also
+`services/transactions/income.py`, then run the income tests. Adding a new stored type also
 requires a new migration because the database restricts allowed values.
 
 ```bash
@@ -714,8 +720,8 @@ errors, and invalid receipt amounts return 400.
 
 Bank requests use one synchronous HTTPX client with connection reuse, explicit
 10-second network timeouts and redirects disabled. Local rate limits and safe
-upstream error messages are handled by `services/starling.py` and
-`services/rate_limit.py`. Caller authentication lives in `services/auth.py`;
+upstream error messages are handled by `services/banking/client.py` and
+`services/banking/rate_limit.py`. Caller authentication lives in `services/web/auth.py`;
 each route blueprint explicitly registers it. Shared query-string validation
 lives in `routes/helpers.py`.
 
@@ -729,8 +735,8 @@ Shared ID, timestamp and money validation lives in `services/validation.py`.
 
 Database models live in `models.py`: `Account`, `Category`, `Transaction`,
 `TransactionClassification`, `TransactionIncome`, `SyncRun`, and `SyncTarget`.
-They map to the `toms` tables. `services/database.py` configures the `db`
-extension using the `PG*` settings; `services/sync_store.py` uses model lookups,
+They map to the `toms` tables. `services/database/connection.py` configures the `db`
+extension using the `PG*` settings; `services/transactions/store.py` uses model lookups,
 attribute updates and session commits.
 
 Each imported page commits its transactions and progress together. A separate
@@ -761,7 +767,7 @@ for transaction in transactions:
     print(transaction.transaction_time, transaction.amount_minor, transaction.currency)
 ```
 
-In other modules, import `db` from `services.database` and models from `models`.
+In other modules, import `db` from `services.database.connection` and models from `models`.
 Database operations require a Flask request or application context. Normal model
 changes use `db.session.add(...)` and `db.session.commit()`.
 

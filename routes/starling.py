@@ -7,9 +7,9 @@ from datetime import date
 from flask import Blueprint, Response, current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
 
-from services.auth import require_api_key
-from services.starling import StarlingError, get_account_holder_name, starling_request
-from services.starling_diagnostics import run_diagnostics
+from services.web.auth import require_api_key
+from services.banking.client import StarlingError, get_account_holder_name, starling_request
+from services.banking.diagnostics import run_diagnostics
 from services.validation import timestamp
 
 
