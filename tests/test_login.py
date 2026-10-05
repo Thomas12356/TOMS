@@ -7,7 +7,6 @@ from unittest.mock import patch
 from sqlalchemy.exc import OperationalError
 from werkzeug.security import generate_password_hash
 
-from flask import g
 
 from app import app
 from models import BrowserSession, OwnerLogin
@@ -30,7 +29,10 @@ class LoginSafetyTests(ApiTestCase):
         for key in (None, "short-key"):
             with patch.dict(app.config, {"SECRET_KEY": key}):
                 self.assertEqual(self.client.get("/login").status_code, 503)
-                self.assertEqual(self.client.get("/dashboard").status_code, 503)
+                response = self.client.get("/dashboard")
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.mimetype, "text/html")
+                self.assertIn("restart Flask", response.get_data(as_text=True))
 
     def test_forms_reject_missing_csrf_before_database_access(self):
         with patch.object(db.session, "get") as get, patch("routes.login.consume_login_attempt") as attempts:
@@ -53,13 +55,6 @@ class OwnerLoginFixture(PostgreSQLTestCase):
     def setUp(self):
         super().setUp()
         self.enterContext(patch.dict(app.config, {"SECRET_KEY": "a" * 64, "SESSION_COOKIE_SECURE": False}))
-        # The database fixture holds an app context across requests. Real HTTP
-        # requests have fresh g state; clear extension caches to reproduce that.
-        def clear_request_caches():
-            for key in ("_login_user", "csrf_token", "csrf_valid"):
-                g.pop(key, None)
-        app.before_request_funcs.setdefault(None, []).insert(0, clear_request_caches)
-        self.addCleanup(app.before_request_funcs[None].remove, clear_request_caches)
         # Tests own a rollback-only transaction; do not alter the real owner.
         self.session.execute(db.delete(OwnerLogin))
         self.session.execute(db.delete(BrowserSession))

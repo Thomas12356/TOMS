@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ 'Create owner account' if setup else 'Change password' }} · TOMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{{ url_for('login.sign_in') if setup else url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+    </header>
+    <main class="login-page">
+        <div class="page-heading">
+            <p class="eyebrow">TOMS / {{ 'FIRST RUN' if setup else 'OWNER SETTINGS' }}</p>
+            <h1>{{ 'Create owner account' if setup else 'Change password' }}</h1>
+            <p class="description">{{ 'Enter your server setup token and choose your login.' if setup else 'Changing your password signs out all devices.' }}</p>
+        </div>
+        {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+        {% if ready %}
+        <form class="login-form" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if setup %}
+            <label for="setup-token">Setup token</label>
+            <input id="setup-token" name="setup_token" type="password" autocomplete="off" maxlength="200" required>
+            <label for="username">Username</label>
+            <input id="username" name="username" autocomplete="username" maxlength="100" required>
+            {% else %}
+            <label for="current-password">Current password</label>
+            <input id="current-password" name="current_password" type="password" autocomplete="current-password" maxlength="1024" required>
+            {% endif %}
+            <label for="password">{{ 'Password' if setup else 'New password' }} <span class="secondary">At least 8 characters</span></label>
+            <input id="password" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="1024" required>
+            <label for="confirmation">Confirm password</label>
+            <input id="confirmation" name="confirmation" type="password" autocomplete="new-password" minlength="8" maxlength="1024" required>
+            <button type="submit">{{ 'Create owner account' if setup else 'Change password' }}</button>
+            {% if not setup %}<a href="{{ url_for('dashboard.transactions_page') }}">Cancel</a>{% endif %}
+        </form>
+        {% endif %}
+    </main>
+</body>
+</html>

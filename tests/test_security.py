@@ -21,9 +21,9 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import app
-from models import BrowserSession, OwnerLogin
+from models import BrowserSession, OwnerLogin, OwnerSetup
 from services.database.connection import db
-from services.web.sessions import consume_login_attempt, load_owner, token_hash
+from services.web.sessions import consume_login_attempt, token_hash
 from test_login import OwnerLoginFixture, csrf_token
 from support import ApiTestCase
 
@@ -109,11 +109,10 @@ class SecurityBoundaryTests(ApiTestCase):
     def test_bank_supplied_text_is_escaped_in_dashboard(self):
         attack = '<img src=x onerror="alert(1)">'
         account = SimpleNamespace(account_uid="11111111-1111-4111-8111-111111111111", name=attack, currency="GBP")
-        payment = SimpleNamespace(transaction_time=datetime.now(timezone.utc), counterparty_name=attack,
+        payment = SimpleNamespace(account_uid=account.account_uid, category_uid=account.account_uid, feed_item_uid=account.account_uid, transaction_time=datetime.now(timezone.utc), counterparty_name=attack,
                                   reference=attack, amount_minor=100, currency="GBP", direction="IN",
                                   source="FASTER_PAYMENTS_IN", status=attack, classification=None)
-        self.session = db.session
-        self.session.scalars.return_value = [account]
+        db.session.scalars.return_value = [account]
         with patch.object(db, "paginate", return_value=SimpleNamespace(items=[payment], total=1, pages=0)):
             response = self.client.get("/dashboard", headers=self.headers)
         self.assertEqual(response.status_code, 200)
@@ -294,6 +293,7 @@ class ConcurrentLoginSecurityTests(ApiTestCase):
         self.bound_engine = self.engine.execution_options(schema_translate_map={"toms": self.schema})
         OwnerLogin.__table__.create(self.bound_engine)
         BrowserSession.__table__.create(self.bound_engine)
+        OwnerSetup.__table__.create(self.bound_engine)
         self.sessions = scoped_session(sessionmaker(bind=self.bound_engine))
         self.addCleanup(self.sessions.remove)
         self.enterContext(patch.object(db, "session", self.sessions))
@@ -367,3 +367,24 @@ class ConcurrentLoginSecurityTests(ApiTestCase):
         with self.engine.connect() as connection:
             self.assertEqual(connection.scalar(text(f"SELECT count(*) FROM {self.schema}.browser_sessions")), 0)
         self.assertEqual(client.get("/dashboard").status_code, 302)
+
+    def test_simultaneous_setup_requests_create_exactly_one_owner(self):
+        self.enterContext(patch.dict(app.config, {"SECRET_KEY": "a" * 64, "SESSION_COOKIE_SECURE": False}))
+        token = "only-the-server-knows-this-setup-token"
+        self.sessions.add(OwnerSetup(id=1, token_hash=token_hash(token), expires_at=datetime.now(timezone.utc) + timedelta(hours=1)))
+        self.sessions.commit()
+        barrier = Barrier(2)
+        def create_owner(username):
+            client = app.test_client()
+            page = client.get("/setup")
+            csrf = re.search(r'name="csrf_token" value="([^"]+)"', page.get_data(as_text=True))[1]
+            barrier.wait(timeout=10)
+            return client.post("/setup", data={"username": username, "setup_token": token,
+                "password": "a long enough owner password", "confirmation": "a long enough owner password",
+                "csrf_token": csrf}).status_code
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(create_owner, ("first", "second")))
+        self.assertEqual(sorted(results), [302, 303])
+        with self.engine.connect() as connection:
+            self.assertEqual(connection.scalar(text(f"SELECT count(*) FROM {self.schema}.owner_login")), 1)
+            self.assertEqual(connection.scalar(text(f"SELECT count(*) FROM {self.schema}.owner_setup")), 0)

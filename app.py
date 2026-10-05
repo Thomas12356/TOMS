@@ -1,8 +1,9 @@
 import os
+import sys
 
 from sqlalchemy.exc import SQLAlchemyError
 import click
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, redirect, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from routes.starling import starling
@@ -11,16 +12,17 @@ from routes.transactions import transactions
 from routes.reports import reports
 from routes.dashboard import dashboard
 from routes.login import login
-from services.web.sessions import login_manager, csrf, SESSION_LIFETIME
+from services.web.sessions import login_manager, csrf, SESSION_LIFETIME, lock_owner_setup, validate_owner_credentials
 from flask_wtf.csrf import CSRFError
 from werkzeug.security import generate_password_hash
-from models import OwnerLogin, BrowserSession
 from services.web.auth import require_api_key
 from services.database.connection import check_database, db, init_database
-from models import Account, Category, Transaction, TransactionClassification, TransactionIncome, SyncRun, SyncTarget
+from models import (Account, BrowserSession, Category, OwnerLogin, OwnerSetup, Transaction,
+                    TransactionClassification, TransactionIncome, SyncRun, SyncTarget)
 from services.database.migrations import upgrade_database
 from services.error_logging import log_failure
 from services.web.request_limits import BoundedRequest
+from services.web.setup import announce_setup, create_setup_token
 
 
 app = Flask(__name__)
@@ -65,7 +67,7 @@ def shell_context():
 @app.after_request
 def protect_banking_responses(response):
     if (request.path.startswith(("/starling/", "/sync/", "/transactions/", "/reports/", "/dashboard/"))
-            or request.path in ("/login", "/logout", "/health/db", "/transactions", "/reports", "/dashboard")):
+            or request.path in ("/login", "/logout", "/setup", "/settings/password", "/health/db", "/transactions", "/reports", "/dashboard")):
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
@@ -80,7 +82,7 @@ def csrf_failure(error):
 
 @app.get("/")
 def index():
-    return jsonify(message="Welcome to the Flask API")
+    return redirect(url_for("dashboard.transactions_page"))
 
 
 @app.get("/health")
@@ -120,13 +122,16 @@ def db_upgrade():
 @click.password_option(confirmation_prompt=True)
 def owner_password(username, password):
     """Create/update the single owner and revoke all previous browser sessions."""
-    username = username.strip()
-    if not 1 <= len(username) <= 100 or not 15 <= len(password) <= 1024:
-        raise click.ClickException("Use a username of 1–100 characters and a password of 15–1024 characters.")
     try:
+        username = validate_owner_credentials(username, password)
+    except ValueError as error:
+        raise click.ClickException(str(error)) from None
+    try:
+        lock_owner_setup()
         db.session.merge(OwnerLogin(id=1, username=username,
                                    password_hash=generate_password_hash(password, method="scrypt")))
         db.session.execute(db.delete(BrowserSession))
+        db.session.execute(db.delete(OwnerSetup))
         db.session.commit()
     except SQLAlchemyError as error:
         db.session.rollback()
@@ -135,5 +140,28 @@ def owner_password(username, password):
     click.echo("Owner password saved. All previous browser sessions have been revoked.")
 
 
+@app.cli.command("owner-setup-token")
+def owner_setup_token():
+    """Generate a one-hour token for the first-run setup page; revoke older tokens."""
+    try:
+        token = create_setup_token()
+        if token is None:
+            raise click.ClickException("An owner already exists. Use the password settings page or owner-password for recovery.")
+    except SQLAlchemyError as error:
+        db.session.rollback()
+        log_failure("owner.setup", error)
+        raise click.ClickException("Setup token generation failed. Check PostgreSQL and run flask db-upgrade.") from None
+    click.echo("Open /setup and enter this token within one hour:")
+    click.echo(token)
+
+
+# Flask's CLI starts its own server rather than calling app.run(). Only the
+# initial launcher prints a token; reloader children reuse it.
+if (os.getenv("FLASK_RUN_FROM_CLI") == "true" and "run" in sys.argv
+        and os.getenv("WERKZEUG_RUN_MAIN") != "true"):
+    announce_setup(app)
+
+
 if __name__ == "__main__":
+    announce_setup(app)
     app.run(host="127.0.0.1", port=5000)
