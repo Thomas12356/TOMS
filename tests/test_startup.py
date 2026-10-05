@@ -25,11 +25,17 @@ class StartupTests(ApiTestCase):
                 self.assertEqual(announce.call_count, int(expected))
 
     def test_direct_python_launcher_announces_before_run(self):
-        with patch.dict(os.environ, {'FLASK_RUN_FROM_CLI': '', 'WERKZEUG_RUN_MAIN': ''}), \
+        with patch.dict(os.environ, {'FLASK_RUN_FROM_CLI': '', 'WERKZEUG_RUN_MAIN': '', 'FLASK_RUN_HOST': '127.0.0.1', 'FLASK_RUN_PORT': '5000'}), \
                 patch('services.web.setup.announce_setup') as announce, patch('flask.Flask.run') as run:
             runpy.run_path(str(ROOT / 'app.py'), run_name='__main__')
             announce.assert_called_once()
             run.assert_called_once_with(host='127.0.0.1', port=5000)
+
+    def test_direct_launcher_respects_lan_host_and_port(self):
+        with patch.dict(os.environ, {'FLASK_RUN_FROM_CLI': '', 'FLASK_RUN_HOST': '0.0.0.0', 'FLASK_RUN_PORT': '5050'}), \
+                patch('services.web.setup.announce_setup'), patch('flask.Flask.run') as run:
+            runpy.run_path(str(ROOT / 'app.py'), run_name='__main__')
+            run.assert_called_once_with(host='0.0.0.0', port=5050)
 
     def test_gunicorn_announces_once_and_discards_prefork_database_pool(self):
         config = runpy.run_path(str(ROOT / 'gunicorn.conf.py'))
