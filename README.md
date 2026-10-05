@@ -1,4 +1,4 @@
-# Flask Starling API
+# TOMS - The Organised Money System
 
 Install dependencies and start the local server:
 
