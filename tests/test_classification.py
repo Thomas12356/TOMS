@@ -6,9 +6,9 @@ from unittest.mock import patch
 from uuid import uuid4
 
 from models import Transaction, TransactionClassification
-from services.database import db
-from services.starling_feed import normalize_feed_item
-from services.sync_store import SyncStore
+from services.database.connection import db
+from services.banking.feed import normalize_feed_item
+from services.transactions.store import SyncStore
 from support import ApiTestCase, SavedTransactionTestCase
 
 

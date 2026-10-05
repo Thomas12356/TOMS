@@ -5,7 +5,7 @@ from unittest.mock import patch
 from urllib.parse import urlparse
 
 from app import app
-from services.starling_diagnostics import CHECKS
+from services.banking.diagnostics import CHECKS
 
 
 ACCOUNT = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa"
@@ -26,7 +26,7 @@ class DiagnosticTests(unittest.TestCase):
                                           "STARLING_CATEGORY_UID": CATEGORY})
         token.start()
         self.addCleanup(token.stop)
-        limiter = patch("services.starling.acquire_slot")
+        limiter = patch("services.banking.client.acquire_slot")
         self.limiter = limiter.start()
         self.addCleanup(limiter.stop)
 
@@ -53,7 +53,7 @@ class DiagnosticTests(unittest.TestCase):
         return httpx.Response(200, json=data)
 
     def test_discovers_ids_and_exercises_all_reads_without_writes(self):
-        with patch("services.starling.http_client.send", side_effect=self.fake_response) as send:
+        with patch("services.banking.client.http_client.send", side_effect=self.fake_response) as send:
             response = self.client.post("/starling/test")
         self.assertEqual(response.status_code, 200)
         report = response.get_json()
@@ -74,7 +74,7 @@ class DiagnosticTests(unittest.TestCase):
             if str(request.url).endswith("/accounts"):
                 return httpx.Response(403)
             return httpx.Response(200, json={})
-        with patch("services.starling.http_client.send", side_effect=upstream):
+        with patch("services.banking.client.http_client.send", side_effect=upstream):
             response = self.client.post("/starling/test", json={})
         report = response.get_json()
         self.assertEqual(response.status_code, 200)
@@ -83,14 +83,14 @@ class DiagnosticTests(unittest.TestCase):
         self.assertFalse(report["allPassed"])
 
     def test_browser_get_runs_read_checks(self):
-        with patch("services.starling.http_client.send", side_effect=self.fake_response) as send:
+        with patch("services.banking.client.http_client.send", side_effect=self.fake_response) as send:
             response = self.client.get("/starling/test")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["summary"]["passed"], 19)
         self.assertTrue(all(call.args[0].method == "GET" for call in send.call_args_list))
 
     def test_get_cannot_enable_writes_and_head_does_not_call_starling(self):
-        with patch("services.starling.http_client.send") as send:
+        with patch("services.banking.client.http_client.send") as send:
             response = self.client.get("/starling/test", json={"includeMetadataWrite": True})
             self.assertEqual(response.status_code, 400)
             self.assertEqual(self.client.get("/starling/test?includeMetadataWrite=true").status_code, 400)
@@ -98,7 +98,7 @@ class DiagnosticTests(unittest.TestCase):
             send.assert_not_called()
 
     def test_invalid_options_do_not_call_starling(self):
-        with patch("services.starling.http_client.send") as send:
+        with patch("services.banking.client.http_client.send") as send:
             for options in [[], {"accountUid": "invalid"}, {"receipt": {}},
                             {"includeMetadataWrite": True}, {"includeMetadataWrite": "false"},
                             {"url": "https://example.com"}]:
@@ -111,7 +111,7 @@ class DiagnosticTests(unittest.TestCase):
                    "includeMetadataWrite": True,
                    "receipt": {"metadataSource": "CUSTOMER", "receiptIdentifier": "test",
                                "totalAmount": 0, "receiptMerchant": {}, "items": [], "paymentMethods": []}}
-        with patch("services.starling.http_client.send", side_effect=self.fake_response) as send:
+        with patch("services.banking.client.http_client.send", side_effect=self.fake_response) as send:
             response = self.client.post("/starling/test", json=options)
         report = response.get_json()
         self.assertTrue(report["allPassed"])
@@ -120,7 +120,7 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(json.loads(writes[0].args[0].content), options["receipt"])
 
     def test_rate_limit_stops_further_bank_requests(self):
-        with patch("services.starling.http_client.send", return_value=httpx.Response(429)) as send:
+        with patch("services.banking.client.http_client.send", return_value=httpx.Response(429)) as send:
             report = self.client.post("/starling/test").get_json()
         self.assertEqual(send.call_count, 1)
         self.assertEqual(report["summary"]["failed"], 1)
@@ -134,14 +134,14 @@ class DiagnosticTests(unittest.TestCase):
                     "space:read", "standing-order:read", "statement-pdf:read", "statement-csv:read",
                     "feed-export-csv:read", "transaction:read"}
         self.assertEqual({scope for scopes in CHECKS.values() for scope in scopes}, expected)
-        with patch("services.starling.http_client.send", side_effect=self.fake_response):
+        with patch("services.banking.client.http_client.send", side_effect=self.fake_response):
             report = self.client.get("/starling/test").get_json()
         self.assertEqual({scope for result in report["results"] for scope in result["scopes"]}, expected)
         self.assertEqual(len(report["results"]), 20)
 
     def test_token_alone_discovers_account_and_category(self):
         with patch.dict("os.environ", {"STARLING_ACCOUNT_UID": "", "STARLING_CATEGORY_UID": ""}):
-            with patch("services.starling.http_client.send", side_effect=self.fake_response) as send:
+            with patch("services.banking.client.http_client.send", side_effect=self.fake_response) as send:
                 report = self.client.get("/starling/test").get_json()
         balance = next(result for result in report["results"] if "balance:read" in result["scopes"])
         self.assertEqual(balance["status"], "passed")
@@ -154,7 +154,7 @@ class DiagnosticTests(unittest.TestCase):
                 return httpx.Response(403)
             return self.fake_response(request, **kwargs)
         with patch.dict("os.environ", {"STARLING_ACCOUNT_UID": "", "STARLING_CATEGORY_UID": ""}):
-            with patch("services.starling.http_client.send", side_effect=upstream):
+            with patch("services.banking.client.http_client.send", side_effect=upstream):
                 report = self.client.get("/starling/test").get_json()
         discovery = next(result for result in report["results"] if "account-list:read" in result["scopes"])
         self.assertEqual(discovery["status"], "failed")
@@ -171,7 +171,7 @@ class DiagnosticTests(unittest.TestCase):
                 ]})
             return self.fake_response(request, **kwargs)
         with patch.dict("os.environ", {"STARLING_ACCOUNT_UID": "", "STARLING_CATEGORY_UID": ""}):
-            with patch("services.starling.http_client.send", side_effect=upstream):
+            with patch("services.banking.client.http_client.send", side_effect=upstream):
                 report = self.client.post("/starling/test", json={"accountUid": ITEM}).get_json()
         feed = next(result for result in report["results"] if "transaction:read" in result["scopes"])
         self.assertIn(f"/account/{ITEM}/category/{PAYEE_ACCOUNT}", feed["url"])
@@ -184,13 +184,13 @@ class DiagnosticTests(unittest.TestCase):
                     {"accountUid": ITEM, "defaultCategory": PAYEE_ACCOUNT},
                 ]})
             return self.fake_response(request, **kwargs)
-        with patch("services.starling.http_client.send", side_effect=upstream):
+        with patch("services.banking.client.http_client.send", side_effect=upstream):
             report = self.client.post("/starling/test", json={"accountUid": ITEM}).get_json()
         feed = next(result for result in report["results"] if "transaction:read" in result["scopes"])
         self.assertIn(f"/account/{ITEM}/category/{PAYEE_ACCOUNT}", feed["url"])
 
     def test_explicit_category_overrides_discovery(self):
-        with patch("services.starling.http_client.send", side_effect=self.fake_response):
+        with patch("services.banking.client.http_client.send", side_effect=self.fake_response):
             report = self.client.post("/starling/test", json={"accountUid": ACCOUNT, "categoryUid": ITEM}).get_json()
         feed = next(result for result in report["results"] if "transaction:read" in result["scopes"])
         self.assertIn(f"/account/{ACCOUNT}/category/{ITEM}", feed["url"])

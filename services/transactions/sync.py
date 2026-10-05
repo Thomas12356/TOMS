@@ -8,8 +8,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest
 
 from services.error_logging import log_failure
-from services.starling import StarlingError, starling_request
-from services.starling_feed import changed_items, history_pages
+from services.banking.client import StarlingError, starling_request
+from services.banking.feed import changed_items, history_pages
 from services.validation import timestamp, uid
 
 

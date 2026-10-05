@@ -11,14 +11,14 @@ from sqlalchemy import text
 
 from sqlalchemy.orm import Session
 
-from services.database import db
+from services.database.connection import db
 from models import Transaction
 
-from services.migrations import upgrade_database
-from services.starling import StarlingError
-from services.starling_feed import normalize_feed_item
-from services.sync_store import LOCK_ID, SyncStore
-from services.transaction_sync import SyncError, run_sync
+from services.database.migrations import upgrade_database
+from services.banking.client import StarlingError
+from services.banking.feed import normalize_feed_item
+from services.transactions.store import LOCK_ID, SyncStore
+from services.transactions.sync import SyncError, run_sync
 from support import PostgreSQLTestCase
 from test_transaction_sync import ACCOUNT, CATEGORY, CURSOR, ITEM, NOW, discovery, feed_item
 
@@ -28,10 +28,10 @@ class PostgreSQLSyncTests(PostgreSQLTestCase):
         super().setUp()
         self.store = SyncStore(self.session, self.engine)
         self.addCleanup(self.store.unlock)
-        self.enterContext(patch("services.transaction_sync.starling_request", side_effect=discovery))
+        self.enterContext(patch("services.transactions.sync.starling_request", side_effect=discovery))
 
     def import_rows(self, items, options=None, now=NOW):
-        with patch("services.transaction_sync.history_pages", return_value=[items]):
+        with patch("services.transactions.sync.history_pages", return_value=[items]):
             return run_sync(self.store, options or {"mode": "history"}, now=now)
 
     def test_migration_idempotency_and_duplicate_safe_versioned_upserts(self):
@@ -54,7 +54,7 @@ class PostgreSQLSyncTests(PostgreSQLTestCase):
         def pages(*args):
             yield [item]
             raise StarlingError("Test upstream interruption.")
-        with patch("services.transaction_sync.history_pages", side_effect=pages):
+        with patch("services.transactions.sync.history_pages", side_effect=pages):
             with self.assertRaises(SyncError) as failure:
                 run_sync(self.store, {}, now=NOW)
         report = self.store.report(failure.exception.run_uid)
@@ -70,7 +70,7 @@ class PostgreSQLSyncTests(PostgreSQLTestCase):
         first = normalize_feed_item(feed_item(), ACCOUNT, CATEGORY)
         invalid = normalize_feed_item(feed_item(CURSOR), ACCOUNT, CATEGORY)
         invalid["amount_minor"] = -1
-        with patch("services.transaction_sync.history_pages", return_value=[[first, invalid]]):
+        with patch("services.transactions.sync.history_pages", return_value=[[first, invalid]]):
             with self.assertRaises(SyncError): run_sync(self.store, {}, now=NOW)
         count = self.session.scalar(db.select(db.func.count()).select_from(Transaction).where(
             Transaction.account_uid == ACCOUNT))
@@ -81,7 +81,7 @@ class PostgreSQLSyncTests(PostgreSQLTestCase):
         self.import_rows([normalize_feed_item(feed_item(), ACCOUNT, CATEGORY)])
         later = NOW + timedelta(hours=1)
         settled = normalize_feed_item(feed_item(status="SETTLED", updated=later), ACCOUNT, CATEGORY)
-        with patch("services.transaction_sync.changed_items", return_value=[settled]):
+        with patch("services.transactions.sync.changed_items", return_value=[settled]):
             result = run_sync(self.store, {}, now=later)
         self.assertEqual(result["targets"][0]["mode"], "incremental")
         self.assertEqual(self.store.category(ACCOUNT, CATEGORY)["changes_through"], later)
@@ -118,7 +118,7 @@ class PostgreSQLSyncTests(PostgreSQLTestCase):
                 yield [item]
                 # The page has committed when the generator resumes.
                 self.assertFalse(contender.scalar(query, {"key": LOCK_ID}))
-            with patch("services.transaction_sync.history_pages", side_effect=pages):
+            with patch("services.transactions.sync.history_pages", side_effect=pages):
                 run_sync(self.store, {}, now=NOW)
             self.assertTrue(contender.scalar(query, {"key": LOCK_ID}))
 
@@ -140,7 +140,7 @@ class PostgreSQLSyncTests(PostgreSQLTestCase):
             filename = "999_test_" + uuid4().hex + ".sql"
             path = Path(directory) / filename
             path.write_text("CREATE TEMP TABLE migration_probe (id INTEGER); INSERT INTO migration_probe VALUES (1);")
-            with patch("services.migrations.MIGRATIONS", Path(directory)):
+            with patch("services.database.migrations.MIGRATIONS", Path(directory)):
                 self.assertEqual(upgrade_database(self.connection), [filename])
                 self.assertEqual(self.connection.scalar(text("SELECT id FROM migration_probe")), 1)
                 self.assertEqual(upgrade_database(self.connection), [])

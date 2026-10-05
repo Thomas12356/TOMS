@@ -2,7 +2,7 @@
 
 from sqlalchemy.dialects.postgresql import JSONB
 
-from services.database import db
+from services.database.connection import db
 
 
 class BaseModel(db.Model):

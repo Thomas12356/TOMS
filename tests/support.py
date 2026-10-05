@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app import app
 from models import Account, Category, Transaction
-from services.database import db
+from services.database.connection import db
 
 
 class ApiTestCase(unittest.TestCase):
@@ -43,7 +43,7 @@ class PostgreSQLTestCase(ApiTestCase):
         self.addCleanup(self.session.close)
         # db.paginate calls the scoped session; other routes use its methods directly.
         self.enterContext(patch.object(db, "session", Mock(return_value=self.session, wraps=self.session)))
-        self.bank = self.enterContext(patch("services.starling.http_client.send",
+        self.bank = self.enterContext(patch("services.banking.client.http_client.send",
             side_effect=AssertionError("Local database tests must not call Starling")))
 
 

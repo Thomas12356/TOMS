@@ -8,7 +8,8 @@ from contextlib import closing
 from pathlib import Path
 
 
-DATABASE = Path(__file__).resolve().parents[1] / "instance" / "starling-rate-limit.sqlite3"
+# Keep all workers using the same instance/ database at the repository root.
+DATABASE = Path(__file__).resolve().parents[2] / "instance" / "starling-rate-limit.sqlite3"
 
 
 class RateLimitError(Exception):

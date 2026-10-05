@@ -17,14 +17,43 @@ handlers. `@transactions.put(...)`, for example, connects a URL and HTTP method
 to the function immediately underneath it. `before_request(require_api_key)`
 checks authentication before those functions run.
 
+## Services by purpose
+
+```text
+services/
+    banking/                Starling integration
+        client.py           Sends bank requests
+        feed.py             Validates feed items and follows pagination
+        diagnostics.py      Runs the live endpoint checks
+        rate_limit.py       Coordinates bank request limits
+    transactions/           The income and categorisation work starts here
+        classification.py   Manual transfer types and automatic defaults
+        income.py           Income choices and amount validation
+        sync.py             Coordinates transaction imports
+        store.py            Saves imports and their progress
+    database/
+        connection.py       Creates the shared db object and configures PostgreSQL
+        migrations.py       Applies the SQL files in the root migrations/ folder
+    web/
+        auth.py             Checks the API key
+        request_limits.py   Bounds incoming request bodies
+    validation.py           Shared UUID, date, money, and text validation
+    error_logging.py        Logs safe diagnostic details
+```
+
+Imports name the actual file, for example
+`from services.transactions.income import income_body`. The `__init__.py` files
+just describe each package. For manual categorisation, begin in
+`services/transactions/`; the bank integration has its own folder.
+
 ## Follow one income edit
 
 Read these functions in order:
 
 1. `routes/transactions.py` → `put_income`: receives the JSON edit.
-2. `services/income.py` → `income_body`: checks the fields and allowed values.
+2. `services/transactions/income.py` → `income_body`: checks the fields and allowed values.
 3. `routes/transactions.py` → `saved_transaction`: loads the bank payment.
-4. `services/income.py` → `validate_reconciliation`: checks entered amounts
+4. `services/transactions/income.py` → `validate_reconciliation`: checks entered amounts
    against the deposit.
 5. Back in `put_income`: updates `TransactionIncome`, commits, and returns JSON.
 
@@ -41,12 +70,12 @@ income amounts but does not yet calculate annual tax.
 
 | Change | Start here | Relevant tests |
 | --- | --- | --- |
-| Change an income source's display label | `services/income.py`: `INCOME_TYPES` | `tests/test_income.py` |
-| Change classification rules | `services/classification.py` and `routes/transactions.py` | `tests/test_classification.py` |
+| Change an income source's display label | `services/transactions/income.py`: `INCOME_TYPES` | `tests/test_income.py` |
+| Change classification rules | `services/transactions/classification.py` and `routes/transactions.py` | `tests/test_classification.py` |
 | Change transaction filters or returned fields | `routes/transactions.py`: `filters`, `FIELDS`, `list_transactions` | `tests/test_transactions.py` |
 | Change monthly totals | `routes/reports.py`: `monthly_report` | `tests/test_reports.py` |
 | Understand date, UUID, or text validation | `services/validation.py` | `tests/test_validation_and_errors.py` |
-| Understand the import flow | `services/transaction_sync.py`: `run_sync` | `tests/test_transaction_sync.py` |
+| Understand the import flow | `services/transactions/sync.py`: `run_sync` | `tests/test_transaction_sync.py` |
 
 Changing a label is a small first exercise. Adding a new stored income type also
 requires a new SQL migration because the database restricts allowed values.

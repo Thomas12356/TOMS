@@ -9,9 +9,9 @@ from werkzeug.exceptions import BadRequest
 
 from models import Transaction, TransactionIncome
 from routes.helpers import query_values
-from services.auth import require_api_key
-from services.classification import effective_type
-from services.database import db
+from services.web.auth import require_api_key
+from services.transactions.classification import effective_type
+from services.database.connection import db
 from services.error_logging import log_failure
 from services.validation import uid
 

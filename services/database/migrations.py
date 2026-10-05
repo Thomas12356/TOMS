@@ -6,7 +6,8 @@ from pathlib import Path
 from sqlalchemy import text
 
 
-MIGRATIONS = Path(__file__).resolve().parents[1] / "migrations"
+# SQL migration files stay in the repository's top-level migrations/ directory.
+MIGRATIONS = Path(__file__).resolve().parents[2] / "migrations"
 
 
 def upgrade_database(connection):

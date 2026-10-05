@@ -5,7 +5,7 @@ from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 
 from app import app
-from services.starling import starling_request
+from services.banking.client import starling_request
 
 
 ACCOUNT = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa"
@@ -20,7 +20,7 @@ class StarlingTests(unittest.TestCase):
         config.start()
         self.addCleanup(config.stop)
         self.client.environ_base["HTTP_AUTHORIZATION"] = "Bearer test-app-key"
-        limiter = patch("services.starling.acquire_slot")
+        limiter = patch("services.banking.client.acquire_slot")
         limiter.start()
         self.addCleanup(limiter.stop)
         self.token = patch.dict("os.environ", {"STARLING_ACCESS_TOKEN": "fake-token"})
@@ -53,7 +53,7 @@ class StarlingTests(unittest.TestCase):
         for path, scope, media_type, query in cases:
             with self.subTest(scope=scope):
                 payload = b'{"test":true}' if media_type == "application/json" else b"\x00test\xff"
-                with patch("services.starling.http_client.send", return_value=httpx.Response(200, content=payload)) as send:
+                with patch("services.banking.client.http_client.send", return_value=httpx.Response(200, content=payload)) as send:
                     response = self.client.get("/starling" + path + query)
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.mimetype, media_type)
@@ -83,7 +83,7 @@ class StarlingTests(unittest.TestCase):
             (f"/accounts/{ACCOUNT}/feed-export", "?start=2026-01-01&url=https://example.com"),
             (f"/feed/account/{ACCOUNT}/category/{CATEGORY}", "?changesSince=2026-01-01"),
         ]
-        with patch("services.starling.http_client.send") as send:
+        with patch("services.banking.client.http_client.send") as send:
             for path, query in queries:
                 with self.subTest(path=path, query=query):
                     response = self.client.get("/starling" + path + query)
@@ -102,7 +102,7 @@ class StarlingTests(unittest.TestCase):
                 payload = dict(body)
                 if edit:
                     payload["receiptUid"] = ITEM
-                with patch("services.starling.http_client.send", return_value=httpx.Response(200, json={"receiptUid": "test"})) as send:
+                with patch("services.banking.client.http_client.send", return_value=httpx.Response(200, json={"receiptUid": "test"})) as send:
                     response = self.client.put(path, json=payload)
                 self.assertEqual(response.status_code, 200)
                 upstream = send.call_args.args[0]
@@ -112,7 +112,7 @@ class StarlingTests(unittest.TestCase):
 
     def test_invalid_receipts_do_not_call_starling(self):
         path = f"/starling/feed/account/{ACCOUNT}/category/{CATEGORY}/{ITEM}/receipt"
-        with patch("services.starling.http_client.send") as send:
+        with patch("services.banking.client.http_client.send") as send:
             self.assertEqual(self.client.put(path, json={}).status_code, 400)
             self.assertEqual(self.client.put(path, data="not JSON").status_code, 400)
             send.assert_not_called()
@@ -120,24 +120,24 @@ class StarlingTests(unittest.TestCase):
     def test_missing_token_and_upstream_failures(self):
         path = f"/starling/accounts/{ACCOUNT}/balance"
         with patch.dict("os.environ", {"STARLING_ACCESS_TOKEN": ""}):
-            with patch("services.starling.http_client.send") as send:
+            with patch("services.banking.client.http_client.send") as send:
                 self.assertEqual(self.client.get(path).status_code, 503)
                 send.assert_not_called()
         for upstream_status, local_status in [(401, 502), (403, 502), (404, 404), (429, 429), (500, 502)]:
             with self.subTest(status=upstream_status):
                 error = httpx.Response(upstream_status, text="fake-token")
-                with patch("services.starling.http_client.send", return_value=error):
+                with patch("services.banking.client.http_client.send", return_value=error):
                     response = self.client.get(path)
                 self.assertEqual(response.status_code, local_status)
                 self.assertNotIn("fake-token", response.get_data(as_text=True))
-        with patch("services.starling.http_client.send", side_effect=httpx.ConnectError("fake-token")):
+        with patch("services.banking.client.http_client.send", side_effect=httpx.ConnectError("fake-token")):
             self.assertEqual(self.client.get(path).status_code, 502)
 
     def test_empty_and_invalid_json_responses(self):
         path = f"/starling/accounts/{ACCOUNT}/balance"
-        with patch("services.starling.http_client.send", return_value=httpx.Response(200)):
+        with patch("services.banking.client.http_client.send", return_value=httpx.Response(200)):
             self.assertEqual(self.client.get(path).status_code, 204)
-        with patch("services.starling.http_client.send", return_value=httpx.Response(200, content=b"not JSON")):
+        with patch("services.banking.client.http_client.send", return_value=httpx.Response(200, content=b"not JSON")):
             self.assertEqual(self.client.get(path).status_code, 502)
 
     def test_only_starling_api_paths_are_accepted(self):
@@ -145,7 +145,7 @@ class StarlingTests(unittest.TestCase):
             starling_request("https://example.com")
 
     def test_original_name_endpoint_still_works(self):
-        with patch("services.starling.http_client.send", return_value=httpx.Response(200, json={"accountHolderName": "Test User"})):
+        with patch("services.banking.client.http_client.send", return_value=httpx.Response(200, json={"accountHolderName": "Test User"})):
             response = self.client.get("/starling/account-holder/name")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"accountHolderName": "Test User"})

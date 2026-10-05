@@ -7,7 +7,7 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from services.rate_limit import RateLimitError, acquire_slot
+from services.banking.rate_limit import RateLimitError, acquire_slot
 
 
 def acquire_in_worker(database):
