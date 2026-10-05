@@ -434,3 +434,65 @@ footer {
     font-family: var(--mono);
     font-size: 11px;
 }
+
+/* The owner login shares the dashboard colours and avoids a separate UI system. */
+.login-page {
+    max-width: 480px;
+    padding-top: 48px;
+}
+
+.login-form {
+    display: grid;
+    gap: 12px;
+    padding: 24px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 3px;
+}
+
+.login-form label {
+    font-family: var(--mono);
+    font-size: 12px;
+}
+
+.login-form input, .login-form button, .logout-form button {
+    min-width: 0;
+    min-height: 42px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font: inherit;
+}
+
+.login-form input {
+    width: 100%;
+    background: var(--surface);
+    color: var(--text);
+}
+
+.login-form button {
+    margin-top: 8px;
+    background: var(--accent);
+    color: white;
+    cursor: pointer;
+}
+
+.logout-form button {
+    background: transparent;
+    color: #f5f0e5;
+    border-color: #59645b;
+    font-family: var(--mono);
+    cursor: pointer;
+}
+
+.login-form input:focus-visible, .login-form button:focus-visible, .logout-form button:focus-visible {
+    outline: 3px solid var(--highlight);
+    outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+    .site-header {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+}

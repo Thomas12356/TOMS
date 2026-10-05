@@ -4,6 +4,7 @@ import re
 from datetime import timezone
 
 from flask import Blueprint, jsonify, render_template, request
+from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only, selectinload
 from werkzeug.exceptions import BadRequest
@@ -13,13 +14,13 @@ from routes.helpers import query_values
 from services.database.connection import db
 from services.error_logging import log_failure
 from services.transactions.classification import CLASSIFICATION_TYPES, classification_details
-from services.web.auth import require_api_key
+from services.web.sessions import require_dashboard_login
 from services.validation import uid
 from services.banking.client import StarlingError, starling_request
 
 
 dashboard = Blueprint("dashboard", __name__, url_prefix="/dashboard")
-dashboard.before_request(require_api_key)
+dashboard.before_request(require_dashboard_login)
 
 
 @dashboard.errorhandler(BadRequest)
@@ -31,6 +32,7 @@ def invalid_request(error):
 
 @dashboard.errorhandler(SQLAlchemyError)
 def database_error(error):
+    db.session.rollback()
     log_failure("dashboard.database", error)
     message = "Unable to load transactions. Check PostgreSQL and run flask db-upgrade."
     if request.endpoint == "dashboard.account_balances":
@@ -141,4 +143,5 @@ def transactions_page():
         })
 
     return render_template("dashboard.html", page=page, rows=rows, error=None,
-                           accounts=accounts, selected_account=selected_account, account_uid=account_uid)
+                           accounts=accounts, selected_account=selected_account, account_uid=account_uid,
+                           current_user=current_user)
