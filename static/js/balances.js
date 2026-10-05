@@ -9,12 +9,13 @@ async function loadBalances() {
         const data = await response.json();
         container.replaceChildren();
 
-        if (data.balances.length === 0) {
+        const displayedBalances = data.totals ?? data.balances;
+        if (displayedBalances.length === 0) {
             container.textContent = "Import your accounts to see their balances here.";
             return;
         }
 
-        for (const balance of data.balances) {
+        for (const balance of displayedBalances) {
             const card = document.createElement("article");
             card.className = "balance-card";
             const name = document.createElement("h3");

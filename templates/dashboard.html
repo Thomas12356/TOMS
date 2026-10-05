@@ -50,8 +50,8 @@
         <section class="balance-section" aria-labelledby="balance-heading">
             <div class="balance-heading">
                 <div>
-                    <h2 id="balance-heading">Account balances</h2>
-                    <p class="secondary">Live main-account balances from Starling.</p>
+                    <h2 id="balance-heading">{{ 'Account balance' if selected_account else 'Total account balance' }}</h2>
+                    <p class="secondary">{{ 'Live main-account balance from Starling.' if selected_account else 'Combined live main-account balances from Starling. Different currencies shown separately.' }}</p>
                 </div>
                 {% if current_user.is_authenticated %}
                 <button type="button" class="sync-button" data-sync-now title="Syncs transactions from your bank account provider." aria-description="Syncs transactions from your bank account provider.">{{ sync_icon() }}<span>Sync now</span></button>
