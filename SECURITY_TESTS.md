@@ -1,8 +1,17 @@
 # Security checks — 5 October 2026
 
-The full suite passed: **141 tests**, with PostgreSQL checks enabled. This
-includes **23 new adversarial tests** in `tests/test_security.py`, plus the
+The full suite passed: **167 tests**, with PostgreSQL checks enabled. This
+includes **24 adversarial tests** in `tests/test_security.py`, plus the
 existing login, API protection, request-boundary and bank-client tests.
+Ten classification-form tests also cover saves, automatic reset, income
+protection, CSRF rejection, escaped notes and safe failures. Eleven owner-setup tests cover
+one-time token rotation/expiry, setup closure and password-change protection.
+Concurrent first-run requests are checked to create exactly one owner. Three
+launcher tests check automatic startup tokens, reloader behaviour and Gunicorn
+initialization without starting servers.
+
+The complete suite and dependency/security scans were rerun after the automatic
+startup-token changes on 5 October 2026, with the same passing results.
 
 ## What was tested
 
@@ -52,7 +61,9 @@ The concurrency tests require permission to create a temporary PostgreSQL schema
 
 - **pip-audit:** checked all 24 installed application packages, including
   transitive dependencies; no known vulnerabilities were reported.
-- **Bandit:** scanned `app.py`, `models.py`, `routes/` and `services/`; no findings.
+- **Bandit:** scanned `app.py`, `models.py`, `routes/`, `services/` and
+  `gunicorn.conf.py`; no findings.
+- **Ruff:** unused imports, undefined names and other F-rule checks passed.
 - **pip check:** no incompatible installed dependencies.
 - **git diff --check:** no whitespace errors.
 
@@ -63,7 +74,7 @@ production dependencies. To repeat those checks:
 .venv/bin/pip install --target /tmp/toms-security-audit-packages pip-audit bandit
 .venv/bin/pip freeze > /tmp/toms-security-installed.txt
 PYTHONPATH=/tmp/toms-security-audit-packages .venv/bin/python -m pip_audit --no-deps --disable-pip -r /tmp/toms-security-installed.txt
-PYTHONPATH=/tmp/toms-security-audit-packages .venv/bin/python -m bandit -r app.py models.py routes services
+PYTHONPATH=/tmp/toms-security-audit-packages .venv/bin/python -m bandit -r app.py models.py routes services gunicorn.conf.py
 .venv/bin/pip check
 ```
 
