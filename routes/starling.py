@@ -4,16 +4,23 @@ import math
 import re
 from datetime import date
 
-from flask import Response, current_app, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 from werkzeug.exceptions import BadRequest
 
-from routes import private_blueprint
+from services.auth import require_api_key
 from services.starling import StarlingError, get_account_holder_name, starling_request
 from services.starling_diagnostics import run_diagnostics
 from services.validation import timestamp
 
 
-starling = private_blueprint("starling")
+# A blueprint groups these URLs; every matched route requires the API key.
+starling = Blueprint("starling", __name__, url_prefix="/starling")
+starling.before_request(require_api_key)
+
+
+@starling.errorhandler(BadRequest)
+def invalid_request(error):
+    return jsonify(error=error.description), error.code
 
 
 @starling.get("/account-holder/name")

@@ -3,21 +3,37 @@
 import re
 from datetime import datetime, timezone
 
-from flask import jsonify
+from flask import Blueprint, jsonify
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest
 
 from models import Transaction, TransactionIncome
-from routes import private_blueprint, query_values
+from routes.helpers import query_values
+from services.auth import require_api_key
 from services.classification import effective_type
 from services.database import db
+from services.error_logging import log_failure
 from services.validation import uid
 
 
-reports = private_blueprint("reports", database_error=
-    "Unable to read the monthly report. Check PostgreSQL and run flask db-upgrade.")
+# A blueprint groups these URLs; every matched route requires the API key.
+reports = Blueprint("reports", __name__, url_prefix="/reports")
+reports.before_request(require_api_key)
+
+
+@reports.errorhandler(BadRequest)
+def invalid_request(error):
+    return jsonify(error=error.description), error.code
+
+
+@reports.errorhandler(SQLAlchemyError)
+def database_error(error):
+    log_failure("reports.database", error)
+    return jsonify(error="Unable to read the monthly report. Check PostgreSQL and run flask db-upgrade."), 503
 
 
 def monthly_options():
+    """Turn month/account query strings into validated report dates and an account ID."""
     values = query_values({"month", "accountUid"}, unknown_error="Use month and optional accountUid.")
     month = values.get("month", "")
     try:
@@ -25,7 +41,11 @@ def monthly_options():
             raise ValueError
         year, number = map(int, month.split("-"))
         start = datetime(year, number, 1, tzinfo=timezone.utc)
-        end = datetime(year + 1, 1, 1, tzinfo=timezone.utc) if number == 12 else datetime(year, number + 1, 1, tzinfo=timezone.utc)
+        # Use the first day of the next month as an exclusive upper bound.
+        if number == 12:
+            end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            end = datetime(year, number + 1, 1, tzinfo=timezone.utc)
     except ValueError:
         raise BadRequest("Supply a valid month in YYYY-MM format.") from None
     account = values.get("accountUid")
@@ -39,13 +59,17 @@ def monthly_options():
 
 @reports.get("/monthly")
 def monthly_report():
+    """Read grouped database totals, build currency summaries, then return JSON."""
     month, start, end, account = monthly_options()
     # Manual transfer types override inference from the bank source.
     internal = effective_type() == "internal_transfer"
     is_income = effective_type() == "income"
     income_type = db.func.coalesce(TransactionIncome.income_type, "unclassified")
     tax_treatment = db.func.coalesce(TransactionIncome.tax_treatment, "unknown")
-    category = db.func.coalesce(db.func.nullif(db.func.nullif(Transaction.spending_category, ""), "NONE"), "UNCATEGORISED")
+    # Treat both empty bank categories and the bank's NONE label as uncategorised.
+    category = db.func.nullif(Transaction.spending_category, "")
+    category = db.func.nullif(category, "NONE")
+    category = db.func.coalesce(category, "UNCATEGORISED")
     query = db.select(
         Transaction.currency, Transaction.direction, category.label("category"),
         internal.label("internal"), is_income.label("is_income"),

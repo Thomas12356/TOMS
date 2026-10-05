@@ -5,6 +5,7 @@ from uuid import UUID
 
 
 def timestamp(value):
+    """Parse a timezone-aware timestamp and return a datetime in UTC."""
     if not isinstance(value, str):
         raise ValueError("Expected a timestamp.")
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -17,12 +18,14 @@ def timestamp(value):
 
 
 def uid(value):
+    """Validate a UUID string and return its standard spelling."""
     if not isinstance(value, str):
         raise ValueError("Expected a UUID string.")
     return str(UUID(value))
 
 
 def money(value):
+    """Read a bank money object as (minor units, currency), e.g. (1250, 'GBP')."""
     if not isinstance(value, dict):
         raise ValueError("Expected money object.")
     amount, currency = value.get("minorUnits"), value.get("currency")

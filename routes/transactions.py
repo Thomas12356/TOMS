@@ -3,21 +3,37 @@
 import re
 from datetime import date, datetime, time, timedelta, timezone
 
-from flask import jsonify, request
+from flask import Blueprint, jsonify, request
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only, selectinload
 from werkzeug.exceptions import BadRequest, NotFound
 
 from models import Transaction, TransactionClassification, TransactionIncome
-from routes import json_error, private_blueprint, query_values
+from routes.helpers import query_values
+from services.auth import require_api_key
 from services.classification import CLASSIFICATION_TYPES, classification_details, effective_type
-from services.income import INCOME_TYPES, TAX_TREATMENTS, income_body, income_details, validate_reconciliation
 from services.database import db
+from services.error_logging import log_failure
+from services.income import INCOME_TYPES, TAX_TREATMENTS, income_body, income_details, validate_reconciliation
 from services.validation import uid, optional_text
 
 
-transactions = private_blueprint("transactions", database_error=
-    "Unable to read saved transactions. Check PostgreSQL and run flask db-upgrade.")
-transactions.register_error_handler(NotFound, json_error)
+# A blueprint groups these URLs; every matched route requires the API key.
+transactions = Blueprint("transactions", __name__, url_prefix="/transactions")
+transactions.before_request(require_api_key)
+
+
+@transactions.errorhandler(BadRequest)
+@transactions.errorhandler(NotFound)
+def invalid_request(error):
+    return jsonify(error=error.description), error.code
+
+
+@transactions.errorhandler(SQLAlchemyError)
+def database_error(error):
+    log_failure("transactions.database", error)
+    return jsonify(error="Unable to read saved transactions. Check PostgreSQL and run flask db-upgrade."), 503
+
 
 # Explicitly select public fields; raw bank JSON is neither loaded nor returned.
 FIELDS = (
@@ -29,6 +45,7 @@ FIELDS = (
 
 
 def filters():
+    """Validate URL filters before list_transactions builds its database query."""
     allowed = {"start", "end", "accountUid", "direction", "status", "page", "per_page", "classification", "income_type", "tax_treatment"}
     values = query_values(allowed)
 
@@ -117,6 +134,10 @@ def classification_types():
 
 
 def saved_transaction(account_uid, category_uid, feed_item_uid, *, lock=False):
+    """Load one saved payment, or raise a JSON 404 through invalid_request above.
+
+    Editing routes use lock=True so simultaneous edits cannot race each other.
+    """
     query = db.select(Transaction).where(
         Transaction.account_uid == str(account_uid), Transaction.category_uid == str(category_uid),
         Transaction.feed_item_uid == str(feed_item_uid)).options(
@@ -196,6 +217,7 @@ def get_income(account_uid, category_uid, feed_item_uid):
 
 @transactions.put(INCOME_PATH)
 def put_income(account_uid, category_uid, feed_item_uid):
+    """Validate the submitted details, check them against the deposit, and save them."""
     if not request.is_json:
         raise BadRequest("Send income details as a JSON object.")
     values = income_body(request.get_json())
@@ -203,6 +225,7 @@ def put_income(account_uid, category_uid, feed_item_uid):
     if transaction.direction != "IN" or classification_details(transaction)["type"] != "income":
         raise BadRequest("Income details require an incoming transaction classified as income.")
     validate_reconciliation(values, transaction.amount_minor)
+    # Only a successful edit against the current bank amount clears the review flag.
     values.update(recorded_currency=transaction.currency, needs_review=False)
     if transaction.income is None:
         transaction.income = TransactionIncome(**values)

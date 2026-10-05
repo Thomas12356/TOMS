@@ -2,16 +2,30 @@
 
 from datetime import datetime, timezone
 
-from flask import jsonify, request
+from flask import Blueprint, jsonify, request
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest
 
-from routes import private_blueprint
+from services.auth import require_api_key
+from services.error_logging import log_failure
 from services.sync_store import SyncStore
 from services.transaction_sync import SyncError, parse_options, run_sync
 
 
-sync = private_blueprint("sync", database_error=
-    "Unable to access the sync database. Check PostgreSQL and run flask db-upgrade.")
+# A blueprint groups these URLs; every matched route requires the API key.
+sync = Blueprint("sync", __name__, url_prefix="/sync")
+sync.before_request(require_api_key)
+
+
+@sync.errorhandler(BadRequest)
+def invalid_request(error):
+    return jsonify(error=error.description), error.code
+
+
+@sync.errorhandler(SQLAlchemyError)
+def database_error(error):
+    log_failure("sync.database", error)
+    return jsonify(error="Unable to access the sync database. Check PostgreSQL and run flask db-upgrade."), 503
 
 
 @sync.errorhandler(SyncError)
