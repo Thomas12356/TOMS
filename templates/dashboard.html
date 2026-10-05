@@ -7,8 +7,9 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
     <script src="{{ url_for('static', filename='js/balances.js') }}" defer></script>
     <script src="{{ url_for('static', filename='js/account-selector.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/transaction-sync.js') }}" defer></script>
 </head>
-<body>
+<body class="ledger-page">
     <!-- Start here to change the page heading and introductory text. -->
     <header class="site-header">
         <a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
@@ -61,7 +62,14 @@
                     <p class="classification-note">Classification describes the payment. It does not establish its tax treatment.</p>
                     <p>{{ "{:,}".format(page.total) }} saved transaction{{ '' if page.total == 1 else 's' }} · {{ (selected_account.name or 'Starling account') if selected_account else 'All accounts' }} · Dates in UTC</p>
                 </div>
-                <span class="record-label">Local records</span>
+                <div class="ledger-controls">
+                    <span class="record-label">Local records</span>
+                    {% if current_user.is_authenticated %}
+                    <div class="sync-controls" data-sync-url="{{ url_for('dashboard.trigger_sync') }}" data-status-url="{{ url_for('dashboard.sync_status') }}" data-csrf="{{ csrf_token() }}">
+                        <button type="button" id="sync-now">Sync now</button>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
 
             {% if rows %}
@@ -133,5 +141,11 @@
         </section>
         {% endif %}
     </main>
+    {% if not error and current_user.is_authenticated %}
+    <footer class="sync-footer" aria-label="Transaction sync status">
+        <span id="last-synced">Last synced: checking…</span>
+        <span id="sync-message" role="status"></span>
+    </footer>
+    {% endif %}
 </body>
 </html>

@@ -155,6 +155,21 @@ def owner_setup_token():
     click.echo(token)
 
 
+@app.cli.command("sync-transactions")
+def scheduled_sync():
+    """Import transactions without running a web server (used by the daily timer)."""
+    from services.transactions.store import SyncStore
+    from services.transactions.sync import SyncError, run_sync
+    try:
+        report = run_sync(SyncStore(), {})
+    except SyncError as error:
+        if error.status_code == 409:
+            click.echo("Another sync is already running.")
+            return
+        raise click.ClickException(str(error)) from None
+    click.echo("Transaction sync completed: " + str(report.get("run_uid", "")))
+
+
 # Flask's CLI starts its own server rather than calling app.run(). Only the
 # initial launcher prints a token; reloader children reuse it.
 if (os.getenv("FLASK_RUN_FROM_CLI") == "true" and "run" in sys.argv

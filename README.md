@@ -923,3 +923,27 @@ currency separation as the monthly cash-flow report. Refunds and other incoming
 transfer types still contribute to cash flow but are excluded from
 `income_by_type`. The breakdown is based on net deposits; it is not a gross
 income or tax-liability calculation.
+
+## Automatic transaction syncing
+
+The dashboard checks for a completed sync when it loads. If the last successful
+full sync is at least one minute old, it imports transactions in the background
+and reloads the current account/page when finished. **Sync now** forces an import.
+Both require browser login and CSRF protection; API keys are never sent to JavaScript.
+Syncing covers all accessible accounts and retains manual classifications.
+
+For twice-daily background imports on Linux, run:
+
+```bash
+.venv/bin/python deployment/install_sync_timer.py
+systemctl --user list-timers toms-sync.timer
+journalctl --user -u toms-sync.service
+```
+
+The timer runs at **08:00 and 20:00 Europe/London**, including daylight-saving
+changes. It uses the repository's `.env` and virtual environment. The host must
+be running and the user systemd manager available. `Persistent=true` runs one
+catch-up import when the timer starts after a missed slot. For unattended use
+after logout, enable lingering for the hosting user with `loginctl enable-linger`.
+Install the timer on the actual host too if deploying to another machine.
+To disable it: `systemctl --user disable --now toms-sync.timer`.

@@ -13,6 +13,7 @@ from models import Account, Transaction
 from routes.helpers import query_values
 from services.database.connection import db
 from services.error_logging import log_failure
+from services.transactions.automatic_sync import latest_sync, start_dashboard_sync
 from services.transactions.classification import CLASSIFICATION_TYPES, classification_details, save_classification, clear_classification
 from services.web.sessions import require_dashboard_login
 from services.validation import uid, optional_text
@@ -26,7 +27,7 @@ dashboard.before_request(require_dashboard_login)
 @dashboard.errorhandler(NotFound)
 @dashboard.errorhandler(BadRequest)
 def invalid_request(error):
-    if request.endpoint == "dashboard.account_balances":
+    if request.endpoint in ("dashboard.account_balances", "dashboard.trigger_sync", "dashboard.sync_status"):
         return jsonify(error=error.description), 400
     return render_template("dashboard.html", error=error.description, page=None), error.code
 
@@ -36,9 +37,25 @@ def database_error(error):
     db.session.rollback()
     log_failure("dashboard.database", error)
     message = "Unable to load transactions. Check PostgreSQL and run flask db-upgrade."
-    if request.endpoint == "dashboard.account_balances":
+    if request.endpoint in ("dashboard.account_balances", "dashboard.trigger_sync", "dashboard.sync_status"):
         return jsonify(error="Unable to load saved accounts. Check PostgreSQL."), 503
     return render_template("dashboard.html", error=message, page=None), 503
+
+
+@dashboard.post("/sync")
+def trigger_sync():
+    if not current_user.is_authenticated:
+        return jsonify(error="Browser login is required."), 401
+    options = query_values({"force"})
+    if options.get("force", "0") not in ("0", "1"):
+        raise BadRequest("force must be 0 or 1.")
+    started = start_dashboard_sync(current_app._get_current_object(), force=options.get("force") == "1")
+    return jsonify(started=started), 202
+
+
+@dashboard.get("/sync-status")
+def sync_status():
+    return jsonify(run=latest_sync())
 
 
 def format_amount(amount_minor, currency):

@@ -570,3 +570,77 @@ td.amount {
     text-align: right;
     white-space: nowrap;
 }
+
+.ledger-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.sync-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    color: var(--muted);
+    font: 12px/1.5 var(--mono);
+}
+
+.sync-controls button {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+}
+
+.sync-controls button:disabled {
+    opacity: .6;
+    cursor: wait;
+}
+
+.sync-controls button:focus-visible {
+    outline: 3px solid var(--highlight);
+    outline-offset: 3px;
+}
+
+/* Reserve room so the fixed sync footer never covers the last ledger row. */
+.ledger-page {
+    padding-bottom: 100px;
+}
+
+.sync-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 24px;
+    min-height: 48px;
+    max-height: 88px;
+    overflow-y: auto;
+    padding: 12px max(24px, calc((100vw - 1152px) / 2));
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font: 12px/1.5 var(--mono);
+}
+
+#last-synced {
+    flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+    .sync-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        padding: 10px 16px;
+    }
+}

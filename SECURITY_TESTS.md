@@ -1,6 +1,6 @@
 # Security checks — 5 October 2026
 
-The full suite passed: **167 tests**, with PostgreSQL checks enabled. This
+The full suite passed: **171 tests**, with PostgreSQL checks enabled. This
 includes **24 adversarial tests** in `tests/test_security.py`, plus the
 existing login, API protection, request-boundary and bank-client tests.
 Ten classification-form tests also cover saves, automatic reset, income
@@ -93,3 +93,13 @@ The application remains single-owner. The tests do not establish isolation
 between multiple customers, and Basic read credentials/API bearer keys must
 still be long, random secrets. Successful automated checks do not guarantee
 that the application is free of security flaws.
+
+## Dashboard and scheduled sync checks
+
+Four additional tests cover skipping fresh imports while releasing the shared
+lock, importing stale data, rejecting unauthenticated/CSRF-free browser syncs,
+and distinguishing automatic freshness checks from forced button clicks.
+The complete PostgreSQL suite passed after these additions. The installed user
+systemd service/timer passed `systemd-analyze --user verify`; the timer is active
+and specifies 08:00/20:00 Europe/London. Browser automation and a live scheduled
+bank import have not been exercised by these tests.
