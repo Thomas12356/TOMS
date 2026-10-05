@@ -12,6 +12,7 @@ from services.database.connection import db
 from services.error_logging import log_failure
 from services.transactions.sync import SyncError, run_sync
 from services.validation import timestamp
+from services.web.sessions import validate_owner_credentials
 from support import ApiTestCase
 from test_transaction_sync import MemoryStore, NOW
 
@@ -23,6 +24,13 @@ TRANSACTION = f"/transactions/{ACCOUNT}/{CATEGORY}/{ITEM}"
 
 
 class InputValidationTests(ApiTestCase):
+    def test_owner_password_length_boundaries(self):
+        for length in (8, 1024):
+            self.assertEqual(validate_owner_credentials("owner", "x" * length), "owner")
+        for length in (0, 7, 1025):
+            with self.subTest(length=length), self.assertRaises(ValueError):
+                validate_owner_credentials("owner", "x" * length)
+
     def test_out_of_range_utc_timestamps_are_validation_errors(self):
         invalid = ("0001-01-01T00:00:00+01:00", "9999-12-31T23:59:59-01:00")
         with patch("routes.sync.SyncStore") as store, patch("routes.starling.starling_request") as bank:

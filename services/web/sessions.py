@@ -3,7 +3,7 @@
 import hashlib
 from datetime import datetime, timedelta, timezone
 
-from flask import current_app, jsonify, redirect, request, url_for
+from flask import current_app, jsonify, redirect, request, url_for, render_template
 from flask_login import LoginManager, UserMixin, current_user
 from flask_wtf.csrf import CSRFProtect
 from sqlalchemy import text
@@ -50,7 +50,10 @@ def require_dashboard_login():
     if auth is not None and auth.type == "bearer":
         return require_api_key()
     if not current_app.secret_key or len(current_app.secret_key) < 32:
-        return jsonify(error="Dashboard login requires a random SECRET_KEY of at least 32 characters. See the setup guide."), 503
+        message = "Set a random SECRET_KEY of at least 32 characters in .env, then restart Flask."
+        if request.endpoint == "dashboard.account_balances":
+            return jsonify(error=message), 503
+        return render_template("login.html", error=message, ready=False), 503
     if not current_user.is_authenticated:
         if request.endpoint == "dashboard.account_balances":
             return jsonify(error="Please sign in again."), 401
@@ -74,3 +77,18 @@ def consume_login_attempt():
     """)).scalar_one()
     db.session.commit()
     return count <= 20
+
+
+def lock_owner_setup():
+    """Serialize first-owner creation, token rotation and CLI recovery."""
+    db.session.execute(text("SELECT pg_advisory_xact_lock(6075157141257144333)"))
+
+
+def validate_owner_credentials(username, password):
+    """Use identical credential requirements in setup, settings and recovery."""
+    from services.validation import optional_text
+
+    username = optional_text(username, field="username", maximum=100)
+    if not username or not 8 <= len(password) <= 1024:
+        raise ValueError("Use a username of 1–100 characters and a password of 8–1024 characters.")
+    return username

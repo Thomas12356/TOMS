@@ -201,3 +201,10 @@ class BrowserSession(BaseModel):
     created_at = db.Column(db.DateTime(timezone=True), nullable=False)
     last_seen_at = db.Column(db.DateTime(timezone=True), nullable=False)
     expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+
+class OwnerSetup(BaseModel):
+    __tablename__ = "owner_setup"
+    id = db.Column(db.Integer, primary_key=True)
+    token_hash = db.Column(db.Text, nullable=False)
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False)

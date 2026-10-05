@@ -16,6 +16,7 @@
             <h1>Sign in</h1>
             <p class="description">Your accounts. Your records.</p>
         </div>
+        {% for message in get_flashed_messages() %}<p class="message" role="status">{{ message }}</p>{% endfor %}
         {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
         {% if ready %}
         <form class="login-form" method="post" action="{{ url_for('login.sign_in') }}">
