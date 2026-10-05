@@ -1,6 +1,5 @@
 """Opt-in real PostgreSQL tests; all synthetic rows are rolled back."""
 
-import os
 import unittest
 from datetime import timedelta
 from unittest.mock import patch
@@ -15,35 +14,21 @@ from sqlalchemy.orm import Session
 from services.database import db
 from models import Transaction
 
-from app import app
 from services.migrations import upgrade_database
 from services.starling import StarlingError
 from services.starling_feed import normalize_feed_item
 from services.sync_store import LOCK_ID, SyncStore
 from services.transaction_sync import SyncError, run_sync
-from test_transaction_sync import ACCOUNT, CATEGORY, CURSOR, ITEM, NOW, OPENED, discovery, feed_item
+from support import PostgreSQLTestCase
+from test_transaction_sync import ACCOUNT, CATEGORY, CURSOR, ITEM, NOW, discovery, feed_item
 
 
-@unittest.skipUnless(os.getenv("RUN_POSTGRES_TESTS") == "1", "Set RUN_POSTGRES_TESTS=1 for rollback-only database tests.")
-class PostgreSQLSyncTests(unittest.TestCase):
+class PostgreSQLSyncTests(PostgreSQLTestCase):
     def setUp(self):
-        self.context = app.app_context()
-        self.context.push()
-        self.addCleanup(self.context.pop)
-        self.engine = db.engine
-        self.connection = self.engine.connect()
-        self.addCleanup(self.connection.close)
-        outer = self.connection.begin()
-        self.addCleanup(outer.rollback)
-        # Page commits release savepoints; the outer transaction rolls back all
-        # synthetic data, including updates to existing interrupted-run records.
-        self.session = Session(bind=self.connection, join_transaction_mode="create_savepoint")
-        self.addCleanup(self.session.close)
+        super().setUp()
         self.store = SyncStore(self.session, self.engine)
         self.addCleanup(self.store.unlock)
-        self.patch = patch("services.transaction_sync.starling_request", side_effect=discovery)
-        self.patch.start()
-        self.addCleanup(self.patch.stop)
+        self.enterContext(patch("services.transaction_sync.starling_request", side_effect=discovery))
 
     def import_rows(self, items, options=None, now=NOW):
         with patch("services.transaction_sync.history_pages", return_value=[items]):
@@ -139,13 +124,10 @@ class PostgreSQLSyncTests(unittest.TestCase):
 
     def test_existing_report_routes_serialize_models_and_uuid_paths(self):
         report = self.import_rows([normalize_feed_item(feed_item(), ACCOUNT, CATEGORY)])
-        client = app.test_client()
-        with patch.dict(app.config, {"APP_API_KEY": "test-key"}):
-            with patch("routes.sync.SyncStore", return_value=self.store):
-                headers = {"Authorization": "Bearer test-key"}
-                response = client.get("/sync/runs/" + report["run_uid"], headers=headers)
-                recent = client.get("/sync/runs", headers=headers)
-                missing = client.get("/sync/runs/" + str(uuid4()), headers=headers)
+        with patch("routes.sync.SyncStore", return_value=self.store):
+            response = self.client.get("/sync/runs/" + report["run_uid"], headers=self.headers)
+            recent = self.client.get("/sync/runs", headers=self.headers)
+            missing = self.client.get("/sync/runs/" + str(uuid4()), headers=self.headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), report)
         self.assertEqual(response.headers["Cache-Control"], "no-store")

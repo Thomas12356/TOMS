@@ -1,27 +1,20 @@
 """Local transfer classification API and sync/report integration."""
 
-import os
 import unittest
-from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, patch
+from datetime import timedelta
+from unittest.mock import patch
 from uuid import uuid4
 
-from sqlalchemy.orm import Session
-
-from app import app
-from models import Account, Category, Transaction, TransactionClassification
+from models import Transaction, TransactionClassification
 from services.database import db
 from services.starling_feed import normalize_feed_item
 from services.sync_store import SyncStore
+from support import ApiTestCase, SavedTransactionTestCase
 
 
-class ClassificationProtectionTests(unittest.TestCase):
+class ClassificationProtectionTests(ApiTestCase):
     def setUp(self):
-        config = patch.dict(app.config, {"APP_API_KEY": "test-key"})
-        config.start()
-        self.addCleanup(config.stop)
-        self.client = app.test_client()
-        self.headers = {"Authorization": "Bearer test-key"}
+        super().setUp()
         self.path = "/transactions/" + "/".join(str(uuid4()) for _ in range(3)) + "/classification"
 
     def test_authentication_precedes_reads_and_writes(self):
@@ -53,45 +46,7 @@ class ClassificationProtectionTests(unittest.TestCase):
             paginate.assert_not_called()
 
 
-@unittest.skipUnless(os.getenv("RUN_POSTGRES_TESTS") == "1", "Set RUN_POSTGRES_TESTS=1 for rollback-only database tests.")
-class PostgreSQLClassificationTests(unittest.TestCase):
-    def setUp(self):
-        context = app.app_context()
-        context.push()
-        self.addCleanup(context.pop)
-        self.engine = db.engine
-        connection = self.engine.connect()
-        self.addCleanup(connection.close)
-        outer = connection.begin()
-        self.addCleanup(outer.rollback)
-        self.session = Session(bind=connection, join_transaction_mode="create_savepoint")
-        self.addCleanup(self.session.close)
-        session_patch = patch.object(db, "session", Mock(return_value=self.session, wraps=self.session))
-        session_patch.start()
-        self.addCleanup(session_patch.stop)
-        config = patch.dict(app.config, {"APP_API_KEY": "test-key"})
-        config.start()
-        self.addCleanup(config.stop)
-        bank = patch("services.starling.http_client.send", side_effect=AssertionError("Local classifications must not call Starling"))
-        self.bank = bank.start()
-        self.addCleanup(bank.stop)
-        self.client = app.test_client()
-        self.headers = {"Authorization": "Bearer test-key"}
-        self.account, self.category, self.outgoing, self.incoming = (str(uuid4()) for _ in range(4))
-        self.now = datetime(2000, 2, 15, 12, tzinfo=timezone.utc)
-        self.session.add(Account(account_uid=self.account, default_category_uid=self.category,
-                                 currency="GBP", raw_payload={}))
-        self.session.flush()
-        self.session.add(Category(account_uid=self.account, category_uid=self.category, kind="main"))
-        self.session.flush()
-        for item, direction, amount, source in ((self.outgoing, "OUT", 1250, "FASTER_PAYMENTS_OUT"),
-                                               (self.incoming, "IN", 2500, "INTERNAL_TRANSFER")):
-            self.session.add(Transaction(account_uid=self.account, category_uid=self.category,
-                feed_item_uid=item, direction=direction, amount_minor=amount, currency="GBP",
-                source=source, status="SETTLED", transaction_time=self.now, source_updated_at=self.now,
-                spending_category="GROCERIES", raw_payload={"private": "Never return this"}))
-        self.session.flush()
-
+class PostgreSQLClassificationTests(SavedTransactionTestCase):
     def path(self, item=None):
         return f"/transactions/{self.account}/{self.category}/{item or self.outgoing}/classification"
 

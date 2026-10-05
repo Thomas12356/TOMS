@@ -1,20 +1,12 @@
 """Sync request bodies must be read even without Content-Length."""
 
 import io
-import unittest
 from unittest.mock import patch
 
-from app import app
+from support import ApiTestCase
 
 
-class SyncRequestTests(unittest.TestCase):
-    def setUp(self):
-        config = patch.dict(app.config, {"APP_API_KEY": "test-key"})
-        config.start()
-        self.addCleanup(config.stop)
-        self.client = app.test_client()
-        self.headers = {"Authorization": "Bearer test-key"}
-
+class SyncRequestTests(ApiTestCase):
     def streamed_post(self, body, *, content_type="application/json", headers=None):
         return self.client.post("/sync/transactions", headers=self.headers if headers is None else headers,
             content_type=content_type, environ_overrides={"CONTENT_LENGTH": "", "wsgi.input_terminated": True,

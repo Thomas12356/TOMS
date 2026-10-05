@@ -12,6 +12,7 @@ from services.database import db
 from services.error_logging import log_failure
 from services.transaction_sync import SyncError, run_sync
 from services.validation import timestamp
+from support import ApiTestCase
 from test_transaction_sync import MemoryStore, NOW
 
 
@@ -21,14 +22,7 @@ ITEM = "cccccccc-cccc-4ccc-cccc-cccccccccccc"
 TRANSACTION = f"/transactions/{ACCOUNT}/{CATEGORY}/{ITEM}"
 
 
-class InputValidationTests(unittest.TestCase):
-    def setUp(self):
-        config = patch.dict(app.config, {"APP_API_KEY": "test-key"})
-        config.start()
-        self.addCleanup(config.stop)
-        self.client = app.test_client()
-        self.headers = {"Authorization": "Bearer test-key"}
-
+class InputValidationTests(ApiTestCase):
     def test_out_of_range_utc_timestamps_are_validation_errors(self):
         invalid = ("0001-01-01T00:00:00+01:00", "9999-12-31T23:59:59-01:00")
         with patch("routes.sync.SyncStore") as store, patch("routes.starling.starling_request") as bank:
