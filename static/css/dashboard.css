@@ -1098,3 +1098,70 @@ td.amount {
 .balance-heading .secondary {
     margin: 4px 0 0;
 }
+
+/* Owner confirmation is separate from the bank's payment status. */
+.review-state {
+    display: block;
+    margin-top: 6px;
+    font: 11px/1.5 var(--mono);
+}
+
+.is-unconfirmed { color: #865b20; }
+.is-confirmed { color: var(--muted); }
+
+.review-dialog {
+    width: min(560px, calc(100% - 32px));
+    max-height: calc(100dvh - 32px);
+    padding: 24px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--text);
+    overflow-y: auto;
+}
+
+.review-dialog::backdrop { background: #18201c99; }
+.review-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.review-heading .eyebrow { margin-top: 0; }
+.review-heading button {
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.review-details {
+    display: grid;
+    grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr);
+    gap: 10px 16px;
+    padding: 16px 0;
+    border-top: 1px solid var(--border);
+}
+.review-details dt { color: var(--muted); font-size: 12px; }
+.review-details dd { margin: 0; overflow-wrap: anywhere; }
+.review-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.review-actions button {
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 1px solid var(--header);
+    border-radius: 3px;
+    background: var(--header);
+    color: var(--surface);
+    cursor: pointer;
+}
+.review-actions button:disabled { opacity: .6; cursor: wait; }
+.review-open[hidden] { display: none; }
+.review-dialog button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+@media (max-width: 640px) {
+    .review-dialog { padding: 18px; }
+    .review-details { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .review-details dd { margin-bottom: 12px; }
+    .review-actions { align-items: stretch; flex-direction: column; }
+}
+
+#review-retry[hidden] { display: none; }

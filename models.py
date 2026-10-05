@@ -65,6 +65,7 @@ class Transaction(BaseModel):
     transaction_time = db.Column(db.DateTime(timezone=True), nullable=False)
     source_updated_at = db.Column(db.DateTime(timezone=True), nullable=False)
     settlement_time = db.Column(db.DateTime(timezone=True))
+    confirmed_at = db.Column(db.DateTime(timezone=True))
     source = db.Column(db.Text)
     spending_category = db.Column(db.Text)
     counterparty_name = db.Column(db.Text)

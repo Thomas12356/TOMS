@@ -121,6 +121,9 @@ class SyncStore:
                     if (item["source_updated_at"] == transaction.source_updated_at
                             and item["raw_payload"] == transaction.raw_payload):
                         continue
+                    review_fields = INCOME_REVIEW_FIELDS + ("status", "settlement_time", "spending_category", "source_amount_minor", "source_currency")
+                    if any(item.get(field) != getattr(transaction, field) for field in review_fields):
+                        transaction.confirmed_at = None
                     if any(item[field] != getattr(transaction, field) for field in INCOME_REVIEW_FIELDS):
                         if transaction.income is not None:
                             transaction.income.needs_review = True
