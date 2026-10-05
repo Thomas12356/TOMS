@@ -27,7 +27,7 @@
         buttons.forEach(button => { button.disabled = true; });
         try {
             const before = await status();
-            if (!force && before?.status === 'completed' && Date.now() - Date.parse(before.finished_at) < 60000) {
+            if (!force && before?.status !== 'running' && before?.last_success_at && Date.now() - Date.parse(before.last_success_at) < 60000) {
                 showLast(before);
                 return;
             }
@@ -46,7 +46,7 @@
                 if (run?.status === 'failed' && run.started_at !== before?.started_at) {
                     throw new Error('Sync failed. Try again later; saved transactions are retained.');
                 }
-                if (!force && run?.status === 'completed' && Date.now() - Date.parse(run.finished_at) < 60000) {
+                if (!force && run?.status !== 'running' && run?.last_success_at && Date.now() - Date.parse(run.last_success_at) < 60000) {
                     showLast(run);
                     return;
                 }

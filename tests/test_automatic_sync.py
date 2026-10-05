@@ -6,6 +6,14 @@ from test_login import OwnerLoginFixture
 from test_transaction_sync import NOW
 import unittest
 
+from datetime import datetime, timedelta
+from uuid import uuid4
+from models import SyncRun, SyncTarget
+from services.database.connection import db
+from services.transactions.automatic_sync import latest_sync
+from services.transactions.store import SyncStore
+from support import PostgreSQLTestCase
+
 
 class SyncFreshnessTests(unittest.TestCase):
     def test_recent_success_skips_bank_requests_and_releases_lock(self):
@@ -48,3 +56,35 @@ class DashboardSyncTests(OwnerLoginFixture):
                 self.assertEqual(start.call_args.kwargs, {'force': force == '1'})
             response = self.client.post('/dashboard/sync?force=bad', headers={'X-CSRFToken': token})
             self.assertEqual(response.status_code, 400)
+
+
+class SyncStatusTests(PostgreSQLTestCase):
+    def setUp(self):
+        super().setUp()
+        self.session.execute(db.delete(SyncTarget))
+        self.session.execute(db.delete(SyncRun))
+
+    def add_run(self, status, age, options=None):
+        when = NOW - timedelta(seconds=age)
+        run = SyncRun(run_uid=str(uuid4()), status=status, requested_options=options or {},
+                      snapshot_at=when, started_at=when, finished_at=when)
+        self.session.add(run)
+        self.session.flush()
+        return run
+
+    def test_freshness_boundary_ignores_failed_and_filtered_runs(self):
+        full = self.add_run('completed', 60)
+        self.add_run('completed', 1, {'accountUid': '11111111-1111-4111-8111-111111111111'})
+        self.add_run('failed', 0)
+        store = SyncStore(session=self.session, engine=self.engine)
+        self.assertFalse(store.recently_synced(NOW, 60))
+        full.finished_at = NOW - timedelta(seconds=59)
+        self.session.flush()
+        self.assertTrue(store.recently_synced(NOW, 60))
+
+    def test_status_keeps_last_success_after_failed_run(self):
+        full = self.add_run('completed', 120)
+        self.add_run('failed', 1)
+        status = latest_sync()
+        self.assertEqual(status['status'], 'failed')
+        self.assertEqual(datetime.fromisoformat(status['last_success_at']), full.finished_at)
