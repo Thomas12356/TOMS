@@ -1,28 +1,156 @@
 # TOMS - The Organised Money System
 
-For a short map of the code and places to start making changes, read
+TOMS is a personal finance project for importing Starling transactions,
+manually categorising incoming money, and keeping income records ready for
+an annual tax calculation. The goal is to make it clear where income came from,
+which records need attention, and how a tax estimate was calculated.
+
+**Current stage:** a working Flask JSON API with PostgreSQL storage and automated
+tests. Manual categorisation is available through the API. The web dashboard
+and annual tax calculator are planned and have not been implemented yet.
+
+For a short map of the code and a walkthrough of an income edit, start with
 [Getting into the code](CODE_GUIDE.md).
 
-Install dependencies and start the local server:
+## Project scope and MVP
+
+The MVP should let you import transactions, review incoming payments, enter
+income details, and see an income-tax estimate for a supported jurisdiction and
+tax year. It will focus on income, with no claimed business expenses or complex
+reliefs in the initial calculation. That assumption should be visible alongside
+the result.
+
+The first supported jurisdiction and tax years still need to be chosen. The
+existing income fields include UK-oriented concepts such as CIS and PAYE, but
+there are currently no country-specific tax rules or calculations. The eventual
+tax profile must capture any region or other inputs required by the supported
+rules. Multi-country support is a later extension.
+
+The proposed initial tax feature calculates income tax within its documented
+scope. National Insurance, other social contributions, tax-return submission,
+and payments to tax authorities would be separate future features. Recorded
+withholding will be shown separately from calculated liability.
+
+## What works today
+
+| Feature | Current behaviour |
+| --- | --- |
+| Starling imports | Manual history imports and incremental updates, including active account spaces. |
+| Saved transactions | Filtered, paginated reads from PostgreSQL without contacting Starling. |
+| Manual categorisation | Choose income, expense, internal transfer, refund, or other; add notes. |
+| Income records | Record source, gross amount, deductions, adjustments, and confirmed tax treatment. |
+| Review flags | Relevant bank corrections flag income details for review while preserving manual entries. |
+| Monthly reports | Summarise settled cash flow by currency, spending category, and income source. |
+| Sync reports | Inspect committed progress, completed runs, and failures. |
+| Private API access | API-key authentication, private response headers, bounded requests, and safe error logging. |
+
+Monthly reports describe cash flow from bank deposits. They do not calculate
+annual tax. Unknown income amounts stay unknown, and choosing an income source
+does not automatically establish its tax treatment.
+
+## Next milestones
+
+1. **Transaction dashboard:** a Flask/Jinja page for browsing and filtering saved
+   payments, with small HTMX enhancements where useful.
+2. **Income review:** manual categorisation forms and a queue for unclassified,
+   incomplete, or flagged incoming payments.
+3. **Complete income inputs:** record income outside the connected account and
+   prevent it from being counted twice.
+4. **Annual tax calculation:** select a supported jurisdiction and tax year,
+   apply verified, versioned rules, and test allowances and band boundaries.
+5. **Tax summary:** show the calculation breakdown, recorded deductions,
+   incomplete records, and an export of the underlying income data.
+
+Each milestone should be delivered as small, understandable changes, with
+focused commits and explanations of the files involved. Browser authentication
+and protection for editing forms belong with the dashboard work.
+
+## Local setup
+
+You need Python, PostgreSQL, and a Starling access token for live bank operations.
+The app uses Flask, Flask-SQLAlchemy, SQLAlchemy, Psycopg, and HTTPX. Normal tests
+mock bank requests and do not require a live bank token.
+
+From the repository root, create the environment and install dependencies:
 
 ```bash
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-flask run
 ```
 
-Set `STARLING_ACCESS_TOKEN` and a separate random `APP_API_KEY` in your ignored
-`.env` file. `.env.example` shows the required configuration without secrets.
-The app uses the production
-Starling API at `https://api.starlingbank.com`. Each operation requires the
-corresponding permission on that token. The server binds to localhost and Flask
-debug mode is disabled in `.env`. Use HTTPS and a production WSGI server if you
-deploy it outside your machine.
+For a new checkout, copy `.env.example` to `.env`. If `.env` already exists,
+edit that file directly to preserve your existing settings.
+
+Set the following values privately in `.env`:
+
+- `STARLING_ACCESS_TOKEN`: the bank credential used by the server.
+- `APP_API_KEY`: a separate random secret for callers of this app.
+- `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD`: your PostgreSQL
+  connection settings. The default database name is `TOMS`.
+
+Create the database if it does not already exist, using your normal PostgreSQL
+administration tools. Then apply the table migrations and start Flask:
+
+```bash
+.venv/bin/flask --app app db-upgrade
+.venv/bin/flask --app app run --host 127.0.0.1 --port 5000
+```
+
+Visit `http://127.0.0.1:5000/health` to check the app. Authenticate to
+`/health/db` to check PostgreSQL. Running migrations creates the storage tables;
+starting Flask does not import bank transactions. Call the manual sync endpoint
+when you are ready to import.
+
+Live bank operations use the **production Starling API** at
+`https://api.starlingbank.com`, with the corresponding permissions on your token.
+The example configuration disables Flask debug mode. Use HTTPS and a production
+WSGI server if you deploy beyond your local machine.
+
+## Code layout
+
+```text
+app.py                      Flask setup, route registration, health checks, CLI
+models.py                   Database tables and relationships
+routes/                     HTTP inputs, endpoint handlers, JSON responses
+services/                   Business rules, bank client, sync and database logic
+migrations/                 Versioned PostgreSQL schema changes
+tests/                      Validation, API and opt-in database tests
+CODE_GUIDE.md               Reading order and places to make your own changes
+.env.example                Configuration template without credentials
+```
+
+Start with `routes/transactions.py` and `services/income.py` for categorisation
+and income edits. `routes/reports.py` contains the monthly report.
+`services/transaction_sync.py` coordinates bank imports, while
+`services/sync_store.py` handles their database writes.
+
+To make a small first edit, change a display label in `INCOME_TYPES` in
+`services/income.py`, then run the income tests. Adding a new stored type also
+requires a new migration because the database restricts allowed values.
+
+```bash
+.venv/bin/python -m unittest discover -s tests -p test_income.py
+```
+
+## API and operation reference
+
+- [Caller authentication](#caller-authentication)
+- [PostgreSQL](#postgresql)
+- [Import and update transactions](#import-and-update-transactions)
+- [Browse saved transactions](#browse-saved-transactions)
+- [Classify transfer types](#classify-transfer-types)
+- [Income sources and tax deductions](#income-sources-and-tax-deductions)
+- [Monthly income and spending](#monthly-income-and-spending)
+- [Routes](#routes)
+- [Test all endpoints](#test-all-endpoints)
+- [Tests and references](#tests-and-references)
 
 ## Caller authentication
 
-All `/starling` endpoints require `APP_API_KEY`. This is a different credential
-from `STARLING_ACCESS_TOKEN`: the bank token stays on the server.
+All `/starling`, `/sync`, `/transactions`, and `/reports` endpoints, plus
+`/health/db`, require `APP_API_KEY`. This is a different credential from
+`STARLING_ACCESS_TOKEN`: the bank token stays on the server.
 
 In a browser, use username **`api`** and the **`APP_API_KEY` value from `.env`**
 as the password when prompted. With curl, use `--user api` to enter the key at
@@ -71,11 +199,11 @@ Apply migrations once, and again when new migration files are added:
 .venv/bin/flask db-upgrade
 ```
 
-The migration creates `toms.accounts`, `toms.categories`, `toms.transactions`,
-`toms.sync_runs`, and `toms.sync_targets`, with migration checksums recorded in
+The migrations create `toms.accounts`, `toms.categories`, `toms.transactions`,
+`toms.transaction_classifications`, `toms.transaction_income`, `toms.sync_runs`,
+and `toms.sync_targets`, with migration checksums recorded in
 `toms.schema_migrations`. Repeating the command is safe. Existing banking data
-is not deleted. The initial migration has already been applied to this project's
-local `TOMS` database.
+is not deleted.
 
 Restart Flask, then start an import:
 
@@ -585,8 +713,11 @@ errors, and invalid receipt amounts return 400.
 ## Implementation choices
 
 Bank requests use one synchronous HTTPX client with connection reuse, explicit
-10-second network timeouts and redirects disabled. Authentication, local rate
-limits and safe upstream error messages remain in `services/starling.py`.
+10-second network timeouts and redirects disabled. Local rate limits and safe
+upstream error messages are handled by `services/starling.py` and
+`services/rate_limit.py`. Caller authentication lives in `services/auth.py`;
+each route blueprint explicitly registers it. Shared query-string validation
+lives in `routes/helpers.py`.
 
 Diagnostics validate options, discover resources and execute/report checks in
 separate helpers. Flask's `url_for` builds diagnostic URLs; internal dispatch
@@ -595,13 +726,12 @@ explicit receipt-write opt-in remain in place.
 
 Sync planning uses a small immutable `SyncPlan` and a separate category importer.
 Shared ID, timestamp and money validation lives in `services/validation.py`.
-These changes preserve the existing endpoints and response formats.
 
 Database models live in `models.py`: `Account`, `Category`, `Transaction`,
-`SyncRun`, `SyncTarget`, and `TransactionClassification`. They map directly to the existing `toms` tables.
-`services/database.py` configures the `db` extension using the existing `PG*`
-settings; `services/sync_store.py` uses model lookups, attribute updates and
-session commits. No table rebuild or data migration is needed for this conversion.
+`TransactionClassification`, `TransactionIncome`, `SyncRun`, and `SyncTarget`.
+They map to the `toms` tables. `services/database.py` configures the `db`
+extension using the `PG*` settings; `services/sync_store.py` uses model lookups,
+attribute updates and session commits.
 
 Each imported page commits its transactions and progress together. A separate
 SQLAlchemy connection holds a PostgreSQL transaction-level advisory lock for the
