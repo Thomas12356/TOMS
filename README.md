@@ -947,3 +947,12 @@ catch-up import when the timer starts after a missed slot. For unattended use
 after logout, enable lingering for the hosting user with `loginctl enable-linger`.
 Install the timer on the actual host too if deploying to another machine.
 To disable it: `systemctl --user disable --now toms-sync.timer`.
+
+### Access over the local network
+
+Set `FLASK_RUN_HOST=0.0.0.0` in `.env` and restart `flask run` or `python app.py`.
+This listens on localhost and all network interfaces. Use the host's LAN IP and
+port 5000 from another device. For a plain HTTP development session, run
+`SESSION_COOKIE_SECURE=0 .venv/bin/python -m flask run`; secure cookies require
+HTTPS for login over a LAN address. Keep secure cookies enabled with Tailscale
+Serve HTTPS. An explicit `--host` or Gunicorn `--bind` overrides this setting.
