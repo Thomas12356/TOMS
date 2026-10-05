@@ -22,6 +22,7 @@ TAX_TREATMENTS = {
 
 
 def income_body(body):
+    """Validate an edit form's JSON and return the values to save on TransactionIncome."""
     allowed = {"income_type", "tax_treatment", "source_name", "gross_minor", "tax_deducted_minor",
                "adjustment_minor", "adjustment_notes"}
     if not isinstance(body, dict) or set(body) - allowed:
@@ -60,7 +61,10 @@ def income_body(body):
 
 
 def validate_reconciliation(values, net_received):
-    """Known components must reconcile; unknown withholding stays unknown."""
+    """Check gross - tax + adjustment = deposit when all components are known.
+
+    This checks the entered amounts; it does not calculate tax liability.
+    """
     gross, tax = values["gross_minor"], values["tax_deducted_minor"]
     if gross is None:
         return

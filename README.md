@@ -1,5 +1,8 @@
 # TOMS - The Organised Money System
 
+For a short map of the code and places to start making changes, read
+[Getting into the code](CODE_GUIDE.md).
+
 Install dependencies and start the local server:
 
 ```bash

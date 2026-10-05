@@ -1,4 +1,12 @@
-"""Shared API clients and rollback-only PostgreSQL fixtures."""
+"""Shared test setup. Test classes inherit one of the three fixtures below.
+
+ApiTestCase: authenticated browser client, with no database connection.
+PostgreSQLTestCase: adds a database session whose changes are rolled back.
+SavedTransactionTestCase: adds an account and two example payments.
+
+In a test's setUp(), super().setUp() runs that fixture before its own setup.
+enterContext() and addCleanup() arrange cleanup even when a test fails.
+"""
 
 import os
 import unittest

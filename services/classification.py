@@ -27,6 +27,10 @@ def classification_details(transaction):
     if record is not None:
         return {"type": record.type, "origin": "manual", "notes": record.notes,
                 "updated_at": record.updated_at.astimezone(timezone.utc).isoformat()}
-    inferred = "internal_transfer" if transaction.source == "INTERNAL_TRANSFER" else (
-        "income" if transaction.direction == "IN" else "expense")
+    if transaction.source == "INTERNAL_TRANSFER":
+        inferred = "internal_transfer"
+    elif transaction.direction == "IN":
+        inferred = "income"
+    else:
+        inferred = "expense"
     return {"type": inferred, "origin": "automatic", "notes": None, "updated_at": None}

@@ -20,6 +20,7 @@ class SyncError(Exception):
 
 
 def parse_options(options, now):
+    """Validate sync JSON, converting IDs and dates into values the importer can use."""
     if not isinstance(options, dict) or set(options) - {"start", "end", "mode", "accountUid", "categoryUid"}:
         raise BadRequest("Use start, end, mode, accountUid, or categoryUid in a JSON object.")
     if options.get("mode", "auto") not in ("auto", "history", "incremental"):
@@ -109,6 +110,7 @@ def choose_sync_plan(account, state, options, snapshot):
 
 
 def sync_category(store, run_uid, account, category_uid, state, options, snapshot):
+    """Import one category, saving each page before advancing its checkpoint."""
     plan = choose_sync_plan(account, state, options, snapshot)
     if plan.mode == "incremental":
         items = changed_items(account["uid"], category_uid, plan.start)
@@ -127,6 +129,10 @@ def sync_category(store, run_uid, account, category_uid, state, options, snapsho
 
 
 def run_sync(store, raw_options, *, now=None):
+    """Main import flow: validate, lock, discover accounts, save pages, finish, unlock.
+
+    `store` handles database writes; this function decides the order of the work.
+    """
     snapshot = now or datetime.now(timezone.utc)
     options = parse_options(raw_options, snapshot)
     if not store.ready():
