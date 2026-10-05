@@ -185,3 +185,19 @@ class SyncTarget(BaseModel):
     earliest_received = db.Column(db.DateTime(timezone=True))
     latest_received = db.Column(db.DateTime(timezone=True))
     run = db.relationship("SyncRun", back_populates="targets")
+
+
+class OwnerLogin(BaseModel):
+    """Only row 1 is allowed: this application has a single owner."""
+    __tablename__ = "owner_login"
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.Text, nullable=False)
+    password_hash = db.Column(db.Text, nullable=False)
+
+
+class BrowserSession(BaseModel):
+    __tablename__ = "browser_sessions"
+    token_hash = db.Column(db.Text, primary_key=True)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    last_seen_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False)

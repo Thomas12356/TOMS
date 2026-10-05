@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign in · TOMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{{ url_for('login.sign_in') }}">TOMS<span>The Organised Money System</span></a>
+    </header>
+    <main class="login-page">
+        <div class="page-heading">
+            <p class="eyebrow">TOMS / PERSONAL WORKSPACE</p>
+            <h1>Sign in</h1>
+            <p class="description">Your accounts. Your records.</p>
+        </div>
+        {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+        {% if ready %}
+        <form class="login-form" method="post" action="{{ url_for('login.sign_in') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="username">Username</label>
+            <input id="username" name="username" autocomplete="username" maxlength="100" required>
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" maxlength="1024" required>
+            <button type="submit">Sign in</button>
+        </form>
+        {% endif %}
+    </main>
+</body>
+</html>

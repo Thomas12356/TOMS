@@ -2,7 +2,7 @@ import os
 
 from sqlalchemy.exc import SQLAlchemyError
 import click
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from routes.starling import starling
@@ -10,6 +10,11 @@ from routes.sync import sync
 from routes.transactions import transactions
 from routes.reports import reports
 from routes.dashboard import dashboard
+from routes.login import login
+from services.web.sessions import login_manager, csrf, SESSION_LIFETIME
+from flask_wtf.csrf import CSRFError
+from werkzeug.security import generate_password_hash
+from models import OwnerLogin, BrowserSession
 from services.web.auth import require_api_key
 from services.database.connection import check_database, db, init_database
 from models import Account, Category, Transaction, TransactionClassification, TransactionIncome, SyncRun, SyncTarget
@@ -22,6 +27,21 @@ app = Flask(__name__)
 app.request_class = BoundedRequest
 app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024  # 1 MiB for JSON options and receipt metadata.
 app.config["APP_API_KEY"] = os.getenv("APP_API_KEY", "").strip()
+# Secure cookies are the default for HTTPS through Tailscale Serve.
+app.config.update(
+    SECRET_KEY=os.getenv("SECRET_KEY", "").strip() or None,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "1") != "0",
+    PERMANENT_SESSION_LIFETIME=SESSION_LIFETIME,
+    SESSION_REFRESH_EACH_REQUEST=False,
+    WTF_CSRF_CHECK_DEFAULT=False,  # Browser blueprints explicitly protect forms.
+)
+# Pass the current-user proxy only to templates that need it. The default
+# context processor eagerly loads sessions, even while rendering database errors.
+login_manager.init_app(app, add_context_processor=False)
+csrf.init_app(app)
+app.register_blueprint(login)
 app.register_blueprint(starling)
 app.register_blueprint(sync)
 app.register_blueprint(transactions)
@@ -45,10 +65,17 @@ def shell_context():
 @app.after_request
 def protect_banking_responses(response):
     if (request.path.startswith(("/starling/", "/sync/", "/transactions/", "/reports/", "/dashboard/"))
-            or request.path in ("/health/db", "/transactions", "/reports", "/dashboard")):
+            or request.path in ("/login", "/logout", "/health/db", "/transactions", "/reports", "/dashboard")):
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "same-origin"
     return response
+
+
+@app.errorhandler(CSRFError)
+def csrf_failure(error):
+    return render_template("login.html", error="The form expired or could not be verified. Reload the page and try again.", ready=True), 400
 
 
 @app.get("/")
@@ -86,6 +113,26 @@ def db_upgrade():
     except RuntimeError as error:
         raise click.ClickException(str(error)) from None
     click.echo("Applied: " + ", ".join(applied) if applied else "Database is already up to date.")
+
+
+@app.cli.command("owner-password")
+@click.option("--username", prompt=True)
+@click.password_option(confirmation_prompt=True)
+def owner_password(username, password):
+    """Create/update the single owner and revoke all previous browser sessions."""
+    username = username.strip()
+    if not 1 <= len(username) <= 100 or not 15 <= len(password) <= 1024:
+        raise click.ClickException("Use a username of 1–100 characters and a password of 15–1024 characters.")
+    try:
+        db.session.merge(OwnerLogin(id=1, username=username,
+                                   password_hash=generate_password_hash(password, method="scrypt")))
+        db.session.execute(db.delete(BrowserSession))
+        db.session.commit()
+    except SQLAlchemyError as error:
+        db.session.rollback()
+        log_failure("owner.database", error)
+        raise click.ClickException("Owner setup failed. Check PostgreSQL and run flask db-upgrade.") from None
+    click.echo("Owner password saved. All previous browser sessions have been revoked.")
 
 
 if __name__ == "__main__":

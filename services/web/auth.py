@@ -14,9 +14,13 @@ def require_api_key():
     if auth is not None:
         if auth.type == "bearer":
             supplied = auth.token or ""
-        elif auth.type == "basic" and auth.username == "api":
+        # Basic credentials can be automatically attached by browsers, so
+        # state-changing API calls require an explicit bearer header.
+        elif (auth.type == "basic" and auth.username == "api"
+              and request.method in {"GET", "HEAD", "OPTIONS"}):
             supplied = auth.password or ""
     if not hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8")):
         return jsonify(error="Authentication required."), 401, {
-            "WWW-Authenticate": 'Basic realm="Personal accountant API"',
+            "WWW-Authenticate": ('Basic realm="Personal accountant API"'
+                                 if request.method in {"GET", "HEAD", "OPTIONS"} else "Bearer"),
         }

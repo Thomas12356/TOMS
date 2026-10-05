@@ -38,18 +38,20 @@ class DashboardTests(ApiTestCase):
         self.bank = self.enterContext(patch("services.banking.client.http_client.send",
             side_effect=AssertionError("The dashboard must not call Starling")))
 
-    def test_authentication_precedes_database_access_and_browser_login_works(self):
+    def test_authentication_precedes_database_access(self):
         with patch.object(db, "paginate", return_value=saved_page([])) as paginate:
-            response = self.client.get("/dashboard")
-            self.assertEqual(response.status_code, 401)
-            self.assertIn("Basic", response.headers["WWW-Authenticate"])
+            with patch.dict(app.config, {"SECRET_KEY": "a" * 64}):
+                response = self.client.get("/dashboard")
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response.headers["Location"].endswith("/login"))
+                basic = base64.b64encode(b"api:test-key").decode()
+                self.assertEqual(self.client.get("/dashboard", headers={"Authorization": "Basic " + basic}).status_code, 302)
             self.assertEqual(response.headers["Cache-Control"], "no-store")
             self.assertEqual(self.client.get("/dashboard", headers={"Authorization": "Bearer wrong"}).status_code, 401)
             with patch.dict(app.config, {"APP_API_KEY": ""}):
                 self.assertEqual(self.client.get("/dashboard", headers=self.headers).status_code, 503)
             paginate.assert_not_called()
-            basic = base64.b64encode(b"api:test-key").decode()
-            self.assertEqual(self.client.get("/dashboard", headers={"Authorization": "Basic " + basic}).status_code, 200)
+            self.assertEqual(self.client.get("/dashboard", headers=self.headers).status_code, 200)
 
     def test_invalid_pages_do_not_query_database(self):
         with patch.object(db, "paginate") as paginate:
@@ -114,7 +116,7 @@ class DashboardTests(ApiTestCase):
 
     def test_balances_require_authentication_and_head_does_not_call_bank(self):
         with patch.object(db.session, "scalars") as accounts, patch("routes.dashboard.starling_request") as bank:
-            self.assertEqual(self.client.get("/dashboard/balances").status_code, 401)
+            self.assertEqual(self.client.get("/dashboard/balances").status_code, 503)
             self.assertEqual(self.client.head("/dashboard/balances", headers=self.headers).status_code, 200)
             accounts.assert_not_called()
             bank.assert_not_called()

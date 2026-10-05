@@ -33,7 +33,7 @@ class ProtectionTests(unittest.TestCase):
                 with self.subTest(method=method, path=path):
                     response = self.client.open(path, method=method)
                     self.assertEqual(response.status_code, 401)
-                    self.assertIn("Basic", response.headers["WWW-Authenticate"])
+                    self.assertIn("Basic" if method == "GET" else "Bearer", response.headers["WWW-Authenticate"])
                     self.assertEqual(response.headers["Cache-Control"], "no-store")
             send.assert_not_called()
         self.assertEqual(self.client.get("/health").status_code, 200)
