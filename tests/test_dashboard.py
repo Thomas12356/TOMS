@@ -151,6 +151,28 @@ class DashboardTests(ApiTestCase):
         bank.assert_any_call("/api/v2/accounts/first/balance", scope="balance:read")
         self.assertEqual(response.headers["Cache-Control"], "no-store")
 
+    def test_all_accounts_total_combines_signed_balances_without_mixing_currencies(self):
+        accounts = [SimpleNamespace(account_uid=str(i), name="Account", currency=currency)
+                    for i, currency in enumerate(("GBP", "GBP", "EUR"))]
+        replies = [{"effectiveBalance": {"minorUnits": amount, "currency": currency}}
+                   for amount, currency in ((1000, "GBP"), (-123, "GBP"), (500, "EUR"))]
+        with patch.object(db.session, "scalars", return_value=accounts), patch("routes.dashboard.starling_request", side_effect=replies):
+            response = self.client.get("/dashboard/balances?account=all", headers=self.headers)
+        self.assertEqual(response.get_json()["totals"], [
+            {"name": "Total balance · All EUR accounts", "amount": "EUR 5.00", "error": None},
+            {"name": "Total balance · All GBP accounts", "amount": "GBP 8.77", "error": None},
+        ])
+
+    def test_missing_account_balance_never_displays_a_partial_total(self):
+        accounts = [SimpleNamespace(account_uid=str(i), name="Account", currency="GBP") for i in range(2)]
+        replies = [{"effectiveBalance": {"minorUnits": 1000, "currency": "GBP"}}, {}]
+        with patch.object(db.session, "scalars", return_value=accounts), patch("routes.dashboard.starling_request", side_effect=replies):
+            response = self.client.get("/dashboard/balances", headers=self.headers)
+        total = response.get_json()["totals"][0]
+        self.assertEqual(total["name"], "Total balance · All accounts")
+        self.assertIsNone(total["amount"])
+        self.assertIn("Total unavailable", total["error"])
+
     def test_invalid_balance_is_unavailable_rather_than_zero(self):
         account = SimpleNamespace(account_uid="first", name="Current account", currency="GBP")
         for payload in (None, {}, {"effectiveBalance": {"minorUnits": True, "currency": "GBP"}},

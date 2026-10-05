@@ -102,8 +102,10 @@ def account_balances():
     if account_uid and not accounts:
         raise BadRequest("This account is not available. Choose a saved account.")
     balances = []
+    totals = {}
     rate_limited = False
     for account in accounts:
+        total = totals.setdefault(account.currency, {"minor_units": 0, "unavailable": False})
         card = {"name": account.name or f"Starling {account.currency} account",
                 "amount": None, "error": None}
         if rate_limited:
@@ -118,11 +120,21 @@ def account_balances():
                         or balance.get("currency") != account.currency):
                     raise StarlingError("Starling returned an invalid account balance.")
                 card["amount"] = format_amount(balance["minorUnits"], balance["currency"])
+                total["minor_units"] += balance["minorUnits"]
             except StarlingError as error:
                 card["error"] = str(error)
                 rate_limited = error.status_code == 429
+        if card["error"]:
+            total["unavailable"] = True
         balances.append(card)
-    return jsonify(balances=balances)
+    if account_uid:
+        return jsonify(balances=balances)
+    combined = [{
+        "name": "Total balance · All accounts" if len(totals) == 1 else f"Total balance · All {currency} accounts",
+        "amount": None if total["unavailable"] else format_amount(total["minor_units"], currency),
+        "error": "Total unavailable: one or more account balances could not be loaded." if total["unavailable"] else None,
+    } for currency, total in sorted(totals.items())]
+    return jsonify(balances=balances, totals=combined)
 
 
 @dashboard.get("")
