@@ -1,6 +1,6 @@
 # Security checks — 6 October 2026
 
-The full suite passed: **240 tests**, with PostgreSQL checks enabled. This
+The full suite passed: **264 tests**, with PostgreSQL checks enabled. This
 includes **24 adversarial tests** in `tests/test_security.py`, plus the
 existing login, API protection, request-boundary and bank-client tests.
 Ten classification-form tests also cover saves, automatic reset, income
@@ -353,3 +353,38 @@ DML grants without leaving a table behind. Missing maintenance credentials fail
 closed. `flask db-upgrade` passes with the separate login; Ruff F checks,
 Bandit and `git diff --check` pass. Both ignored credential files have mode 0600.
 Restart any already-running server to replace its previously opened connections.
+
+## Annual income-tax planning — 6 October 2026
+
+The PostgreSQL-enabled suite passes **264 tests** with the restricted runtime
+login. New coverage includes official-rate examples at allowance/basic/higher/
+additional boundaries, penny rounding and the allowance taper; employment plus
+self-employment; multiple employers sharing one allowance; entered PAYE/CIS
+credits; excess deductions; part-year and archived forecasts; unknown deductions;
+missing gross and foreign-currency blockers; zero receipts and no division by
+zero. Increased withholding cannot increase the reserve target.
+
+Authenticated route checks cover owner-only access (anonymous and bearer calls
+cannot retrieve owner forecasts), no-store headers, escaped names, invalid and
+duplicate query parameters, empty/incomplete rendering and no bank calls.
+PostgreSQL rejects incompatible modes and missing/negative entered deductions.
+Form checks cover save/prefill, unchanged recorded-payment deductions, forged
+and duplicate fields, overflow/negative/excess amounts and retained invalid input.
+The official-source validator now checks calculation bands against the verified
+published ranges, rather than verifying only the displayed table.
+
+Chromium checks pass for five tax-estimate states at 320, 390, 640, 768 and 1280px:
+complete, CIS excess, unknown deductions, foreign currency and no streams.
+Figures, mobile navigation, layout and JavaScript are checked. Income forms,
+annual-deduction visibility/validation and submitted values pass at mobile and
+desktop widths; existing ledger/sync/review browser checks also pass. The narrow
+selector overflow found during testing is fixed. Ruff F checks, Bandit application
+scan and diff whitespace checks pass. A live public GOV.UK verification succeeds.
+Migration 014 applies through the maintenance login and a repeat upgrade is a
+no-op. No live bank calls, dependencies or authentication settings changed.
+
+This is an income-tax planning forecast, not payroll software or a complete
+Self Assessment calculation. PAYE estimates assume a standard employment-only
+allowance; entered forecasts account for tax-code differences. NI, reliefs,
+expenses, trading allowance, payments on account and money already saved/paid
+directly remain outside scope and are labelled on the page.

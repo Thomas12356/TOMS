@@ -12,7 +12,7 @@ from werkzeug.exceptions import BadRequest, NotFound, Conflict
 
 from models import Account, Transaction, TransactionIncome, IncomeStream
 from uuid import uuid4
-from services.transactions.income_streams import STREAM_KINDS, FORECAST_PERIODS, FORECAST_CURRENCIES, TAX_YEARS, active_days, annual_gross, holiday_amount, stream_id, stream_fields
+from services.transactions.income_streams import STREAM_KINDS, WITHHOLDING_MODES, FORECAST_PERIODS, FORECAST_CURRENCIES, TAX_YEARS, active_days, annual_gross, holiday_amount, stream_id, stream_fields
 from routes.helpers import query_values
 from services.database.connection import db
 from services.error_logging import log_failure
@@ -350,9 +350,9 @@ def income_streams():
     if selected_id and db.session.get(IncomeStream, selected_id) is None:
         raise NotFound('Income stream not found.')
     error = None
-    create_fields = ('name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on')
+    create_fields = ('name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'withholding_mode', 'expected_tax_deducted')
     create_values = dict.fromkeys(create_fields, '')
-    create_values.update(expected_gross_period='yearly', expected_gross_currency='GBP', unpaid_holiday='0', unpaid_holiday_unit='weeks', forecast_tax_year='2026-27')
+    create_values.update(expected_gross_period='yearly', expected_gross_currency='GBP', unpaid_holiday='0', unpaid_holiday_unit='weeks', forecast_tax_year='2026-27', withholding_mode='unknown')
     editing_id, editing_values = None, {}
     if request.method == 'POST':
         submitted = {field: request.form.get(field, '') for field in create_fields}
@@ -403,7 +403,7 @@ def income_streams():
                                   stream=selected_id or 'all', return_to='income-streams', page=page_number))
             for payment in page.items]
     return render_template('income_streams.html', streams=streams, selected_stream=selected_id,
-                           counts=counts, stream_kinds=STREAM_KINDS, create_values=create_values, error=error,
+                           counts=counts, stream_kinds=STREAM_KINDS, withholding_modes=WITHHOLDING_MODES, create_values=create_values, error=error,
                            forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES,
                            tax_years=TAX_YEARS, active_days=active_days,
                            editing_id=editing_id, editing_values=editing_values,
@@ -432,3 +432,24 @@ def tax_rules():
     start_rule_check(current_app.instance_path)
     return render_template('tax_rules.html', rules=reviewed_rules(), status=status,
                            format_amount=format_amount, current_user=current_user)
+
+
+@dashboard.get('/tax-estimate')
+def tax_estimate():
+    """Annual planning across all streams; never add bank receipts to forecasts."""
+    from services.tax.estimate import estimate_streams, rounded_minor
+    from services.tax.rules import reviewed_rules, cached_status
+
+    if request.authorization is not None or not current_user.is_authenticated:
+        return redirect(url_for('login.sign_in'))
+    options = query_values({'year', 'region'})
+    if options.get('year', '2026-27') != '2026-27' or options.get('region', 'uk-ewni') != 'uk-ewni':
+        raise BadRequest('The estimate currently supports England, Wales and Northern Ireland, 2026–27 only.')
+    streams = db.session.scalars(db.select(IncomeStream).where(
+        IncomeStream.forecast_tax_year == '2026-27').order_by(IncomeStream.name, IncomeStream.id)).all()
+    rules = reviewed_rules()
+    status = cached_status(current_app.instance_path)
+    estimate = estimate_streams(streams, rules)
+    return render_template('tax_estimate.html', estimate=estimate, rules=rules, status=status,
+                           format_amount=format_amount, rounded_minor=rounded_minor, stream_kinds=STREAM_KINDS,
+                           withholding_modes=WITHHOLDING_MODES, current_user=current_user)

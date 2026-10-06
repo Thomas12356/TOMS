@@ -26,4 +26,21 @@
 <input id="{{ prefix }}-holiday" name="unpaid_holiday" value="{{ values.unpaid_holiday }}" type="number" min="0" max="260" step="0.01" inputmode="decimal" placeholder="0">
 <p class="secondary">Days are working days, using 5 days per week. Maximum 52 weeks or 260 days.</p>
 <p class="secondary">Enter planned unpaid time off within the active dates of the selected tax year. Paid holiday does not reduce the estimate. If your income figure already includes unpaid time off, enter 0 to avoid subtracting it twice.</p>
+<fieldset class="income-adjustments">
+    <legend>Tax taken automatically</legend>
+    <label for="{{ prefix }}-withholding">How should deductions be forecast?</label>
+    <select id="{{ prefix }}-withholding" name="withholding_mode" data-withholding-mode>
+        <option value="unknown" {{ 'selected' if values.withholding_mode == 'unknown' }}>Not set yet</option>
+        <option value="none" {{ 'selected' if values.withholding_mode == 'none' }}>No tax taken automatically</option>
+        <option value="paye_estimate" {{ 'selected' if values.withholding_mode == 'paye_estimate' }}>Estimate standard PAYE (employed only)</option>
+        <option value="manual" {{ 'selected' if values.withholding_mode == 'manual' }}>Enter expected annual PAYE / CIS deductions</option>
+    </select>
+    <div data-withholding-amount>
+    <label for="{{ prefix }}-tax-deducted">Expected tax deducted for the tax year <span class="secondary">In the selected currency; only for entered deductions</span></label>
+    <input id="{{ prefix }}-tax-deducted" name="expected_tax_deducted" value="{{ values.expected_tax_deducted }}" inputmode="decimal" maxlength="30" placeholder="0.00">
+    </div>
+    <p class="secondary">Enter the total already deducted plus what you expect to be deducted for the rest of these active dates. This amount is already for the tax year; it is not multiplied by the income period or reduced again for absence.</p>
+    <p class="secondary">PAYE estimates use all employed streams together and one standard allowance. Actual deductions depend on tax codes; use an entered amount for a more reliable estimate. Exclude National Insurance, pensions and student loans.</p>
+    <p class="secondary">For CIS, enter expected deductions from contractor statements, or select no automatic tax for gross payment status. CIS is an advance credit, not the final tax rate. We do not assume 20% of all receipts: materials and VAT can change the deduction base.</p>
+</fieldset>
 {% endmacro %}

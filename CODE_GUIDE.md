@@ -297,3 +297,27 @@ and `services/database/migration_connection.py` (maintenance only). The owner-ru
 must continue using `db.session`; never load migration credentials in a route.
 PostgreSQL concurrency fixtures use the migration login to create disposable
 schemas, then run their actual requests with the restricted runtime login.
+
+## Tax planning: where to change it
+
+- `services/tax/estimate.py` contains the calculation without database or network
+  calls. `income_tax` applies the allowance taper and progressive bands;
+  `estimate_streams` combines forecasts and subtracts withholding credits.
+- `routes/dashboard.py → tax_estimate` loads this year's streams for the signed-in
+  owner. It is a read-only page and does not trigger a bank sync.
+- `templates/tax_estimate.html` displays the annual target, percentage, individual
+  stream forecasts, incomplete inputs and scope. Change layout here.
+- `services/transactions/income_streams.py → stream_fields` validates the forecast
+  deduction mode and amount. `models.py` and migration 014 enforce the same
+  basic mode/amount contract in PostgreSQL.
+- `static/js/income-streams.js` shows the annual deduction input when needed and
+  restricts the PAYE option to employed streams. Validation also runs server-side.
+- `tests/test_tax_estimate.py` has plain income examples and real PostgreSQL/auth
+  checks. `tests/tax_estimate_browser_checks.py` verifies Chromium/mobile layout.
+
+All money stays in integer pence, except temporary Decimal values needed for
+half-penny allowance reductions. Annual tax rounds once, half-up. The reviewed
+JSON contains the bands; `validate_publication` checks the calculator's band
+values as well as the visible published table. Withholding forecasts do not
+change the actual amounts entered on bank payments. Before adding NI or a new
+jurisdiction/year, extend the reviewed rules and tests explicitly.

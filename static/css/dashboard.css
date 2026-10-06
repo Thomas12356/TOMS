@@ -1197,3 +1197,30 @@ td.amount {
 .stream-manage { padding: 18px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 .stream-manage .login-form { max-width: 520px; }
 .stream-manage summary { cursor: pointer; padding: 12px 0; }
+
+/* Annual tax planning: readable totals and stream details at any screen size. */
+.tax-estimate section { margin: 28px 0; }
+.tax-note { padding: 16px 20px; border-left: 3px solid var(--highlight); background: var(--surface); overflow-wrap: anywhere; }
+.tax-note h2 { margin-top: 0; }
+.tax-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 16px; }
+.tax-totals > div { padding: 16px; border: 1px solid var(--border); background: var(--surface); }
+.tax-totals span { display: block; color: var(--muted); font-size: 12px; }
+.tax-totals strong { display: block; margin-top: 8px; font: 600 22px var(--mono); overflow-wrap: anywhere; }
+.tax-totals .tax-reserve { border-top: 3px solid var(--income); }
+.tax-plan { padding: 18px 20px; border: 1px solid var(--border); }
+.tax-plan h2 { margin-top: 0; }
+.tax-bands > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.tax-stream { padding: 20px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.tax-stream h3 { margin: 0; }
+.tax-stream dl { display: flex; flex-wrap: wrap; gap: 16px 40px; }
+.tax-stream dt { color: var(--muted); font-size: 12px; }
+.tax-stream dd { margin: 4px 0 0; font: 600 16px var(--mono); }
+.tax-stream > a { display: inline-flex; align-items: center; min-height: 44px; }
+@media (max-width: 640px) {
+    .tax-stream dl { flex-direction: column; gap: 12px; }
+    .tax-totals strong { font-size: 20px; }
+}
+.stream-create select, .stream-manage select { min-width: 0; width: 100%; min-height: 42px; padding: 8px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--text); font: inherit; }
+.stream-create .income-adjustments, .stream-manage .income-adjustments { grid-template-columns: minmax(0, 1fr); }
+[data-withholding-amount] label { display: block; margin-bottom: 8px; }
+[data-withholding-amount][hidden] { display: none; }

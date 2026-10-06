@@ -79,6 +79,21 @@ def validate_publication(payload, rules):
         raise ValueError('The official page covers a different tax year. New rules need review.')
     if parser.rows != [['Band', 'Taxable income', 'Tax rate']] + rules['published_bands']:
         raise ValueError('Published tax bands differ from the reviewed rules.')
+    # The calculation bands must match the published ranges too. Otherwise a
+    # correct display table could mask an accidentally edited calculator value.
+    try:
+        published = rules['published_bands']
+        basic_end = int(re.findall(r'£([0-9,]+)', published[1][1])[-1].replace(',', '')) * 100
+        higher_end = int(re.findall(r'£([0-9,]+)', published[2][1])[-1].replace(',', '')) * 100
+        rates = [int(row[2].removesuffix('%')) for row in published[1:]]
+        expected = [dict(upper_minor=basic_end - rules['personal_allowance_minor'], rate_percent=rates[0]),
+                    dict(upper_minor=higher_end, rate_percent=rates[1]),
+                    dict(upper_minor=None, rate_percent=rates[2])]
+    except (KeyError, IndexError, TypeError, ValueError):
+        raise ValueError('Reviewed calculation bands need validation.') from None
+    if rules['taxable_bands'] != expected:
+        raise ValueError('Reviewed calculation bands do not match the published ranges.')
+
     def money_pattern(field):
         value = rules[field]
         if type(value) is not int or value < 0 or value % 100:

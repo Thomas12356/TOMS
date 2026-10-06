@@ -1,4 +1,4 @@
-"""Owner-created stream names and types; a stream never infers tax deductions."""
+"""Owner-created stream names and types; deduction forecasts never change recorded payments."""
 import re
 from decimal import Decimal
 from datetime import date
@@ -12,6 +12,12 @@ STREAM_KINDS = {'self_employed': 'Self employed', 'employed': 'Employed', 'cis':
 
 FORECAST_PERIODS = {'weekly': 'Weekly', 'monthly': 'Monthly', 'yearly': 'Yearly'}
 FORECAST_CURRENCIES = ('GBP', 'EUR', 'USD')
+WITHHOLDING_MODES = {
+    'unknown': 'Not set yet',
+    'none': 'No tax taken automatically',
+    'paye_estimate': 'Estimate standard PAYE (employed only)',
+    'manual': 'Enter expected annual PAYE / CIS deductions',
+}
 TAX_YEARS = {'2026-27': (date(2026, 4, 6), date(2027, 4, 5))}
 
 
@@ -23,7 +29,7 @@ def stream_id(value):
 
 
 def stream_fields(form):
-    if set(form) - {'csrf_token', 'action', 'stream_id', 'name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on'} or any(len(form.getlist(key)) != 1 for key in form):
+    if set(form) - {'csrf_token', 'action', 'stream_id', 'name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'withholding_mode', 'expected_tax_deducted'} or any(len(form.getlist(key)) != 1 for key in form):
         raise BadRequest('Supply each form field once.')
     action = form.get('action', '')
     if action not in ('create', 'update', 'archive', 'restore'):
@@ -69,6 +75,16 @@ def stream_fields(form):
     active, total = active_days(SimpleNamespace(**forecast))
     if int(weeks * 10000) * total > active * 520000:
         raise BadRequest('Unpaid absence cannot exceed the time this stream is active in the selected tax year.')
+    mode = form.get('withholding_mode', 'unknown')
+    if mode not in WITHHOLDING_MODES or (mode == 'paye_estimate' and kind != 'employed'):
+        raise BadRequest('Choose a valid deduction option. Standard PAYE is for employed streams only.')
+    deducted = parse_amount(form.get('expected_tax_deducted', ''), currency)
+    if mode == 'manual':
+        if deducted is None or deducted > 2**63 - 1 or deducted > annual_gross(SimpleNamespace(**forecast)):
+            raise BadRequest('Enter expected annual tax deductions between zero and the gross forecast for these dates.')
+    elif deducted not in (None, 0):
+        raise BadRequest('Choose Enter expected annual PAYE / CIS deductions to save an amount.')
+    forecast.update(withholding_mode=mode, expected_tax_deducted_minor=deducted if mode == 'manual' else None)
     return action, name, kind, forecast
 
 

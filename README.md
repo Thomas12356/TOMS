@@ -1116,3 +1116,68 @@ Keep `.env.migrations` out of a web-server deployment where migrations are run
 on a separate maintenance host. On a single personal host, both logins belong
 to the same OS user: PostgreSQL privileges contain SQL-level compromise, while
 full code execution as that OS user could still read the maintenance file.
+
+## Annual income-tax estimate
+
+Open **Tax estimate** in the navigation, or `/dashboard/tax-estimate` after
+signing in. This first estimate supports **England, Wales and Northern Ireland,
+2026–27**, in GBP. It combines every stream's gross forecast for that year,
+including archived streams, applies one personal allowance and the reviewed
+20%, 40% and 45% bands, and handles the allowance reduction above £100,000.
+Ending a job should use its end date: archiving it does not remove that year's
+income. Forecasts already account for active dates and unpaid absence.
+
+In **Income streams → Manage**, choose how each stream's tax is deducted:
+
+- **No tax taken automatically**: its automatic deduction credit is zero.
+- **Estimate standard PAYE**: employed streams share the employment-only annual
+  tax calculation and one allowance. This is a planning assumption, not an
+  implementation of payroll tax codes. When there are multiple jobs, the
+  estimated deduction pool is allocated by gross income, preserving pennies.
+- **Enter expected annual PAYE / CIS deductions**: enter tax already withheld
+  plus expected deductions for the rest of the stream's active dates. Use only
+  income-tax/PAYE or CIS deduction amounts, not NI, pensions or student loans.
+  This is a whole-year amount in the stream's currency: it is not multiplied by
+  weekly/monthly periods or reduced again for absence.
+- **Not set yet**: the tax liability can be shown if gross income is complete,
+  but the set-aside target remains unavailable until deductions are specified.
+
+CIS credits are taken from your entered annual deduction forecast rather than
+assuming every receipt has a 20% deduction. Gross payment status, contractor
+verification, VAT and materials can change the deductions. This MVP does not
+subtract expenses or materials from taxable gross earnings.
+
+The annual set-aside target is **combined estimated income tax minus all
+expected automatic deductions**, floored at zero. An excess is labelled as a
+forecast, not a confirmed refund. A planning percentage spreads unpaid income
+tax over the forecast self-employed/CIS receipts after automatic tax deductions;
+it also covers any PAYE shortfall. No self-employed/CIS receipts means the page
+shows the amount without inventing a percentage. This is a whole-year target,
+not a remaining balance: money already saved or paid directly to HMRC is not
+subtracted, and the rate is not recalculated over remaining months.
+
+For example, £40,000 employment and £20,000 self-employment produce £11,432
+estimated income tax. Standard PAYE is £5,486, leaving £5,946 to fund yourself:
+29.73% of that self-employed forecast. If employment alone is £100,000, another
+£10,000 adds £6,000 income tax because the personal allowance also falls.
+
+Missing gross forecasts and non-GBP streams block partial totals; foreign
+currencies need a separately reviewed conversion policy. Bank payments are not
+added again to stream forecasts. Existing recorded payment deductions and
+transaction confirmations remain independent of these planning fields.
+
+**Scope:** income tax only. Excludes National Insurance, expenses/write-offs,
+trading allowance, pension/other reliefs, savings/dividends, student loans,
+payments on account and tax already paid directly. The target is therefore not
+the complete Self Assessment bill. The page shows the source-check status and
+links to the reviewed rules.
+
+Migration `014_income_stream_withholding.sql` adds the forecast deduction fields.
+Existing streams start as **Not set yet**, rather than guessing their deductions.
+Run `.venv/bin/flask db-upgrade` and restart Flask when updating another
+installation.
+
+Sources: [HMRC rates and personal allowance](https://www.gov.uk/income-tax-rates),
+[rates after allowances](https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past),
+[PAYE](https://www.gov.uk/income-tax/how-you-pay-income-tax) and
+[CIS deduction statements](https://www.gov.uk/what-you-must-do-as-a-cis-subcontractor/get-paid).
