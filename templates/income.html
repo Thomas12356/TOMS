@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Income details · TOMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <a class="brand" href="{{ back_url }}">TOMS<span>The Organised Money System</span></a>
+        <nav aria-label="Main navigation"><a href="{{ back_url }}">← {{ 'Income streams' if request.args.get('return_to') == 'income-streams' else 'Transactions' }}</a></nav>
+    </header>
+    <main class="classification-page">
+        <div class="page-heading"><p class="eyebrow">TOMS / INCOME</p><h1>Income details</h1></div>
+        <section class="payment-summary">
+            <h2>{{ transaction.counterparty_name or 'Unnamed payment' }}</h2>
+            <p class="amount incoming">Received {{ amount }}</p>
+            {% if transaction.reference %}<p class="secondary">{{ transaction.reference }}</p>{% endif %}
+        </section>
+        {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+        {% if currency_changed %}
+        <p class="message" role="alert">Saved amounts were in {{ recorded_currency }}. Re-enter amounts in {{ transaction.currency }}; no currency conversion has been applied.</p>
+        {% elif needs_review %}
+        <p class="message" role="alert">The bank changed this payment. Check these income details before saving again.</p>
+        {% endif %}
+        <form class="login-form classification-form income-form" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="version" value="{{ version }}">
+            <p class="classification-explanation">Record what you know. Leave unknown amounts blank. This form does not calculate tax or infer that income is tax-free. Saving requires transaction confirmation again.</p>
+            <label for="income-stream">Income stream</label>
+            <select id="income-stream" name="income_stream_id" required>
+                <option value="">Choose a stream</option>
+                {% for stream in streams %}<option value="{{ stream.id }}" {{ 'selected' if values.income_stream_id == stream.id else '' }}>{{ stream.name }} · {{ stream_kinds[stream.kind] }}{{ ' (archived)' if stream.archived else '' }}</option>{% endfor %}
+            </select>
+            <p class="secondary"><a href="{{ url_for('dashboard.income_streams') }}">Create or manage income streams</a>. Stream type does not confirm tax treatment or a deduction amount.</p>
+            <label for="source-name">Income source <span class="secondary">Optional employer or client name</span></label>
+            <input id="source-name" name="source_name" value="{{ values.source_name }}" maxlength="200">
+            <label for="tax-treatment">Tax treatment</label>
+            <select id="tax-treatment" name="tax_treatment" required>
+                {% for key, label in treatments.items() %}<option value="{{ key }}" {{ 'selected' if values.tax_treatment == key else '' }}>{{ label }}</option>{% endfor %}
+            </select>
+            {% set unit = transaction.currency if decimal_places else transaction.currency ~ ' minor units' %}
+            <label for="gross">Gross income ({{ unit }}) <span class="secondary">Before tax was deducted · optional</span></label>
+            <input id="gross" name="gross" value="{{ values.gross }}" inputmode="{{ 'decimal' if decimal_places else 'numeric' }}" maxlength="30" placeholder="{{ '0.00' if decimal_places else '0' }}">
+            <label for="tax-deducted">Tax already deducted ({{ unit }}) <span class="secondary">Optional; zero means none</span></label>
+            <input id="tax-deducted" name="tax_deducted" value="{{ values.tax_deducted }}" inputmode="{{ 'decimal' if decimal_places else 'numeric' }}" maxlength="30" placeholder="{{ '0.00' if decimal_places else '0' }}">
+            <fieldset class="income-adjustments">
+                <legend>Adjustments <span class="secondary">Only when needed</span></legend>
+                <p class="secondary">Gross income − tax deducted + adjustment should match the bank deposit. For example, a fee reduces the deposit and needs a negative adjustment.</p>
+                <label for="adjustment">Adjustment ({{ unit }})</label>
+                <input id="adjustment" name="adjustment" value="{{ values.adjustment }}" maxlength="30" placeholder="{{ '0.00' if decimal_places else '0' }}">
+                <label for="adjustment-notes">Explain the adjustment</label>
+                <textarea id="adjustment-notes" name="adjustment_notes" rows="3" maxlength="2000">{{ values.adjustment_notes }}</textarea>
+            </fieldset>
+            <button type="submit" name="action" value="save">Save income details</button>
+            <a href="{{ back_url }}">Cancel</a>
+        </form>
+    </main>
+</body>
+</html>

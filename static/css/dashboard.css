@@ -1165,3 +1165,35 @@ td.amount {
 }
 
 #review-retry[hidden] { display: none; }
+
+.edit-income {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 12px;
+}
+.income-adjustments {
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+    margin: 8px 0;
+    padding: 16px;
+    border: 1px solid var(--border);
+}
+.income-adjustments legend { padding: 0 6px; }
+.income-adjustments p { margin: 0; }
+
+@media (max-width: 640px) {
+    .classification-cell .income-status { grid-column: 1 / -1; grid-row: 4; }
+    .classification-cell .edit-income { grid-column: 1 / -1; grid-row: 5; min-height: 44px; display: inline-flex; align-items: center; margin-top: 0; }
+    .site-header nav:not(.main-navigation) { grid-column: 1 / -1; }
+}
+
+.stream-payment { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--border); }
+.stream-payment > div { flex: 1; min-width: min(100%, 200px); overflow-wrap: anywhere; }
+.stream-payment h3, .stream-payment p { margin: 4px 0; }
+.stream-payment > a { display: inline-flex; align-items: center; min-height: 44px; }
+@media (max-width: 640px) { .stream-payment > a { width: 100%; } }
+.stream-create { max-width: 520px; margin: 24px 0 32px; }
+.stream-manage { padding: 18px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.stream-manage .login-form { max-width: 520px; }
+.stream-manage summary { cursor: pointer; padding: 12px 0; }

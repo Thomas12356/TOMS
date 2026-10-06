@@ -110,6 +110,10 @@
                                 <span class="mobile-classification-tip">{{ classification_tip("classification-tip-" ~ row.number) }}</span>
                                 <span class="classification-value">{{ row.classification }}</span>
                                 <span class="secondary classification-origin">{{ 'Manual' if row.origin == 'manual' else 'Automatic' }}</span>
+                                {% if row.income_url %}
+                                <span class="secondary income-status">Income: {{ row.income_status }}</span>
+                                <a class="edit-income" href="{{ row.income_url }}">Edit income details</a>
+                                {% endif %}
                                 <a class="edit-classification{{ ' is-manual' if row.origin == 'manual' else '' }}" href="{{ row.edit_url }}">Edit classification</a>
                             </td>
                             <td role="cell" data-label="Amount" class="amount {{ 'incoming' if row.direction == 'IN' else 'outgoing' }}">

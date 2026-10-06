@@ -1,0 +1,21 @@
+{% macro forecast_fields(prefix, values, periods, currencies) %}
+<label for="{{ prefix }}-period">Income period</label>
+<select id="{{ prefix }}-period" name="expected_gross_period" required><option value="">Choose a period</option>
+    {% for key, label in periods.items() %}<option value="{{ key }}" {{ 'selected' if values.expected_gross_period == key else '' }}>{{ label }}</option>{% endfor %}
+</select>
+<label for="{{ prefix }}-currency">Currency</label>
+<select id="{{ prefix }}-currency" name="expected_gross_currency" required><option value="">Choose a currency</option>
+    {% for currency in currencies %}<option value="{{ currency }}" {{ 'selected' if values.expected_gross_currency == currency else '' }}>{{ currency }}</option>{% endfor %}
+</select>
+<label for="{{ prefix }}-gross">Expected gross income <span class="secondary">Before tax, other deductions or unpaid absence</span></label>
+<input id="{{ prefix }}-gross" name="expected_gross" value="{{ values.expected_gross }}" inputmode="decimal" maxlength="30" placeholder="0.00" required>
+<label for="{{ prefix }}-holiday-unit">Holiday unit</label>
+<select id="{{ prefix }}-holiday-unit" name="unpaid_holiday_unit">
+    <option value="weeks" {{ 'selected' if values.unpaid_holiday_unit == 'weeks' else '' }}>Weeks</option>
+    <option value="days" {{ 'selected' if values.unpaid_holiday_unit == 'days' else '' }}>Days</option>
+</select>
+<label for="{{ prefix }}-holiday">Unpaid holiday / absence per year</label>
+<input id="{{ prefix }}-holiday" name="unpaid_holiday" value="{{ values.unpaid_holiday }}" type="number" min="0" max="260" step="0.01" inputmode="decimal" placeholder="0">
+<p class="secondary">Days are working days, using 5 days per week. Maximum 52 weeks or 260 days.</p>
+<p class="secondary">Only include time off without income. Paid holiday does not reduce the estimate. If your income figure already includes unpaid time off, enter 0 to avoid subtracting it twice.</p>
+{% endmacro %}

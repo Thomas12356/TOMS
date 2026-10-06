@@ -1,18 +1,24 @@
 """Browse saved transactions, view balances and edit local classifications."""
 
 import re
+import hmac
 from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, current_app
 from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only, selectinload
-from werkzeug.exceptions import BadRequest, NotFound
+from werkzeug.exceptions import BadRequest, NotFound, Conflict
 
-from models import Account, Transaction
+from models import Account, Transaction, TransactionIncome, IncomeStream
+from uuid import uuid4
+from services.transactions.income_streams import STREAM_KINDS, FORECAST_PERIODS, FORECAST_CURRENCIES, annual_gross, holiday_amount, stream_id, stream_fields
 from routes.helpers import query_values
 from services.database.connection import db
 from services.error_logging import log_failure
+from services.transactions.income import TAX_TREATMENTS, save_income
+from services.transactions.review import REVIEW_FIELDS, review_version
+from services.transactions.income_form import FIELDS as INCOME_FORM_FIELDS, display_amount, decimal_places, form_values
 from services.transactions.automatic_sync import latest_sync, start_dashboard_sync
 from services.transactions.classification import CLASSIFICATION_TYPES, classification_details, save_classification, clear_classification
 from services.web.sessions import require_dashboard_login
@@ -156,7 +162,7 @@ def transactions_page():
         load_only(Transaction.transaction_time, Transaction.counterparty_name,
                   Transaction.reference, Transaction.amount_minor, Transaction.currency,
                   Transaction.direction, Transaction.status, Transaction.source, Transaction.confirmed_at),
-        selectinload(Transaction.classification),
+        selectinload(Transaction.classification), selectinload(Transaction.income),
     ).order_by(Transaction.transaction_time.desc(), Transaction.account_uid,
                Transaction.category_uid, Transaction.feed_item_uid)
     if account_uid:
@@ -181,6 +187,11 @@ def transactions_page():
             "confirmed": getattr(transaction, "confirmed_at", None) is not None,
             "classification": CLASSIFICATION_TYPES[classification["type"]]["label"],
             "origin": classification["origin"],
+            "income_url": url_for("dashboard.edit_income", account_uid=transaction.account_uid,
+                                  category_uid=transaction.category_uid, feed_item_uid=transaction.feed_item_uid,
+                                  account=account_uid, page=page_number) if classification["type"] == "income" else None,
+            "income_status": "Needs review" if getattr(transaction, "income", None) and transaction.income.needs_review else
+                             "Details saved" if getattr(transaction, "income", None) else "Details missing",
             "confirm_url": url_for("review.confirm_transaction", account_uid=transaction.account_uid,
                                    category_uid=transaction.category_uid, feed_item_uid=transaction.feed_item_uid),
             "edit_url": url_for("dashboard.edit_classification", account_uid=transaction.account_uid,
@@ -247,3 +258,154 @@ def edit_classification(account_uid, category_uid, feed_item_uid):
                            amount=format_amount(transaction.amount_minor, transaction.currency),
                            choices=choices, kind=kind, notes=notes, origin=details["origin"],
                            back_url=back_url, error=error), 400 if error else 200
+
+
+@dashboard.route("/transactions/<uuid:account_uid>/<uuid:category_uid>/<uuid:feed_item_uid>/income", methods=["GET", "POST"])
+def edit_income(account_uid, category_uid, feed_item_uid):
+    # Browser edits always require a session and CSRF; API edits have their own route.
+    if request.authorization is not None or not current_user.is_authenticated:
+        return redirect(url_for("login.sign_in"))
+    options = query_values({"page", "account", "return_to", "stream"})
+    account = requested_account(options)
+    page = requested_page(options)
+    back_url = url_for("dashboard.transactions_page", account=account, page=page)
+    if options.get('return_to') == 'income-streams':
+        stream = options.get('stream', 'all')
+        if stream != 'all':
+            stream = stream_id(stream)
+            if db.session.get(IncomeStream, stream) is None:
+                raise NotFound('Income stream not found.')
+        back_url = url_for('dashboard.income_streams', stream=stream if stream != 'all' else None, page=page)
+    elif options.get('return_to') is not None or options.get('stream') is not None:
+        raise BadRequest('Choose a valid return page.')
+    query = db.select(Transaction).where(
+        Transaction.account_uid == str(account_uid), Transaction.category_uid == str(category_uid),
+        Transaction.feed_item_uid == str(feed_item_uid)).options(
+            load_only(*(getattr(Transaction, field) for field in REVIEW_FIELDS)),
+            selectinload(Transaction.classification), selectinload(Transaction.income))
+    if request.method == "POST":
+        query = query.with_for_update(of=Transaction)
+    transaction = db.session.scalar(query)
+    if transaction is None:
+        raise NotFound("Saved transaction not found.")
+    if transaction.direction != "IN" or classification_details(transaction)["type"] != "income":
+        raise BadRequest("Income details require an incoming transaction classified as income.")
+    transaction_version = review_version(transaction)
+    record = transaction.income
+    currency_changed = record is not None and record.recorded_currency != transaction.currency
+    values = {field: '' for field in INCOME_FORM_FIELDS}
+    values['tax_treatment'] = 'unknown'
+    streams = db.session.scalars(db.select(IncomeStream).where(
+        db.or_(IncomeStream.archived.is_(False), IncomeStream.id == record.income_stream_id if record else False)
+    ).order_by(IncomeStream.name, IncomeStream.id)).all()
+    if record:
+        values.update(income_stream_id=record.income_stream_id or '', income_type=record.income_type, tax_treatment=record.tax_treatment,
+                      source_name=record.source_name or '', adjustment_notes=record.adjustment_notes or '')
+        if not currency_changed:
+            for field, column in (('gross', 'gross_minor'), ('tax_deducted', 'tax_deducted_minor'), ('adjustment', 'adjustment_minor')):
+                values[field] = display_amount(getattr(record, column), transaction.currency)
+    error, error_status = None, 400
+    original_values = dict(values)
+    if request.method == "POST":
+        values = {field: request.form.get(field, '') for field in INCOME_FORM_FIELDS}
+        try:
+            version = request.form.get('version', '')
+            if not re.fullmatch(r'[0-9a-f]{64}', version) or not hmac.compare_digest(version, transaction_version):
+                raise Conflict('The payment or income details changed while this form was open. Review the current values before saving.')
+            chosen_id = stream_id(request.form.get('income_stream_id', ''))
+            chosen = db.session.scalar(db.select(IncomeStream).where(IncomeStream.id == chosen_id).with_for_update().execution_options(populate_existing=True))
+            if chosen is None or (chosen.archived and (not record or record.income_stream_id != chosen.id)):
+                raise BadRequest('Choose an active income stream.')
+            # Retain the existing API's historical income types; browser selection is a stream.
+            kind = 'employment' if chosen.kind == 'employed' else 'other'
+            clean = form_values(request.form, transaction.currency, income_type=kind)
+            clean['income_stream_id'] = chosen.id
+            action = request.form.get('action', 'save')
+            if action != 'save':
+                raise BadRequest('Choose a valid action.')
+            save_income(transaction, clean)
+            db.session.commit()
+        except (BadRequest, Conflict) as invalid:
+            db.session.rollback()
+            error, error_status = invalid.description, invalid.code
+            if isinstance(invalid, Conflict):
+                values = original_values
+        else:
+            return redirect(back_url, code=303)
+    return render_template('income.html', transaction=transaction, amount=format_amount(transaction.amount_minor, transaction.currency),
+                           values=values, version=transaction_version, streams=streams, stream_kinds=STREAM_KINDS, treatments=TAX_TREATMENTS,
+                           decimal_places=decimal_places(transaction.currency), currency_changed=currency_changed,
+                           recorded_currency=record.recorded_currency if record else None,
+                           needs_review=record.needs_review if record else False, back_url=back_url, error=error), error_status if error else 200
+
+
+@dashboard.route('/income-streams', methods=['GET', 'POST'])
+def income_streams():
+    """Create and manage streams without changing bank records or inferring tax."""
+    if request.authorization is not None or not current_user.is_authenticated:
+        return redirect(url_for('login.sign_in'))
+    options = query_values({'stream', 'page'})
+    selected_id = stream_id(options['stream']) if options.get('stream') else None
+    page_number = requested_page(options)
+    if selected_id and db.session.get(IncomeStream, selected_id) is None:
+        raise NotFound('Income stream not found.')
+    error = None
+    create_fields = ('name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit')
+    create_values = dict.fromkeys(create_fields, '')
+    create_values.update(expected_gross_period='yearly', expected_gross_currency='GBP', unpaid_holiday='0', unpaid_holiday_unit='weeks')
+    editing_id, editing_values = None, {}
+    if request.method == 'POST':
+        submitted = {field: request.form.get(field, '') for field in create_fields}
+        if request.form.get('action') == 'update':
+            editing_id, editing_values = request.form.get('stream_id'), submitted
+        else:
+            create_values = submitted
+        try:
+            action, name, kind, forecast = stream_fields(request.form)
+            if action == 'create':
+                edited = IncomeStream(id=str(uuid4()), name=name, kind=kind, **forecast)
+                db.session.add(edited)
+            else:
+                edited = db.session.scalar(db.select(IncomeStream).where(
+                    IncomeStream.id == stream_id(request.form.get('stream_id', ''))).with_for_update())
+                if edited is None:
+                    raise BadRequest('Income stream not found.')
+                if action == 'update':
+                    if kind != edited.kind:
+                        raise BadRequest('Create a new stream to use a different type.')
+                    edited.name = name
+                    for field, value in forecast.items():
+                        setattr(edited, field, value)
+                else:
+                    edited.archived = action == 'archive'
+            db.session.commit()
+            return redirect(url_for('dashboard.income_streams', stream=selected_id, page=page_number), code=303)
+        except BadRequest as invalid:
+            db.session.rollback()
+            error = invalid.description
+    counts = dict(db.session.execute(db.select(TransactionIncome.income_stream_id, db.func.count())
+                                    .group_by(TransactionIncome.income_stream_id)).all())
+    streams = db.session.scalars(db.select(IncomeStream).order_by(IncomeStream.archived, IncomeStream.name, IncomeStream.id)).all()
+    names = {stream.id: stream.name for stream in streams}
+    query = db.select(Transaction).join(Transaction.income).options(
+        load_only(Transaction.transaction_time, Transaction.counterparty_name, Transaction.amount_minor, Transaction.currency),
+        selectinload(Transaction.income)).order_by(Transaction.transaction_time.desc(), Transaction.account_uid,
+                                                 Transaction.category_uid, Transaction.feed_item_uid)
+    if selected_id:
+        query = query.where(TransactionIncome.income_stream_id == selected_id)
+    page = db.paginate(query, page=page_number, per_page=50, error_out=False)
+    rows = [dict(source=payment.income.source_name or payment.counterparty_name or 'Unnamed source',
+                 kind=names.get(payment.income.income_stream_id, 'No stream assigned'),
+                 date=payment.transaction_time.strftime('%d %b %Y'),
+                 amount=format_amount(payment.amount_minor, payment.currency), needs_review=payment.income.needs_review,
+                 edit_url=url_for('dashboard.edit_income', account_uid=payment.account_uid,
+                                  category_uid=payment.category_uid, feed_item_uid=payment.feed_item_uid,
+                                  stream=selected_id or 'all', return_to='income-streams', page=page_number))
+            for payment in page.items]
+    return render_template('income_streams.html', streams=streams, selected_stream=selected_id,
+                           counts=counts, stream_kinds=STREAM_KINDS, create_values=create_values, error=error,
+                           forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES,
+                           editing_id=editing_id, editing_values=editing_values,
+                           display_amount=display_amount, format_amount=format_amount, annual_gross=annual_gross, holiday_amount=holiday_amount,
+                           selected_name=names.get(selected_id, 'All income'), rows=rows, page=page,
+                           current_user=current_user), 400 if error else 200

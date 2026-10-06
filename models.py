@@ -104,6 +104,32 @@ class TransactionClassification(BaseModel):
     transaction = db.relationship("Transaction", back_populates="classification")
 
 
+class IncomeStream(BaseModel):
+    __tablename__ = "income_streams"
+    __table_args__ = (
+        db.CheckConstraint("char_length(trim(name)) BETWEEN 1 AND 200"),
+        db.CheckConstraint("kind IN ('self_employed', 'employed', 'cis')"),
+        db.CheckConstraint("(expected_gross_minor IS NULL AND expected_gross_period IS NULL AND expected_gross_currency IS NULL) OR "
+                           "(expected_gross_minor IS NOT NULL AND expected_gross_minor >= 0 AND "
+                           "expected_gross_period IS NOT NULL AND expected_gross_period IN ('weekly', 'monthly', 'yearly') AND "
+                           "expected_gross_currency IS NOT NULL AND expected_gross_currency IN ('GBP', 'EUR', 'USD'))",
+                           name="income_stream_forecast_complete"),
+        db.CheckConstraint("unpaid_holiday_weeks BETWEEN 0 AND 52", name="income_stream_holiday_range"),
+        db.CheckConstraint("unpaid_holiday_unit IN ('days', 'weeks')", name="income_stream_holiday_unit"),
+        {"schema": "toms"},
+    )
+
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    name = db.Column(db.Text, nullable=False)
+    kind = db.Column(db.Text, nullable=False)
+    archived = db.Column(db.Boolean, nullable=False, server_default=db.false())
+    expected_gross_minor = db.Column(db.BigInteger)
+    expected_gross_period = db.Column(db.Text)
+    expected_gross_currency = db.Column(db.Text)
+    unpaid_holiday_weeks = db.Column(db.Numeric(6, 4), nullable=False, server_default="0")
+    unpaid_holiday_unit = db.Column(db.Text, nullable=False, server_default="weeks")
+
+
 class TransactionIncome(BaseModel):
     __tablename__ = "transaction_income"
     __table_args__ = (
@@ -127,6 +153,8 @@ class TransactionIncome(BaseModel):
     account_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
     category_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
     feed_item_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    income_stream_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey("toms.income_streams.id"), index=True)
+    income_stream = db.relationship("IncomeStream")
     income_type = db.Column(db.Text, nullable=False)
     tax_treatment = db.Column(db.Text, nullable=False)
     source_name = db.Column(db.Text)
