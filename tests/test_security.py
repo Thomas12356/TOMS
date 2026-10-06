@@ -1,3 +1,4 @@
+from services.database.migration_connection import migration_engine
 """Adversarial security checks. All bank calls are blocked or mocked.
 
 Database scenarios inherit rollback-only fixtures. Concurrency scenarios use a
@@ -285,15 +286,21 @@ class ConcurrentLoginSecurityTests(ApiTestCase):
         super().setUp()
         self.enterContext(app.app_context())
         self.engine = db.engine
+        self.admin_engine = migration_engine()
+        self.addCleanup(self.admin_engine.dispose)
         self.schema = "security_" + uuid4().hex
-        with self.engine.begin() as connection:
+        with self.admin_engine.begin() as connection:
             connection.execute(text(f"CREATE SCHEMA {self.schema}"))
             connection.execute(text(f"CREATE TABLE {self.schema}.login_attempts (id integer PRIMARY KEY, window_started_at timestamptz NOT NULL, attempts integer NOT NULL)"))
         self.addCleanup(self.drop_schema)
         self.bound_engine = self.engine.execution_options(schema_translate_map={"toms": self.schema})
-        OwnerLogin.__table__.create(self.bound_engine)
-        BrowserSession.__table__.create(self.bound_engine)
-        OwnerSetup.__table__.create(self.bound_engine)
+        admin_bound = self.admin_engine.execution_options(schema_translate_map={"toms": self.schema})
+        OwnerLogin.__table__.create(admin_bound)
+        BrowserSession.__table__.create(admin_bound)
+        OwnerSetup.__table__.create(admin_bound)
+        with self.admin_engine.begin() as connection:
+            connection.execute(text(f"GRANT USAGE ON SCHEMA {self.schema} TO toms_app"))
+            connection.execute(text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {self.schema} TO toms_app"))
         self.sessions = scoped_session(sessionmaker(bind=self.bound_engine))
         self.addCleanup(self.sessions.remove)
         self.enterContext(patch.object(db, "session", self.sessions))
@@ -301,7 +308,7 @@ class ConcurrentLoginSecurityTests(ApiTestCase):
         self.enterContext(patch("services.web.sessions.text", side_effect=lambda sql: text(sql.replace("toms.login_attempts", self.schema + ".login_attempts"))))
 
     def drop_schema(self):
-        with self.engine.begin() as connection:
+        with self.admin_engine.begin() as connection:
             connection.execute(text(f"DROP SCHEMA {self.schema} CASCADE"))
 
     def test_concurrent_workers_share_exactly_twenty_allowed_attempts(self):
@@ -342,7 +349,7 @@ class ConcurrentLoginSecurityTests(ApiTestCase):
 
         def reset_worker():
             try:
-                with self.engine.begin() as connection:
+                with self.admin_engine.begin() as connection:
                     reset_started.set()
                     connection.execute(text(f"UPDATE {self.schema}.owner_login SET password_hash = :hash WHERE id = 1"), {"hash": replacement})
                     connection.execute(text(f"DELETE FROM {self.schema}.browser_sessions"))

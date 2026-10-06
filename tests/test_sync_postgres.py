@@ -1,3 +1,4 @@
+from services.database.migration_connection import migration_engine
 """Opt-in real PostgreSQL tests; all synthetic rows are rolled back."""
 
 import unittest
@@ -35,7 +36,10 @@ class PostgreSQLSyncTests(PostgreSQLTestCase):
             return run_sync(self.store, options or {"mode": "history"}, now=now)
 
     def test_migration_idempotency_and_duplicate_safe_versioned_upserts(self):
-        self.assertEqual(upgrade_database(self.connection), [])
+        engine = migration_engine()
+        self.addCleanup(engine.dispose)
+        with engine.begin() as connection:
+            self.assertEqual(upgrade_database(connection), [])
         pending = normalize_feed_item(feed_item(), ACCOUNT, CATEGORY)
         first = self.import_rows([pending])
         self.assertEqual(first["rows_changed"], 1)
@@ -149,17 +153,23 @@ class PostgreSQLSyncTests(PostgreSQLTestCase):
         self.assertEqual(missing.status_code, 404)
 
     def test_sql_migrations_apply_once_and_detect_edits(self):
+        engine = migration_engine()
+        self.addCleanup(engine.dispose)
+        connection = engine.connect()
+        self.addCleanup(connection.close)
+        transaction = connection.begin()
+        self.addCleanup(transaction.rollback)
         with TemporaryDirectory() as directory:
             filename = "999_test_" + uuid4().hex + ".sql"
             path = Path(directory) / filename
             path.write_text("CREATE TEMP TABLE migration_probe (id INTEGER); INSERT INTO migration_probe VALUES (1);")
             with patch("services.database.migrations.MIGRATIONS", Path(directory)):
-                self.assertEqual(upgrade_database(self.connection), [filename])
-                self.assertEqual(self.connection.scalar(text("SELECT id FROM migration_probe")), 1)
-                self.assertEqual(upgrade_database(self.connection), [])
+                self.assertEqual(upgrade_database(connection), [filename])
+                self.assertEqual(connection.scalar(text("SELECT id FROM migration_probe")), 1)
+                self.assertEqual(upgrade_database(connection), [])
                 path.write_text("SELECT 2;")
                 with self.assertRaisesRegex(RuntimeError, "modified"):
-                    upgrade_database(self.connection)
+                    upgrade_database(connection)
 
 
 if __name__ == "__main__":

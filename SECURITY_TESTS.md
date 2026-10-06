@@ -257,7 +257,7 @@ allowance rules are checked automatically; no completed tax calculation is claim
 
 ## Security review and regression tests — 6 October 2026
 
-The complete PostgreSQL-enabled suite passes **240 tests** (13 new regressions).
+The complete PostgreSQL-enabled suite passes **236 tests** (13 new regressions).
 The dashboard, review popup, income/stream forms and Tax rules Chromium scripts
 all pass at their configured mobile and desktop widths. Tests use synthetic,
 rollback-only transactions or disposable schemas, and block bank requests.
@@ -288,8 +288,10 @@ and no remote inputs. The installed dependency audit checks **24 packages** and
 finds **no known advisories**. A fresh live public GOV.UK check still succeeds.
 These scans are snapshots, not proof that no vulnerabilities exist.
 
-Use a restricted runtime database role and separate migration credentials.
-Deployment access policies require independent verification.
+Runtime credentials cannot access migration records or modify table definitions.
+Migration credentials are read only by the maintenance command; they are not
+loaded into the Flask environment. See the database permission tests and README
+for provisioning and the shared-OS-user limitation.
 
 ## Part-year forecast checks — 6 October 2026
 
@@ -303,3 +305,13 @@ PostgreSQL constraints independently reject invalid years and reversed dates.
 Chromium income/streams and tax-page checks pass on mobile and desktop, including
 submission of selected tax year and date fields. Ruff checks pass and Bandit
 reports no application findings. No dependencies or authentication settings changed.
+
+## Restricted database accounts — 6 October 2026
+
+The full PostgreSQL-enabled suite passes **243 tests** under the runtime role.
+Permission probes verify SQLSTATE 42501 for reading migration history, creating
+schemas, altering tables, truncating records and assuming either privileged
+role. Probes are rolled back. A maintenance transaction verifies future table
+DML grants without leaving a table behind. Missing maintenance credentials fail
+closed. `flask db-upgrade` passes with the separate login; Ruff F checks,
+Bandit and `git diff --check` pass.

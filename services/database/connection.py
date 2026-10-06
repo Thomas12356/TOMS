@@ -13,7 +13,7 @@ def init_database(app):
     # URL.create handles special characters in passwords without manual escaping.
     app.config.setdefault("SQLALCHEMY_DATABASE_URI", URL.create(
         "postgresql+psycopg",
-        username=os.getenv("PGUSER", "postgres"),
+        username=os.getenv("PGUSER", "toms_app"),
         password=os.getenv("PGPASSWORD", ""),
         host=os.getenv("PGHOST", "localhost"),
         port=int(os.getenv("PGPORT", "5432")),
