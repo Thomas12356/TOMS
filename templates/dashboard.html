@@ -22,6 +22,7 @@
     </header>
 
     <main>
+        {% include 'test_data_notice.html' %}
         <div class="page-heading">
             <p class="eyebrow">TOMS / LEDGER</p>
             <h1>Transactions</h1>
@@ -52,17 +53,17 @@
             <div class="balance-heading">
                 <div>
                     <h2 id="balance-heading">{{ 'Account balance' if selected_account else 'Total account balance' }}</h2>
-                    <p class="secondary">{{ 'Live main-account balance from Starling.' if selected_account else 'Combined live main-account balances from Starling. Different currencies shown separately.' }}</p>
+                    <p class="secondary">{{ 'Fixed sample balances for test mode.' if using_test_data else ('Live main-account balance from Starling.' if selected_account else 'Combined live main-account balances from Starling. Different currencies shown separately.') }}</p>
                 </div>
                 {% if current_user.is_authenticated %}
-                <button type="button" class="sync-button" data-sync-now title="Syncs transactions from your bank account provider." aria-description="Syncs transactions from your bank account provider.">{{ sync_icon() }}<span>Sync now</span></button>
+                <button type="button" class="sync-button" data-sync-now title="{{ 'Simulates a sync using sample data; no bank connection.' if using_test_data else 'Syncs transactions from your bank account provider.' }}" aria-description="{{ 'Simulates a sync using sample data; no bank connection.' if using_test_data else 'Syncs transactions from your bank account provider.' }}">{{ sync_icon() }}<span>Sync now</span></button>
                 {% endif %}
             </div>
             <div id="account-balances" class="balance-cards" aria-live="polite"
                  data-url="{{ url_for('dashboard.account_balances', account=account_uid) }}">
                 <p>Loading balances…</p>
             </div>
-            <noscript><p>Enable JavaScript to load live account balances.</p></noscript>
+            <noscript><p>Enable JavaScript to load {{ 'sample' if using_test_data else 'live account' }} balances.</p></noscript>
         </section>
 
         <section class="transactions-panel" aria-labelledby="table-heading">
@@ -74,8 +75,8 @@
                 <div class="ledger-controls">
                     {% if current_user.is_authenticated %}
                     <button type="button" class="review-open sync-button" id="review-open" hidden>Review transactions</button>
-                    <div class="sync-controls" data-sync-url="{{ url_for('dashboard.trigger_sync') }}" data-status-url="{{ url_for('dashboard.sync_status') }}" data-csrf="{{ csrf_token() }}">
-                        <button type="button" id="sync-now" data-sync-now title="Syncs transactions from your bank account provider." aria-description="Syncs transactions from your bank account provider.">{{ sync_icon() }}<span>Sync now</span></button>
+                    <div class="sync-controls" data-test-data="{{ 'true' if using_test_data else 'false' }}" data-sync-url="{{ url_for('dashboard.trigger_sync') }}" data-status-url="{{ url_for('dashboard.sync_status') }}" data-csrf="{{ csrf_token() }}">
+                        <button type="button" id="sync-now" data-sync-now title="{{ 'Simulates a sync using sample data; no bank connection.' if using_test_data else 'Syncs transactions from your bank account provider.' }}" aria-description="{{ 'Simulates a sync using sample data; no bank connection.' if using_test_data else 'Syncs transactions from your bank account provider.' }}">{{ sync_icon() }}<span>Sync now</span></button>
                     </div>
                     {% endif %}
                 </div>
@@ -114,6 +115,7 @@
                                 <span class="secondary income-status">Income: {{ row.income_status }}</span>
                                 <a class="edit-income" href="{{ row.income_url }}">Edit income details</a>
                                 {% endif %}
+                                {% if row.deduction_url %}<a class="edit-income" href="{{ row.deduction_url }}">Tax deduction</a>{% endif %}
                                 <a class="edit-classification{{ ' is-manual' if row.origin == 'manual' else '' }}" href="{{ row.edit_url }}">Edit classification</a>
                             </td>
                             <td role="cell" data-label="Amount" class="amount {{ 'incoming' if row.direction == 'IN' else 'outgoing' }}">

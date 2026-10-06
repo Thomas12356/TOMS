@@ -1,0 +1,15 @@
+{
+  "version": "uk-mileage-2026-27-v1",
+  "tax_year": "2026-27",
+  "starts_on": "2026-04-06",
+  "ends_on": "2027-04-05",
+  "locations": ["england", "wales", "northern_ireland", "scotland"],
+  "reviewed_on": "2026-10-06",
+  "threshold_miles": 10000,
+  "car_van_first_pence": 55,
+  "car_van_after_pence": 25,
+  "motorcycle_pence": 24,
+  "employee_bicycle_pence": 20,
+  "business_source": "https://www.gov.uk/simpler-income-tax-simplified-expenses/vehicles",
+  "employee_source": "https://www.gov.uk/tax-relief-for-employees/vehicles-you-use-for-work"
+}

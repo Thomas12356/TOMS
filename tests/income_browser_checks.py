@@ -10,7 +10,7 @@ from app import app
 from flask import render_template
 from playwright.sync_api import sync_playwright
 from services.transactions.income import TAX_TREATMENTS
-from services.transactions.income_streams import STREAM_KINDS, WITHHOLDING_MODES, FORECAST_PERIODS, FORECAST_CURRENCIES, TAX_YEARS, active_days, annual_gross, holiday_amount
+from services.transactions.income_streams import STREAM_KINDS, FORECAST_PERIODS, FORECAST_CURRENCIES, TAX_YEARS, active_days, annual_gross, holiday_amount
 from services.transactions.income_form import display_amount
 from routes.dashboard import format_amount
 from services.transactions.income_form import FIELDS
@@ -26,7 +26,7 @@ with app.test_request_context('/dashboard/income'):
 
 with app.test_request_context('/dashboard/income-streams'):
     stream_html = render_template('income_streams.html',
-        streams=[stream], stream_kinds=STREAM_KINDS, withholding_modes=WITHHOLDING_MODES, counts={stream.id: 1},
+        streams=[stream], stream_kinds=STREAM_KINDS, counts={stream.id: 1},
         create_values={'name': '', 'kind': '', 'expected_gross': '', 'expected_gross_period': 'yearly', 'expected_gross_currency': 'GBP', 'unpaid_holiday': '0', 'unpaid_holiday_unit': 'weeks', 'forecast_tax_year': '2026-27', 'forecast_starts_on': '', 'forecast_ends_on': '', 'withholding_mode': 'unknown', 'expected_tax_deducted': ''},
         forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES, tax_years=TAX_YEARS, active_days=active_days,
         format_amount=format_amount, display_amount=display_amount, annual_gross=annual_gross, holiday_amount=holiday_amount,
@@ -70,6 +70,8 @@ with sync_playwright() as playwright:
         page.goto('http://toms.test/dashboard/income-streams')
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
         assert page.locator('.stream-manage').count() == 1
+        assert not page.locator('#create-stream-dialog').is_visible()
+        page.get_by_role('link', name='Create a Stream', exact=True).click()
         page.locator('#stream-name').fill('New business')
         page.locator('#stream-kind').select_option('cis')
         page.locator('#stream-gross').fill('1234.56')
@@ -80,13 +82,9 @@ with sync_playwright() as playwright:
         for period in ('weekly', 'monthly', 'yearly'):
             page.locator('#stream-period').select_option(period)
         page.locator('#stream-currency').select_option('USD')
-        assert not page.locator('#stream-tax-deducted').is_visible()
-        assert page.locator('#stream-withholding option[value=paye_estimate]').is_disabled()
-        page.locator('#stream-withholding').select_option('manual')
-        assert page.locator('#stream-tax-deducted').is_visible()
-        assert not page.locator('.stream-create form').evaluate('(form) => form.checkValidity()')
-        page.locator('#stream-tax-deducted').fill('200.50')
         assert page.locator('.stream-create form').evaluate('(form) => form.checkValidity()')
+        page.keyboard.press('Escape')
+        assert not page.locator('#create-stream-dialog').is_visible()
         page.locator('.stream-manage summary').click()
         assert page.get_by_role('button', name='Save changes', exact=True).is_visible()
         assert page.get_by_role('button', name='Archive', exact=True).is_visible()
@@ -97,6 +95,7 @@ with sync_playwright() as playwright:
         assert page.locator('#forecast-' + stream.id + '-gross').input_value() == '1000.50'
         assert page.locator('#forecast-' + stream.id + '-period').input_value() == 'monthly'
         assert 'GBP 12,006.00 for 2026-27' in page.locator('main').inner_text()
+        page.get_by_role('link', name='Create a Stream', exact=True).click()
         with page.expect_request(lambda request: request.method == 'POST') as submitted:
             page.get_by_role('button', name='Create stream', exact=True).click()
         payload = parse_qs(submitted.value.post_data)
@@ -108,8 +107,8 @@ with sync_playwright() as playwright:
         assert payload['forecast_tax_year'] == ['2026-27']
         assert payload['forecast_starts_on'] == ['2026-10-06']
         assert payload['forecast_ends_on'] == ['2027-03-31']
-        assert payload['withholding_mode'] == ['manual']
-        assert payload['expected_tax_deducted'] == ['200.50']
+        assert 'withholding_mode' not in payload
+        assert 'expected_tax_deducted' not in payload
         page.close()
     browser.close()
 print('Income form and streams browser checks passed at mobile and desktop widths.')
@@ -117,6 +116,7 @@ print('Income form and streams browser checks passed at mobile and desktop width
 from services.tax.rules import reviewed_rules
 with app.test_request_context('/dashboard/tax-rules'):
     tax_html = render_template('tax_rules.html', rules=reviewed_rules(),
+        mileage_rules=__import__('services.tax.mileage_rules', fromlist=['reviewed_rules']).reviewed_rules(), mileage_status={},
         status={'message': 'Published rules match the reviewed values.', 'checked_at': '2026-10-06T13:00:00+00:00', 'verified_at': '2026-10-06T13:00:00+00:00'},
         format_amount=format_amount, current_user=SimpleNamespace(is_authenticated=True))
 with sync_playwright() as playwright:

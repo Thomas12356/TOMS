@@ -4,9 +4,10 @@ import os
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import URL, text
+from services.database.session import DataSession
 
 
-db = SQLAlchemy()
+db = SQLAlchemy(session_options={"class_": DataSession})
 
 
 def init_database(app):

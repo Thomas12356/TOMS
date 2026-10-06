@@ -4,9 +4,16 @@
 <nav id="main-navigation" class="main-navigation" aria-label="Main navigation">
     <a href="{{ url_for('dashboard.transactions_page') }}"{% if navigation_page == 'transactions' %} aria-current="page"{% endif %}>Transactions</a>
     <a href="{{ url_for('dashboard.income_streams') }}"{% if navigation_page == 'income-streams' %} aria-current="page"{% endif %}>Income streams</a>
+    <a href="{{ url_for('deductions.page') }}"{% if navigation_page == 'deductions' %} aria-current="page"{% endif %}>Deductions</a>
     <a href="{{ url_for('dashboard.tax_estimate') }}"{% if navigation_page == 'tax-estimate' %} aria-current="page"{% endif %}>Tax estimate</a>
     <a href="{{ url_for('dashboard.tax_rules') }}"{% if navigation_page == 'tax-rules' %} aria-current="page"{% endif %}>Tax rules</a>
     {% if navigation_owner %}
+    <form class="test-data-form" method="post" action="{{ url_for('dashboard.switch_test_data') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" role="switch" aria-checked="{{ 'true' if using_test_data else 'false' }}" name="enabled" value="{{ '0' if using_test_data else '1' }}" title="Switch between real records and isolated sample data.">
+            <span class="test-data-track" aria-hidden="true"><span></span></span><span>Test data</span>
+        </button>
+    </form>
     <a href="{{ url_for('login.change_password') }}"{% if navigation_page == 'settings' %} aria-current="page"{% endif %}>Password settings</a>
     <form class="logout-form" method="post" action="{{ url_for('login.sign_out') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

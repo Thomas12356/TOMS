@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Expenses and mileage · TOMS</title><link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}"></head>
+<body>
+<header class="site-header"><a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+{% with navigation_page='deductions', navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}</header>
+<main>{% include 'test_data_notice.html' %}
+<div class="page-heading"><p class="eyebrow">TOMS / DEDUCTIONS</p><h1>Expenses and mileage</h1></div>
+<p class="secondary">These reduce taxable earnings. They are not tax already paid, and an expense classification alone does not make a payment tax deductible.</p>
+<p><a href="{{ url_for('dashboard.tax_estimate') }}">View tax estimate</a> · <a href="{{ url_for('dashboard.income_streams') }}">Manage income streams</a></p>
+{% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+<form method="get" class="login-form deduction-type-form" id="deduction-type-form">
+<label for="deduction-type">Add a deduction</label>
+{% if request.args.get('shift') %}<input type="hidden" name="shift" value="{{ request.args.get('shift') }}">{% endif %}
+<select id="deduction-type" name="type">
+    <option value="">Choose a deduction type</option>
+    <option value="expense" {{ 'selected' if deduction_type == 'expense' else '' }}>Expense</option>
+    <option value="mileage" {{ 'selected' if deduction_type == 'mileage' else '' }}>Mileage</option>
+</select>
+<noscript><button type="submit">Show form</button></noscript>
+</form>
+{% if deduction_type == 'expense' %}
+<section class="deduction-section"><h2>Link an existing expense</h2>
+<form method="get" class="login-form">
+<input type="hidden" name="type" value="expense">
+{% if values.shift_id %}<input type="hidden" name="shift" value="{{ values.shift_id }}">{% endif %}
+<label for="expense-payment">Existing payment · latest 200 settled GBP expenses</label>
+<select id="expense-payment" name="expense" required><option value="">Choose an expense</option>
+{% for payment in payments %}{% set key = payment.account_uid ~ ':' ~ payment.category_uid ~ ':' ~ payment.feed_item_uid %}<option value="{{ key }}" {{ 'selected' if selected and selected.feed_item_uid == payment.feed_item_uid and selected.account_uid == payment.account_uid and selected.category_uid == payment.category_uid else '' }}>{{ payment.transaction_time.strftime('%d %b %Y') }} · {{ payment.counterparty_name or 'Unnamed expense' }} · {{ format_amount(payment.amount_minor, payment.currency) }}</option>{% endfor %}</select>
+<button type="submit">Choose expense</button></form>
+<p class="secondary">For older payments, use “Tax deduction” on the Transactions page. Claim only the eligible business portion. Employee expenses must qualify for job-expense relief and be unreimbursed.</p>
+{% if selected %}
+<form method="post" class="login-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="payment" value="{{ selected.account_uid }}:{{ selected.category_uid }}:{{ selected.feed_item_uid }}"><input type="hidden" name="version" value="{{ expense_version(selected, selected.expense) }}">
+<label for="expense-stream">Income stream</label><select id="expense-stream" name="stream_id" required><option value="">Choose a stream</option>{% for stream in streams if not stream.archived %}<option value="{{ stream.id }}" {{ 'selected' if values.stream_id == stream.id else '' }}>{{ stream.name }}</option>{% endfor %}</select>
+<label for="expense-shift">Specific shift · optional</label><select id="expense-shift" name="shift_id" data-shift-selector data-stream-selector="expense-stream"><option value="">No specific shift</option>{% for shift in available_shifts %}<option value="{{ shift.id }}" data-stream-id="{{ shift.income_stream_id }}" {{ 'selected' if values.shift_id == shift.id else '' }}>{{ names.get(shift.income_stream_id) }} · {{ shift_label(shift) }}</option>{% endfor %}</select>
+<label for="expense-amount">Eligible amount · GBP</label><input id="expense-amount" name="amount" inputmode="decimal" maxlength="30" value="{{ values.amount or '' }}" required>
+<label for="expense-purpose">Business / job purpose</label><textarea id="expense-purpose" name="purpose" maxlength="1000" required>{{ values.purpose or '' }}</textarea>
+<label for="expense-category">Expense category</label><select id="expense-category" name="category"><option value="general" {{ 'selected' if values.category == 'general' else '' }}>Other allowable expense</option><option value="vehicle_running" {{ 'selected' if values.category == 'vehicle_running' else '' }}>Actual vehicle purchase / running costs</option><option value="parking_tolls" {{ 'selected' if values.category == 'parking_tolls' else '' }}>Parking / tolls for a business journey</option></select>
+<label for="expense-vehicle">Vehicle registration / label · required for vehicle costs</label><input id="expense-vehicle" name="vehicle_key" maxlength="40" value="{{ values.vehicle_key or '' }}">
+<label class="eligibility"><input type="checkbox" name="eligible" value="1" required> I confirm this amount is tax eligible, excludes personal use and reimbursements, and is not claimed elsewhere or already included in my forecast.</label>
+<button name="action" value="save_expense">Save deduction</button>{% if selected.expense %}<button class="secondary-button" name="action" value="delete_expense" formnovalidate>Remove deduction</button>{% endif %}</form>
+{% endif %}
+</section>
+{% endif %}
+{% if deduction_type == 'mileage' %}
+<section class="deduction-section"><h2>Log business mileage</h2>
+<p>UK {{ rules.tax_year }} · cars / vans {{ rules.car_van_first_pence }}p for the first {{ '{:,}'.format(rules.threshold_miles) }} miles, then {{ rules.car_van_after_pence }}p. Motorcycles {{ rules.motorcycle_pence }}p. Employee bicycles {{ rules.employee_bicycle_pence }}p.</p>
+<p class="secondary">{{ status.message if status else 'Using reviewed HMRC rules; an automatic source check has been requested.' }}{% if status.checked_at %} Last check: {{ status.checked_at }}.{% endif %} <a href="{{ url_for('dashboard.tax_rules') }}">Check official rules</a></p>
+<p class="secondary">Business travel only: exclude ordinary commuting and private travel. Self-employed / CIS mileage replaces running costs and capital allowances for that vehicle, with the method kept for its business life. Employee relief is the approved annual amount minus actual employer reimbursement; company vehicles are not supported.</p>
+<form class="login-form" method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="entry_id" value="{{ entry_id }}">
+<label for="mileage-stream">Income stream</label><select id="mileage-stream" name="stream_id" required><option value="">Choose a stream</option>{% for stream in streams if not stream.archived %}<option value="{{ stream.id }}" {{ 'selected' if values.action == 'save_mileage' and values.stream_id == stream.id else '' }}>{{ stream.name }}</option>{% endfor %}</select>
+<label for="mileage-shift">Specific shift · optional</label><select id="mileage-shift" name="shift_id" data-shift-selector data-stream-selector="mileage-stream"><option value="">No specific shift</option>{% for shift in available_shifts %}<option value="{{ shift.id }}" data-stream-id="{{ shift.income_stream_id }}" {{ 'selected' if values.shift_id == shift.id else '' }}>{{ names.get(shift.income_stream_id) }} · {{ shift_label(shift) }}</option>{% endfor %}</select>
+<label for="journey-date">Journey date · tax year is selected from this date</label><input id="journey-date" type="date" name="journey_date" min="2026-04-06" max="{{ [today|string, '2027-04-05']|min }}" value="{{ values.journey_date or today }}" required>
+<label for="mileage-location">Taxpayer location · UK mileage rates</label><select id="mileage-location" name="location">{% for key,label in locations.items() %}<option value="{{ key }}" {{ 'selected' if values.location == key else '' }}>{{ label }}</option>{% endfor %}</select>
+<label for="vehicle-type">Vehicle type</label><select id="vehicle-type" name="vehicle_type">{% for key,label in vehicles.items() %}<option value="{{ key }}" {{ 'selected' if values.vehicle_type == key else '' }}>{{ label }}</option>{% endfor %}</select>
+<label for="mileage-vehicle">Vehicle registration / label</label><input id="mileage-vehicle" name="vehicle_key" maxlength="40" value="{{ values.vehicle_key if values.action == 'save_mileage' else '' }}" required>
+<label for="mileage-miles">Business miles</label><input id="mileage-miles" name="miles" inputmode="decimal" maxlength="9" value="{{ values.miles or '' }}" required>
+<label for="mileage-purpose">Journey purpose</label><textarea id="mileage-purpose" name="purpose" maxlength="1000" required>{{ values.purpose if values.action == 'save_mileage' else '' }}</textarea>
+<label for="start-postcode">Start postcode</label><input id="start-postcode" name="start_postcode" maxlength="12" value="{{ values.start_postcode or '' }}" required>
+<label for="end-postcode">End postcode</label><input id="end-postcode" name="end_postcode" maxlength="12" value="{{ values.end_postcode or '' }}" required>
+<label for="mileage-reimbursed">Actual employer mileage reimbursement · GBP</label><input id="mileage-reimbursed" name="reimbursed" inputmode="decimal" maxlength="30" value="{{ values.reimbursed or '0.00' }}" required>
+<p class="secondary">For self-employed / CIS work, enter zero here and record reimbursed expenses as business income.</p>
+<label for="mileage-group">Shared business / employer group · optional</label><input id="mileage-group" name="mileage_group" maxlength="80" value="{{ values.mileage_group or '' }}">
+<p class="secondary">One stream is one trade or job by default. Use exactly the same group name for streams in the same trade or associated employments, so they share the 10,000-mile band across all cars / vans. Use a group consistently on every entry.</p>
+<label class="eligibility"><input type="checkbox" name="eligible" value="1" required> I confirm this was an eligible journey in my own qualifying vehicle. No incompatible running costs, vehicle purchase deduction or capital allowances have been claimed, including in earlier years. This journey is not claimed elsewhere.</label>
+<button name="action" value="save_mileage">Save mileage</button></form>
+<p><a href="{{ rules.business_source }}" target="_blank" rel="noopener noreferrer">HMRC self-employed mileage rules</a> · <a href="{{ rules.employee_source }}" target="_blank" rel="noopener noreferrer">HMRC employee mileage rules</a></p>
+</section>
+{% endif %}
+<section><h2>Recorded deductions</h2>
+{% for expense in expenses %}<article class="stream-payment"><div><h3>{{ names.get(expense.income_stream_id, 'Unknown stream') }}</h3><p>{{ expense.purpose }} · {{ format_amount(expense.amount_minor, 'GBP') }}</p>{% if expense.shift_id %}<p class="secondary">Shift: {{ shift_names.get(expense.shift_id) }}</p>{% endif %}{% if not expense_current(expense) %}<p class="message">Needs review · excluded from the estimate.</p>{% endif %}</div><a href="{{ url_for('deductions.page', expense=expense.account_uid ~ ':' ~ expense.category_uid ~ ':' ~ expense.feed_item_uid) }}">Edit deduction</a></article>{% else %}<p>No linked expenses.</p>{% endfor %}
+<h2>Mileage log</h2>
+{% for key,amount in allowance.items() %}<p>{{ names.get(key) }} · calculated mileage relief {{ format_amount(amount, 'GBP') }} (before income tax).</p>{% endfor %}
+{% for entry in journeys %}<article class="stream-payment"><div><h3>{{ names.get(entry.income_stream_id) }}</h3><p>{{ entry.journey_date }} · {{ entry.miles }} miles · {{ entry.vehicle_key }} · {{ entry.purpose }}</p><p class="secondary">{% if entry.shift_id %}Shift: {{ shift_names.get(entry.shift_id) }} · {% endif %}{{ entry.start_postcode }} → {{ entry.end_postcode }} · {{ locations[entry.location] }} · Reimbursed {{ format_amount(entry.reimbursed_minor, 'GBP') }}</p></div><form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="entry_id" value="{{ entry.id }}"><input type="hidden" name="version" value="{{ mileage_version(entry) }}">
+<label for="mileage-link-{{ entry.id }}">Shift link</label><select id="mileage-link-{{ entry.id }}" name="shift_id"><option value="">No specific shift</option>{% for shift in available_shifts if shift.income_stream_id == entry.income_stream_id %}<option value="{{ shift.id }}" {{ 'selected' if shift.id == entry.shift_id else '' }}>{{ shift_label(shift) }}</option>{% endfor %}</select><button class="secondary-button" name="action" value="link_mileage_shift">Save shift link</button>
+<button class="secondary-button" name="action" value="delete_mileage">Remove journey</button></form></article>{% else %}<p>No mileage logged.</p>{% endfor %}
+</section></main><script src="{{ url_for('static', filename='js/deductions.js') }}" defer></script></body></html>

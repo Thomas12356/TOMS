@@ -75,6 +75,9 @@ class Transaction(BaseModel):
     raw_payload = db.Column(JSONB, nullable=False)
     fetched_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
 
+    expense = db.relationship("ExpenseDeduction", uselist=False, back_populates="transaction",
+        cascade="all, delete-orphan", passive_deletes=True)
+
     income = db.relationship("TransactionIncome", uselist=False,
         back_populates="transaction", cascade="all, delete-orphan", passive_deletes=True)
 
@@ -109,6 +112,7 @@ class IncomeStream(BaseModel):
     __table_args__ = (
         db.CheckConstraint("char_length(trim(name)) BETWEEN 1 AND 200"),
         db.CheckConstraint("kind IN ('self_employed', 'employed', 'cis')"),
+        db.CheckConstraint("income_mode IN ('forecast', 'shifts')"),
         db.CheckConstraint("(expected_gross_minor IS NULL AND expected_gross_period IS NULL AND expected_gross_currency IS NULL) OR "
                            "(expected_gross_minor IS NOT NULL AND expected_gross_minor >= 0 AND "
                            "expected_gross_period IS NOT NULL AND expected_gross_period IN ('weekly', 'monthly', 'yearly') AND "
@@ -119,16 +123,13 @@ class IncomeStream(BaseModel):
         db.CheckConstraint("forecast_tax_year = '2026-27'", name="income_stream_forecast_year"),
         db.CheckConstraint("forecast_starts_on IS NULL OR forecast_ends_on IS NULL OR forecast_starts_on <= forecast_ends_on",
                            name="income_stream_forecast_dates"),
-        db.CheckConstraint("withholding_mode IN ('unknown', 'none', 'paye_estimate', 'manual')", name="income_stream_withholding_mode"),
-        db.CheckConstraint("withholding_mode <> 'paye_estimate' OR kind = 'employed'", name="income_stream_paye_employed"),
-        db.CheckConstraint("(withholding_mode = 'manual' AND expected_tax_deducted_minor IS NOT NULL AND expected_tax_deducted_minor >= 0) OR "
-                           "(withholding_mode <> 'manual' AND expected_tax_deducted_minor IS NULL)", name="income_stream_withholding_amount"),
         {"schema": "toms"},
     )
 
     id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
     name = db.Column(db.Text, nullable=False)
     kind = db.Column(db.Text, nullable=False)
+    income_mode = db.Column(db.Text, nullable=False, server_default="forecast")
     archived = db.Column(db.Boolean, nullable=False, server_default=db.false())
     expected_gross_minor = db.Column(db.BigInteger)
     expected_gross_period = db.Column(db.Text)
@@ -138,8 +139,6 @@ class IncomeStream(BaseModel):
     forecast_tax_year = db.Column(db.Text, nullable=False, server_default="2026-27")
     forecast_starts_on = db.Column(db.Date)
     forecast_ends_on = db.Column(db.Date)
-    withholding_mode = db.Column(db.Text, nullable=False, server_default="unknown")
-    expected_tax_deducted_minor = db.Column(db.BigInteger)
 
 
 class TransactionIncome(BaseModel):
@@ -249,3 +248,90 @@ class OwnerSetup(BaseModel):
     id = db.Column(db.Integer, primary_key=True)
     token_hash = db.Column(db.Text, nullable=False)
     expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+
+
+class ExpenseDeduction(BaseModel):
+    """One eligible portion of a bank expense, claimed once against one stream."""
+    __tablename__ = 'expense_deductions'
+    __table_args__ = (
+        db.ForeignKeyConstraint(['shift_id', 'income_stream_id'], ['toms.income_shifts.id', 'toms.income_shifts.income_stream_id']),
+        db.ForeignKeyConstraint(['account_uid', 'category_uid', 'feed_item_uid'],
+            ['toms.transactions.account_uid', 'toms.transactions.category_uid', 'toms.transactions.feed_item_uid'], ondelete='CASCADE'),
+        db.CheckConstraint('amount_minor > 0 AND amount_minor <= recorded_amount_minor'),
+        db.CheckConstraint("char_length(trim(purpose)) BETWEEN 1 AND 1000"),
+        db.CheckConstraint("category IN ('general','vehicle_running','parking_tolls')"),
+        db.CheckConstraint("char_length(vehicle_key) <= 40 AND (category <> 'vehicle_running' OR char_length(trim(vehicle_key)) > 0)"),
+        {'schema': 'toms'},
+    )
+    account_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    category_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    feed_item_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    income_stream_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.income_streams.id'), nullable=False, index=True)
+    shift_id = db.Column(db.Uuid(as_uuid=False), index=True)
+    amount_minor = db.Column(db.BigInteger, nullable=False)
+    purpose = db.Column(db.Text, nullable=False)
+    category = db.Column(db.Text, nullable=False)
+    vehicle_key = db.Column(db.Text, nullable=False, server_default='')
+    recorded_amount_minor = db.Column(db.BigInteger, nullable=False)
+    recorded_currency = db.Column(db.Text, nullable=False)
+    recorded_time = db.Column(db.DateTime(timezone=True), nullable=False)
+    transaction = db.relationship('Transaction', back_populates='expense')
+
+
+class MileageEntry(BaseModel):
+    """An actual journey; allowance is calculated across the year, not per row."""
+    __tablename__ = 'mileage_entries'
+    __table_args__ = (
+        db.ForeignKeyConstraint(['shift_id', 'income_stream_id'], ['toms.income_shifts.id', 'toms.income_shifts.income_stream_id']),
+        db.CheckConstraint("journey_date BETWEEN '2026-04-06' AND '2027-04-05'"),
+        db.CheckConstraint("location IN ('england','wales','northern_ireland','scotland')"),
+        db.CheckConstraint("vehicle_type IN ('car_van','motorcycle','bicycle')"),
+        db.CheckConstraint("char_length(trim(vehicle_key)) BETWEEN 1 AND 40"),
+        db.CheckConstraint('miles > 0 AND miles <= 100000'),
+        db.CheckConstraint("char_length(trim(purpose)) BETWEEN 1 AND 1000"),
+        db.CheckConstraint("char_length(trim(start_postcode)) BETWEEN 1 AND 12 AND char_length(trim(end_postcode)) BETWEEN 1 AND 12"),
+        db.CheckConstraint('reimbursed_minor >= 0'),
+        db.CheckConstraint('char_length(mileage_group) <= 80'),
+        {'schema': 'toms'},
+    )
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    income_stream_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.income_streams.id'), nullable=False, index=True)
+    income_stream = db.relationship('IncomeStream')
+    shift_id = db.Column(db.Uuid(as_uuid=False), index=True)
+    journey_date = db.Column(db.Date, nullable=False)
+    location = db.Column(db.Text, nullable=False)
+    vehicle_type = db.Column(db.Text, nullable=False)
+    vehicle_key = db.Column(db.Text, nullable=False)
+    miles = db.Column(db.Numeric(9, 2), nullable=False)
+    purpose = db.Column(db.Text, nullable=False)
+    start_postcode = db.Column(db.Text, nullable=False)
+    end_postcode = db.Column(db.Text, nullable=False)
+    reimbursed_minor = db.Column(db.BigInteger, nullable=False, server_default='0')
+    mileage_group = db.Column(db.Text, nullable=False, server_default='')
+
+
+class IncomeShift(BaseModel):
+    """One planned or completed shift, before tax; not a second bank payment."""
+    __tablename__ = 'income_shifts'
+    __table_args__ = (
+        db.UniqueConstraint('id', 'income_stream_id'),
+        db.CheckConstraint("ends_at > starts_at AND ends_at - starts_at <= interval '24 hours'"),
+        db.CheckConstraint("unpaid_break_minutes >= 0 AND unpaid_break_minutes * interval '1 minute' < ends_at - starts_at"),
+        db.CheckConstraint("payment_mode IN ('hourly','total')"),
+        db.CheckConstraint("(payment_mode = 'hourly' AND hourly_rate_minor IS NOT NULL AND hourly_rate_minor > 0) OR (payment_mode = 'total' AND hourly_rate_minor IS NULL)"),
+        db.CheckConstraint('gross_minor > 0'),
+        db.CheckConstraint("currency IN ('GBP','EUR','USD')"),
+        db.CheckConstraint('char_length(notes) <= 1000'),
+        {'schema': 'toms'},
+    )
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    income_stream_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.income_streams.id'), nullable=False, index=True)
+    starts_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    ends_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    unpaid_break_minutes = db.Column(db.Integer, nullable=False, server_default='0')
+    payment_mode = db.Column(db.Text, nullable=False)
+    is_overtime = db.Column(db.Boolean, nullable=False, server_default=db.false())
+    hourly_rate_minor = db.Column(db.BigInteger)
+    gross_minor = db.Column(db.BigInteger, nullable=False)
+    currency = db.Column(db.Text, nullable=False)
+    notes = db.Column(db.Text, nullable=False, server_default='')
