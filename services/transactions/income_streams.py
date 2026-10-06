@@ -23,7 +23,7 @@ def stream_id(value):
 
 
 def stream_fields(form):
-    if set(form) - {'csrf_token', 'action', 'stream_id', 'name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'income_mode'} or any(len(form.getlist(key)) != 1 for key in form):
+    if set(form) - {'csrf_token', 'action', 'stream_id', 'name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'income_mode', 'mileage_with_stream'} or any(len(form.getlist(key)) != 1 for key in form):
         raise BadRequest('Supply each form field once.')
     action = form.get('action', '')
     if action not in ('create', 'update', 'archive', 'restore'):

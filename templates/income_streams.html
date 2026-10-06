@@ -1,4 +1,5 @@
 {% from 'income_forecast_fields.html' import forecast_fields %}
+{% from 'mileage_relationship_fields.html' import mileage_relationship %}
 <!doctype html>
 <html lang="en">
 <head>
@@ -27,6 +28,7 @@
             <select id="stream-kind" name="kind" required><option value="">Choose a type</option>
                 {% for key, label in stream_kinds.items() %}<option value="{{ key }}" {{ 'selected' if create_values.kind == key else '' }}>{{ label }}</option>{% endfor %}
             </select>
+            {{ mileage_relationship('stream', create_values.mileage_with_stream, streams) }}
             {{ forecast_fields('stream', create_values, forecast_periods, forecast_currencies, tax_years) }}
             <p class="secondary">For a regular forecast, enter normal weekly/monthly pay or a full-year salary. Individual shifts can be added after creating the stream. We prorate it by active calendar days within the tax year, then subtract unpaid absence. Update it if your income changes.</p>
             <button name="action" value="create">Create stream</button>
@@ -52,6 +54,8 @@
             <p class="secondary">Expected gross: {{ format_amount(stream.expected_gross_minor, stream.expected_gross_currency) }} {{ stream.expected_gross_period }} · {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} for {{ stream.forecast_tax_year }} after {{ holiday_amount(stream) }} {{ stream.unpaid_holiday_unit }} unpaid holiday / absence</p>
             {% else %}<p class="secondary">Expected gross income not set.</p>{% endif %}
             {% if stream.income_mode != 'shifts' and stream.overtime_gross_minor %}<p class="secondary">Includes {{ format_amount(stream.overtime_gross_minor, stream.expected_gross_currency) }} logged overtime above normal pay.</p>{% endif %}
+            {% set partners = mileage_partners.get(stream.id, []) if mileage_partners is defined else [] %}
+            <p class="secondary">Mileage: {% if partners %}counted with {% for partner in partners %}{{ partner.name }}{{ ', ' if not loop.last else '' }}{% endfor %}{% else %}counted separately{% endif %}.</p>
 {% if stream.income_mode != 'shifts' %}            <p class="secondary">{{ stream.forecast_tax_year }} · {{ stream.forecast_starts_on or 'Tax-year start' }} to {{ stream.forecast_ends_on or 'Tax-year end' }} · {{ active_days(stream)[0] }} active days in the tax year</p>{% endif %}
             <details{% if editing_id == stream.id and error %} open{% endif %}><summary>Edit stream settings</summary>
                 <form class="login-form" method="post">
@@ -59,6 +63,7 @@
                     <label for="rename-{{ stream.id }}">Name</label><input id="rename-{{ stream.id }}" name="name" value="{{ editing_values.name if editing_id == stream.id and error else stream.name }}" maxlength="200" required>
                     {% set forecast_values = editing_values if editing_id == stream.id and error else dict(income_mode=stream.income_mode, expected_gross=display_amount(stream.expected_gross_minor, stream.expected_gross_currency), expected_gross_period=stream.expected_gross_period or 'yearly', expected_gross_currency=stream.expected_gross_currency or 'GBP', unpaid_holiday=holiday_amount(stream), unpaid_holiday_unit=stream.unpaid_holiday_unit, forecast_tax_year=stream.forecast_tax_year, forecast_starts_on=stream.forecast_starts_on or '', forecast_ends_on=stream.forecast_ends_on or '') %}
                     {{ forecast_fields('forecast-' ~ stream.id, forecast_values, forecast_periods, forecast_currencies, tax_years) }}
+                    {{ mileage_relationship('manage-' ~ stream.id, editing_values.mileage_with_stream if editing_id == stream.id and error else (partners[0].id if partners else ''), streams, stream.id) }}
                     <button name="action" value="update">Save changes</button>
                     <button name="action" value="{{ 'restore' if stream.archived else 'archive' }}" formnovalidate>{{ 'Restore' if stream.archived else 'Archive' }}</button>
                 </form>

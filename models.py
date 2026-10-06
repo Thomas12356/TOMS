@@ -139,6 +139,9 @@ class IncomeStream(BaseModel):
     forecast_tax_year = db.Column(db.Text, nullable=False, server_default="2026-27")
     forecast_starts_on = db.Column(db.Date)
     forecast_ends_on = db.Column(db.Date)
+    # Shared by sources belonging to the same business/associated employment.
+    mileage_pool_id = db.Column(db.Uuid(as_uuid=False), nullable=False,
+                                server_default=db.func.gen_random_uuid(), index=True)
 
 
 class TransactionIncome(BaseModel):
@@ -291,7 +294,6 @@ class MileageEntry(BaseModel):
         db.CheckConstraint("char_length(trim(purpose)) BETWEEN 1 AND 1000"),
         db.CheckConstraint("char_length(trim(start_postcode)) BETWEEN 1 AND 12 AND char_length(trim(end_postcode)) BETWEEN 1 AND 12"),
         db.CheckConstraint('reimbursed_minor >= 0'),
-        db.CheckConstraint('char_length(mileage_group) <= 80'),
         {'schema': 'toms'},
     )
     id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
@@ -307,7 +309,6 @@ class MileageEntry(BaseModel):
     start_postcode = db.Column(db.Text, nullable=False)
     end_postcode = db.Column(db.Text, nullable=False)
     reimbursed_minor = db.Column(db.BigInteger, nullable=False, server_default='0')
-    mileage_group = db.Column(db.Text, nullable=False, server_default='')
 
 
 class IncomeShift(BaseModel):

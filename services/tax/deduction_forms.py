@@ -80,13 +80,12 @@ def mileage_fields(form, stream):
         raise ValueError('Business reimbursements must be recorded as business income; enter zero here.')
     if form.get('eligible') != '1':
         raise ValueError('Confirm the journey and vehicle qualify for mileage relief.')
-    group = optional_text(form.get('mileage_group'), field='business / employer group', maximum=80) or ''
     return dict(journey_date=journey, location=form['location'], vehicle_type=form['vehicle_type'],
                 vehicle_key=vehicle_key(form.get('vehicle_key', '')), miles=Decimal(miles),
                 purpose=text(form.get('purpose'), 'journey purpose', 1000),
                 start_postcode=text(form.get('start_postcode'), 'start postcode', 12).upper(),
                 end_postcode=text(form.get('end_postcode'), 'end postcode', 12).upper(),
-                reimbursed_minor=reimbursed, mileage_group=group)
+                reimbursed_minor=reimbursed)
 
 
 def mileage_version(entry):

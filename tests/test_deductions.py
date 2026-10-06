@@ -21,7 +21,7 @@ from deduction_support import DeductionOwnerCase
 
 def journey(miles, kind='self_employed', vehicle='car_van', **changes):
     values = dict(id=str(uuid4()), income_stream_id='stream-1', income_stream=SimpleNamespace(kind=kind),
-                  miles=Decimal(str(miles)), vehicle_type=vehicle, mileage_group='',
+                  miles=Decimal(str(miles)), vehicle_type=vehicle,
                   journey_date=date(2026, 4, 6), location='england', reimbursed_minor=0)
     values.update(changes)
     return SimpleNamespace(**values)
@@ -49,15 +49,12 @@ class MileageTests(unittest.TestCase):
         first, second = journey(8000), journey(4000, id='later', journey_date=date(2026,5,1))
         self.assertEqual(mileage_allowances([second,first]), {'stream-1':600000})
 
-    def test_shared_trade_across_streams_and_separate_jobs(self):
-        a = journey(8000, mileage_group='My trade')
-        b = journey(4000, mileage_group='MY TRADE', income_stream_id='stream-2', journey_date=date(2026,5,1))
-        self.assertEqual(sum(mileage_allowances([a,b]).values()),600000)
+    def test_independent_streams_have_separate_mileage_limits(self):
+        a = journey(8000)
+        b = journey(4000, income_stream_id='stream-2', journey_date=date(2026,5,1))
+        self.assertEqual(mileage_allowances([a,b]), {'stream-1':440000, 'stream-2':220000})
         a.income_stream.kind = b.income_stream.kind = 'employed'
-        a.mileage_group = b.mileage_group = ''
-        self.assertEqual(sum(mileage_allowances([a,b]).values()),660000)
-        a.mileage_group = b.mileage_group = 'Associated employers'
-        self.assertEqual(sum(mileage_allowances([a,b]).values()),600000)
+        self.assertEqual(mileage_allowances([a,b]), {'stream-1':440000, 'stream-2':220000})
 
     def test_reimbursement_offsets_whole_annual_group(self):
         a = journey(100, kind='employed', reimbursed_minor=10000)
@@ -230,10 +227,10 @@ class DeductionFormsTests(DeductionOwnerCase):
             self.session.commit()
             self.assertEqual(bool(tax_records(income_rules())['credits']),included)
 
-    def test_group_must_be_consistent_for_the_same_stream(self):
-        self.assertEqual(self.mileage(mileage_group='Business').status_code,303)
-        self.assertEqual(self.mileage(mileage_group='Other').status_code,400)
-        self.assertEqual(self.mileage(mileage_group='BUSINESS').status_code,303)
+    def test_obsolete_group_field_is_rejected(self):
+        self.assertEqual(self.mileage(mileage_group='Business').status_code,400)
+        self.assertEqual(self.mileage().status_code,303)
+        self.assertFalse('name="mileage_group"' in self.html())
 
     def test_employee_reimbursements_and_bicycle_are_supported(self):
         stream=self.session.get(IncomeStream,self.stream)

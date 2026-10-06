@@ -49,7 +49,7 @@ class DeductionOwnerCase(SavedTransactionTestCase):
         html=self.html()
         data=dict(action='save_mileage',entry_id=str(uuid4()),stream_id=self.stream,journey_date='2026-04-10',location='england',
                   vehicle_type='car_van',vehicle_key='AB12 CDE',miles='100',purpose='Customer visit',start_postcode='SW1A 1AA',
-                  end_postcode='SW1A 2AA',reimbursed='0',mileage_group='',eligible='1',
+                  end_postcode='SW1A 2AA',reimbursed='0',eligible='1',
                   csrf_token=re.search(r'name="csrf_token" value="([^"]+)"',html)[1])
         data.update(changes)
         return self.client.post('/dashboard/deductions',data=data)
