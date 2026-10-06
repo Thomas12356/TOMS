@@ -29,6 +29,7 @@ class DatabasePermissionTests(unittest.TestCase):
                 'SELECT * FROM toms.schema_migrations',
                 'CREATE SCHEMA toms_forbidden_probe',
                 'ALTER TABLE toms.accounts ADD COLUMN forbidden_probe integer',
+                'ALTER TABLE toms_demo.accounts ADD COLUMN forbidden_probe integer',
                 'TRUNCATE toms.accounts CASCADE',
                 'SET ROLE toms_migrator',
                 'SET ROLE postgres',

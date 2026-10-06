@@ -4,6 +4,7 @@ from threading import Lock, Thread
 
 from models import SyncRun
 from services.database.connection import db
+from services.database.session import test_data_active
 from services.error_logging import log_failure
 from services.transactions.store import SyncStore
 from services.transactions.sync import SyncError, run_sync
@@ -24,6 +25,8 @@ def latest_sync():
 
 def start_dashboard_sync(app, *, force=False):
     """Keep HTTP requests short, with at most one job per worker."""
+    if test_data_active():
+        raise RuntimeError('A bank sync cannot start from browser test mode.')
     if not _job_lock.acquire(blocking=False):
         return False
 

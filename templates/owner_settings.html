@@ -16,6 +16,7 @@
         {% endif %}
     </header>
     <main class="login-page">
+        {% include 'test_data_notice.html' %}
         <div class="page-heading">
             <p class="eyebrow">TOMS / {{ 'FIRST RUN' if setup else 'OWNER SETTINGS' }}</p>
             <h1>{{ 'Create owner account' if setup else 'Change password' }}</h1>

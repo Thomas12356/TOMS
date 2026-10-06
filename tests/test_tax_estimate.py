@@ -6,8 +6,6 @@ import unittest
 from unittest.mock import patch
 from uuid import uuid4
 
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy import text
 
 from app import app
 from models import BrowserSession
@@ -54,54 +52,48 @@ class TaxCalculationTests(unittest.TestCase):
     def test_employment_uses_bands_before_untaxed_income(self):
         result = estimate_streams([stream(4000000, 'employed', 'paye_estimate'), stream(2000000)], self.rules)
         self.assertEqual(result['calculation']['tax_minor'], 1143200)
-        self.assertEqual(result['withheld_minor'], 548600)
+        self.assertEqual(result['withheld_minor'], 0)
         self.assertEqual(result['reserve_minor'], 594600)
         self.assertEqual(result['reserve_percent'], Decimal('29.73'))
         result = estimate_streams([stream(10000000, 'employed', 'paye_estimate'), stream(1000000)], self.rules)
         self.assertEqual(result['reserve_minor'], 600000)
         self.assertEqual(result['reserve_percent'], Decimal('60.00'))
 
-    def test_multiple_employers_share_only_one_allowance_and_all_pennies(self):
-        jobs = [stream(3000000, 'employed', 'paye_estimate')] * 2
-        result = estimate_streams(jobs, self.rules)
-        self.assertEqual(result['withheld_minor'], 1143200)
+    def test_only_logged_credits_reduce_tax_not_legacy_forecasts(self):
+        employee, business = stream(4000000, 'employed', 'paye_estimate'), stream(2000000, 'cis', 'manual', 400000)
+        result = estimate_streams([employee, business], self.rules)
+        self.assertEqual(result['withheld_minor'], 0)
+        self.assertEqual(result['uncovered_minor'], 1143200)
+        self.assertEqual(result['reserve_minor'], 594600)
+        logged = estimate_streams([employee, business], self.rules, credits={employee.id: 100000, business.id: 200000})
+        self.assertEqual(logged['withheld_minor'], 300000)
+        self.assertEqual(logged['uncovered_minor'], 843200)
+        self.assertEqual(logged['reserve_minor'], 394600)
+        self.assertEqual(logged['reserve_percent'], Decimal('21.92'))
+
+    def test_employment_only_has_no_manual_business_reserve(self):
+        result = estimate_streams([stream(6000000, 'employed')], self.rules)
+        self.assertEqual(result['withheld_minor'], 0)
         self.assertEqual(result['reserve_minor'], 0)
+        self.assertEqual(result['uncovered_minor'], 1143200)
         self.assertIsNone(result['reserve_percent'])
-        for gross in (1257003, 5000001, 11000001):
-            jobs = [stream(gross // 3, 'employed', 'paye_estimate'), stream(gross - gross // 3, 'employed', 'paye_estimate')]
-            result = estimate_streams(jobs, self.rules)
-            self.assertEqual(result['withheld_minor'], income_tax(gross, self.rules)['tax_minor'])
-            self.assertEqual(result['reserve_minor'], 0)
 
-    def test_manual_paye_overrides_and_cis_credits_reduce_unpaid_tax(self):
-        result = estimate_streams([stream(4000000, 'employed', 'paye_estimate'),
-                                  stream(1000000), stream(1000000, 'cis', 'manual', 200000)], self.rules)
-        self.assertEqual(result['reserve_minor'], 394600)
-        self.assertEqual(result['self_managed_gross_minor'], 1800000)
-        self.assertEqual(result['reserve_percent'], Decimal('21.92'))
-        result = estimate_streams([stream(5000000, 'employed', 'manual', 600000), stream(1000000)], self.rules)
-        self.assertEqual(result['withheld_minor'], 600000)
-        self.assertEqual(result['reserve_minor'], 543200)
+    def test_expenses_reduce_earnings_not_credit_tax_pound_for_pound(self):
+        business = stream(3000000)
+        result = estimate_streams([business], self.rules, deductions={business.id: 100000})
+        self.assertEqual(result['gross_minor'], 3000000)
+        self.assertEqual(result['calculation']['gross_minor'], 2900000)
+        self.assertEqual(result['calculation']['tax_minor'], 328600)
+        self.assertEqual(result['withheld_minor'], 0)
+        loss = estimate_streams([business], self.rules, deductions={business.id: 3000001})
+        self.assertTrue(loss['blockers'])
+        self.assertIsNone(loss['reserve_minor'])
 
-    def test_cis_can_leave_a_shortfall_or_forecast_excess(self):
-        result = estimate_streams([stream(3000000, 'cis', 'manual', 600000)], self.rules)
+    def test_excess_logged_credits_never_generate_a_negative_target(self):
+        business = stream(3000000, 'cis')
+        result = estimate_streams([business], self.rules, credits={business.id: 600000})
         self.assertEqual(result['reserve_minor'], 0)
         self.assertEqual(result['excess_withheld_minor'], 251400)
-        result = estimate_streams([stream(8000000, 'cis', 'manual', 1600000)], self.rules)
-        self.assertEqual(result['reserve_minor'], 343200)
-        self.assertEqual(result['self_managed_gross_minor'], 6400000)
-        self.assertEqual(result['reserve_percent'], Decimal('5.36'))
-        result = estimate_streams([stream(3000000, 'cis', 'none')], self.rules)
-        self.assertEqual(result['reserve_minor'], 348600)
-
-    def test_unknown_deductions_do_not_become_zero(self):
-        result = estimate_streams([stream(4000000, 'employed', 'unknown'), stream(2000000)], self.rules)
-        self.assertEqual(result['calculation']['tax_minor'], 1143200)
-        self.assertTrue(result['blockers'])
-        self.assertIsNone(result['reserve_minor'])
-        self.assertIsNone(result['withheld_minor'])
-        zero = estimate_streams([stream(0, 'employed', 'unknown')], self.rules)
-        self.assertEqual(zero['reserve_minor'], 0)
 
     def test_missing_and_foreign_gross_block_partial_totals(self):
         for missing in (stream(None, expected_gross_period=None, expected_gross_currency=None), stream(100000, expected_gross_currency='EUR')):
@@ -120,13 +112,9 @@ class TaxCalculationTests(unittest.TestCase):
         self.assertEqual(result['calculation']['gross_minor'], 2407123)
         self.assertEqual(result['reserve_minor'], 230025)
 
-    def test_inconsistent_deductions_block_reserve(self):
-        result = estimate_streams([stream(10000, 'cis', 'manual', 10001)], self.rules)
-        self.assertTrue(result['blockers'])
-        self.assertIsNone(result['reserve_minor'])
-
-    def test_more_automatic_deductions_never_increase_reserve(self):
-        targets = [estimate_streams([stream(5000000, 'cis', 'manual', amount)], self.rules)['reserve_minor']
+    def test_more_logged_business_credits_never_increase_reserve(self):
+        business = stream(5000000, 'cis')
+        targets = [estimate_streams([business], self.rules, credits={business.id: amount})['reserve_minor']
                    for amount in (0, 100000, 500000, 1000000, 5000000)]
         self.assertEqual(targets, sorted(targets, reverse=True))
 
@@ -143,21 +131,21 @@ class TaxEstimatePageTests(PostgreSQLTestCase):
             cookie['_user_id'] = token
 
     def page(self, rows):
-        with patch.object(self.session, 'scalars', return_value=SimpleNamespace(all=lambda: rows)):
+        with patch.object(self.session, 'scalars', return_value=SimpleNamespace(all=lambda: rows)), patch('services.tax.records.tax_records', return_value={}):
             return self.client.get('/dashboard/tax-estimate')
 
     def test_owner_page_nav_numbers_and_no_bank_calls(self):
         response = self.page([stream(4000000, 'employed', 'paye_estimate'), stream(2000000)])
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        for expected in ('GBP 60,000.00', 'GBP 11,432.00', 'GBP 5,486.00', 'GBP 5,946.00', '29.73%', 'whole year'):
+        for expected in ('GBP 60,000.00', 'GBP 11,432.00', 'GBP 0.00', 'GBP 5,946.00', '29.73%', 'whole year'):
             self.assertIn(expected, html)
         self.assertIn('aria-current="page">Tax estimate', html)
         self.assertIn('no-store', response.headers['Cache-Control'])
         self.bank.assert_not_called()
 
     def test_incomplete_and_archived_names_are_escaped(self):
-        response = self.page([stream(3000000, 'cis', 'unknown', name='<script>alert(1)</script>', archived=True)])
+        response = self.page([stream(None, 'cis', 'unknown', name='<script>alert(1)</script>', archived=True)])
         html = response.get_data(as_text=True)
         self.assertNotIn('<script>alert(1)</script>', html)
         self.assertIn('&lt;script&gt;', html)
@@ -181,16 +169,3 @@ class TaxEstimatePageTests(PostgreSQLTestCase):
         with self.client.session_transaction() as cookie:
             cookie.clear()
         self.assertEqual(self.client.get('/dashboard/tax-estimate').status_code, 302)
-
-    def test_database_enforces_deduction_modes_and_amount_completeness(self):
-        for values in ({'withholding_mode': 'bogus'}, {'withholding_mode': 'paye_estimate', 'kind': 'cis'},
-                       {'withholding_mode': 'manual'}, {'withholding_mode': 'manual', 'expected_tax_deducted_minor': -1},
-                       {'withholding_mode': 'none', 'expected_tax_deducted_minor': 10}):
-            savepoint = self.connection.begin_nested()
-            try:
-                with self.assertRaises(IntegrityError):
-                    self.connection.execute(text('INSERT INTO toms.income_streams (id,name,kind,withholding_mode,expected_tax_deducted_minor) VALUES (:id,:name,:kind,:withholding_mode,:expected_tax_deducted_minor)'),
-                                            dict(id=str(uuid4()), name='Constraint probe', kind=values.get('kind', 'employed'),
-                                                 withholding_mode=values['withholding_mode'], expected_tax_deducted_minor=values.get('expected_tax_deducted_minor')))
-            finally:
-                savepoint.rollback()

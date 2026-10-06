@@ -18,9 +18,11 @@ from services.transactions.income import INCOME_TYPES, TAX_TREATMENTS, income_de
 from services.transactions.review import REVIEW_FIELDS, review_version
 from services.transactions.income_streams import STREAM_KINDS
 from services.web.sessions import require_dashboard_login
+from services.web.test_data import activate_test_data
 
 review = Blueprint('review', __name__, url_prefix='/dashboard')
 review.before_request(require_dashboard_login)
+review.before_request(activate_test_data)
 
 
 @review.errorhandler(BadRequest)

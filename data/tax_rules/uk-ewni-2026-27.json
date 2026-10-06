@@ -12,16 +12,41 @@
   "allowance_taper_reduction": "1 pound for every 2 pounds above the threshold",
   "allowance_zero_at_minor": 12514000,
   "published_bands": [
-    ["Personal Allowance", "Up to £12,570", "0%"],
-    ["Basic rate", "£12,571 to £50,270", "20%"],
-    ["Higher rate", "£50,271 to £125,140", "40%"],
-    ["Additional rate", "over £125,140", "45%"]
+    [
+      "Personal Allowance",
+      "Up to £12,570",
+      "0%"
+    ],
+    [
+      "Basic rate",
+      "£12,571 to £50,270",
+      "20%"
+    ],
+    [
+      "Higher rate",
+      "£50,271 to £125,140",
+      "40%"
+    ],
+    [
+      "Additional rate",
+      "over £125,140",
+      "45%"
+    ]
   ],
   "taxable_bands": [
-    {"upper_minor": 3770000, "rate_percent": 20},
-    {"upper_minor": 12514000, "rate_percent": 40},
-    {"upper_minor": null, "rate_percent": 45}
+    {
+      "upper_minor": 3770000,
+      "rate_percent": 20
+    },
+    {
+      "upper_minor": 12514000,
+      "rate_percent": 40
+    },
+    {
+      "upper_minor": null,
+      "rate_percent": 45
+    }
   ],
   "calculation_source_url": "https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past",
-  "scope": "Income tax on employment and self-employment earnings only. No National Insurance, savings, dividends, expenses, special reliefs or payments on account."
+  "scope": "Income tax on employment and self-employment earnings, with logged eligible expenses and mileage. No National Insurance, loss relief, capital allowances, savings, dividends, special reliefs or payments on account."
 }

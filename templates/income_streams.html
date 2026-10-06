@@ -12,10 +12,13 @@
     {% with navigation_page='income-streams', navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}
 </header>
 <main>
+        {% include 'test_data_notice.html' %}
     <div class="page-heading"><p class="eyebrow">TOMS / INCOME</p><h1>Income streams</h1></div>
     <p class="secondary">Create a stream for each job or business, then assign income payments to it. <a href="{{ url_for('dashboard.tax_estimate') }}">View tax estimate</a></p>
     {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
-    <section class="stream-create" aria-labelledby="create-stream-heading">
+    <a class="secondary-button" id="open-create-stream" href="?create=1">Create a Stream</a>
+    <dialog id="create-stream-dialog" class="review-dialog stream-create" aria-labelledby="create-stream-heading" {{ 'open' if request.args.get('create') == '1' or (error and not editing_id) else '' }} data-reopen="{{ 'true' if (error and not editing_id) or request.args.get('create') == '1' else 'false' }}">
+        <button type="button" id="close-create-stream" class="secondary-button">Close</button>
         <h2 id="create-stream-heading">Create a stream</h2>
         <form class="login-form" method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -25,26 +28,36 @@
                 {% for key, label in stream_kinds.items() %}<option value="{{ key }}" {{ 'selected' if create_values.kind == key else '' }}>{{ label }}</option>{% endfor %}
             </select>
             {{ forecast_fields('stream', create_values, forecast_periods, forecast_currencies, tax_years) }}
-            <p class="secondary">Enter normal weekly/monthly pay or a full-year salary. We prorate it by active calendar days within the tax year, then subtract unpaid absence. Update it if your income changes.</p>
+            <p class="secondary">For a regular forecast, enter normal weekly/monthly pay or a full-year salary. Individual shifts can be added after creating the stream. We prorate it by active calendar days within the tax year, then subtract unpaid absence. Update it if your income changes.</p>
             <button name="action" value="create">Create stream</button>
         </form>
-    </section>
+    </dialog>
+
     <section aria-labelledby="your-streams-heading">
         <h2 id="your-streams-heading">Your streams</h2>
         {% for stream in streams %}
         <article class="stream-manage">
-            <div><a href="{{ url_for('dashboard.income_streams', stream=stream.id) }}"{% if selected_stream == stream.id %} aria-current="page"{% endif %}><strong>{{ stream.name }}</strong></a>
-                <p class="secondary">{{ stream_kinds[stream.kind] }} · {{ counts.get(stream.id, 0) }} payments{{ ' · Archived' if stream.archived else '' }}</p></div>
-            {% if stream.expected_gross_minor is not none %}
+            <div class="stream-heading">
+                <div><a href="{{ url_for('dashboard.income_streams', stream=stream.id) }}"{% if selected_stream == stream.id %} aria-current="page"{% endif %}><strong>{{ stream.name }}</strong></a>
+                    <p class="secondary">{{ stream_kinds[stream.kind] }} · {{ counts.get(stream.id, 0) }} payments{{ ' · Archived' if stream.archived else '' }}</p></div>
+                {% if stream.income_mode == 'shifts' %}
+                <a class="stream-shifts-button" href="{{ url_for('shifts.page', stream_id=stream.id) }}">Manage shifts</a>
+                {% else %}
+                <a class="stream-shifts-button" href="{{ url_for('shifts.page', stream_id=stream.id, add=1) }}">Add overtime</a>
+                {% endif %}
+            </div>
+            {% if stream.income_mode == 'shifts' %}
+            <p class="secondary">Individual shifts · {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} entered gross for {{ stream.forecast_tax_year }}. No future shifts assumed.</p>
+            {% elif stream.expected_gross_minor is not none %}
             <p class="secondary">Expected gross: {{ format_amount(stream.expected_gross_minor, stream.expected_gross_currency) }} {{ stream.expected_gross_period }} · {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} for {{ stream.forecast_tax_year }} after {{ holiday_amount(stream) }} {{ stream.unpaid_holiday_unit }} unpaid holiday / absence</p>
             {% else %}<p class="secondary">Expected gross income not set.</p>{% endif %}
-            <p class="secondary">{{ stream.forecast_tax_year }} · {{ stream.forecast_starts_on or 'Tax-year start' }} to {{ stream.forecast_ends_on or 'Tax-year end' }} · {{ active_days(stream)[0] }} active days in the tax year</p>
-            <p class="secondary">Automatic tax: {{ withholding_modes.get(stream.withholding_mode, 'Not set yet') }}{% if stream.expected_tax_deducted_minor is not none %} · {{ format_amount(stream.expected_tax_deducted_minor, stream.expected_gross_currency) }} for the tax year{% endif %}</p>
-            <details{% if editing_id == stream.id and error %} open{% endif %}><summary>Manage</summary>
+            {% if stream.income_mode != 'shifts' and stream.overtime_gross_minor %}<p class="secondary">Includes {{ format_amount(stream.overtime_gross_minor, stream.expected_gross_currency) }} logged overtime above normal pay.</p>{% endif %}
+{% if stream.income_mode != 'shifts' %}            <p class="secondary">{{ stream.forecast_tax_year }} · {{ stream.forecast_starts_on or 'Tax-year start' }} to {{ stream.forecast_ends_on or 'Tax-year end' }} · {{ active_days(stream)[0] }} active days in the tax year</p>{% endif %}
+            <details{% if editing_id == stream.id and error %} open{% endif %}><summary>Edit stream settings</summary>
                 <form class="login-form" method="post">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="stream_id" value="{{ stream.id }}"><input type="hidden" name="kind" value="{{ stream.kind }}">
                     <label for="rename-{{ stream.id }}">Name</label><input id="rename-{{ stream.id }}" name="name" value="{{ editing_values.name if editing_id == stream.id and error else stream.name }}" maxlength="200" required>
-                    {% set forecast_values = editing_values if editing_id == stream.id and error else dict(expected_gross=display_amount(stream.expected_gross_minor, stream.expected_gross_currency), expected_gross_period=stream.expected_gross_period or 'yearly', expected_gross_currency=stream.expected_gross_currency or 'GBP', unpaid_holiday=holiday_amount(stream), unpaid_holiday_unit=stream.unpaid_holiday_unit, forecast_tax_year=stream.forecast_tax_year, forecast_starts_on=stream.forecast_starts_on or '', forecast_ends_on=stream.forecast_ends_on or '', withholding_mode=stream.withholding_mode, expected_tax_deducted=display_amount(stream.expected_tax_deducted_minor, stream.expected_gross_currency)) %}
+                    {% set forecast_values = editing_values if editing_id == stream.id and error else dict(income_mode=stream.income_mode, expected_gross=display_amount(stream.expected_gross_minor, stream.expected_gross_currency), expected_gross_period=stream.expected_gross_period or 'yearly', expected_gross_currency=stream.expected_gross_currency or 'GBP', unpaid_holiday=holiday_amount(stream), unpaid_holiday_unit=stream.unpaid_holiday_unit, forecast_tax_year=stream.forecast_tax_year, forecast_starts_on=stream.forecast_starts_on or '', forecast_ends_on=stream.forecast_ends_on or '') %}
                     {{ forecast_fields('forecast-' ~ stream.id, forecast_values, forecast_periods, forecast_currencies, tax_years) }}
                     <button name="action" value="update">Save changes</button>
                     <button name="action" value="{{ 'restore' if stream.archived else 'archive' }}" formnovalidate>{{ 'Restore' if stream.archived else 'Archive' }}</button>
@@ -52,7 +65,7 @@
                 <p class="secondary">Archiving keeps existing payments. Create a new stream for a different type.</p>
             </details>
         </article>
-        {% else %}<p>No streams yet. Create your first one above.</p>{% endfor %}
+        {% else %}<p>No streams yet. Use Create a Stream to add your first one.</p>{% endfor %}
     </section>
     <section class="stream-records" aria-labelledby="income-payments-heading">
         <h2 id="income-payments-heading">{{ selected_name }} payments</h2>
@@ -68,6 +81,7 @@
             {% if page.has_next %}<a href="{{ url_for('dashboard.income_streams', stream=selected_stream, page=page.next_num) }}">Next</a>{% endif %}
         </nav>{% endif %}
     </section>
+    <p><a href="{{ url_for('deductions.page') }}">Manage expenses and mileage deductions</a></p>
 </main>
 <script src="{{ url_for('static', filename='js/income-streams.js') }}" defer></script>
 </body>

@@ -113,11 +113,11 @@ def validate_publication(payload, rules):
     return hashlib.sha256(matches[0]['body'].encode()).hexdigest()
 
 
-def fetch_publication():
+def fetch_publication(url=CONTENT_URL):
     # Separate unauthenticated client: never send bank credentials or follow redirects.
     started = time.monotonic()
     with httpx.Client(timeout=10, follow_redirects=False, trust_env=False) as client:
-        with client.stream('GET', CONTENT_URL, headers={'Accept': 'application/json', 'Accept-Encoding': 'identity', 'User-Agent': 'TOMS-tax-rules/1.0'}) as response:
+        with client.stream('GET', url, headers={'Accept': 'application/json', 'Accept-Encoding': 'identity', 'User-Agent': 'TOMS-tax-rules/1.0'}) as response:
             if response.status_code != 200:
                 raise ValueError('GOV.UK could not be checked; reviewed rules are retained.')
             if response.headers.get('Content-Encoding', 'identity').lower() not in ('', 'identity'):
@@ -209,6 +209,8 @@ def start_rule_check(instance_path):
     def work():
         try:
             refresh_rules(instance_path)
+            from services.tax.mileage_rules import refresh_rules as refresh_mileage
+            refresh_mileage(instance_path)
         except OSError:
             pass  # A read-only cache never prevents viewing the reviewed rules.
         finally:

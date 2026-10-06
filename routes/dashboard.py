@@ -4,15 +4,16 @@ import re
 import hmac
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify, render_template, request, redirect, url_for, current_app
+from flask import Blueprint, jsonify, render_template, request, redirect, url_for, current_app, session
 from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only, selectinload
 from werkzeug.exceptions import BadRequest, NotFound, Conflict
 
-from models import Account, Transaction, TransactionIncome, IncomeStream
+from models import Account, Transaction, TransactionIncome, IncomeStream, IncomeShift
+from services.transactions.shifts import attach_shift_totals
 from uuid import uuid4
-from services.transactions.income_streams import STREAM_KINDS, WITHHOLDING_MODES, FORECAST_PERIODS, FORECAST_CURRENCIES, TAX_YEARS, active_days, annual_gross, holiday_amount, stream_id, stream_fields
+from services.transactions.income_streams import STREAM_KINDS, FORECAST_PERIODS, FORECAST_CURRENCIES, TAX_YEARS, active_days, annual_gross, holiday_amount, stream_id, stream_fields
 from routes.helpers import query_values
 from services.database.connection import db
 from services.error_logging import log_failure
@@ -22,12 +23,15 @@ from services.transactions.income_form import FIELDS as INCOME_FORM_FIELDS, disp
 from services.transactions.automatic_sync import latest_sync, start_dashboard_sync
 from services.transactions.classification import CLASSIFICATION_TYPES, classification_details, save_classification, clear_classification
 from services.web.sessions import require_dashboard_login
+from services.web.test_data import activate_test_data, ensure_sample_data, record_sample_sync, sample_balances
+from services.database.session import test_data_active
 from services.validation import uid, optional_text
 from services.banking.client import StarlingError, starling_request
 
 
 dashboard = Blueprint("dashboard", __name__, url_prefix="/dashboard")
 dashboard.before_request(require_dashboard_login)
+dashboard.before_request(activate_test_data)
 
 
 @dashboard.errorhandler(NotFound)
@@ -55,6 +59,9 @@ def trigger_sync():
     options = query_values({"force"})
     if options.get("force", "0") not in ("0", "1"):
         raise BadRequest("force must be 0 or 1.")
+    if test_data_active():
+        record_sample_sync()
+        return jsonify(started=True, test_data=True), 202
     started = start_dashboard_sync(current_app._get_current_object(), force=options.get("force") == "1")
     return jsonify(started=started), 202
 
@@ -107,6 +114,8 @@ def account_balances():
     accounts = list(db.session.scalars(query))
     if account_uid and not accounts:
         raise BadRequest("This account is not available. Choose a saved account.")
+    if test_data_active():
+        return jsonify(sample_balances(accounts, format_amount, combined=account_uid is None))
     balances = []
     totals = {}
     rate_limited = False
@@ -192,6 +201,7 @@ def transactions_page():
                                   account=account_uid, page=page_number) if classification["type"] == "income" else None,
             "income_status": "Needs review" if getattr(transaction, "income", None) and transaction.income.needs_review else
                              "Details saved" if getattr(transaction, "income", None) else "Details missing",
+            "deduction_url": url_for('deductions.page', expense=f'{transaction.account_uid}:{transaction.category_uid}:{transaction.feed_item_uid}') if classification['type'] == 'expense' else None,
             "confirm_url": url_for("review.confirm_transaction", account_uid=transaction.account_uid,
                                    category_uid=transaction.category_uid, feed_item_uid=transaction.feed_item_uid),
             "edit_url": url_for("dashboard.edit_classification", account_uid=transaction.account_uid,
@@ -344,15 +354,15 @@ def income_streams():
     """Create and manage streams without changing bank records or inferring tax."""
     if request.authorization is not None or not current_user.is_authenticated:
         return redirect(url_for('login.sign_in'))
-    options = query_values({'stream', 'page'})
+    options = query_values({'stream', 'page', 'create'})
     selected_id = stream_id(options['stream']) if options.get('stream') else None
     page_number = requested_page(options)
     if selected_id and db.session.get(IncomeStream, selected_id) is None:
         raise NotFound('Income stream not found.')
     error = None
-    create_fields = ('name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'withholding_mode', 'expected_tax_deducted')
+    create_fields = ('name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'income_mode')
     create_values = dict.fromkeys(create_fields, '')
-    create_values.update(expected_gross_period='yearly', expected_gross_currency='GBP', unpaid_holiday='0', unpaid_holiday_unit='weeks', forecast_tax_year='2026-27', withholding_mode='unknown')
+    create_values.update(income_mode='forecast', expected_gross_period='yearly', expected_gross_currency='GBP', unpaid_holiday='0', unpaid_holiday_unit='weeks', forecast_tax_year='2026-27')
     editing_id, editing_values = None, {}
     if request.method == 'POST':
         submitted = {field: request.form.get(field, '') for field in create_fields}
@@ -373,6 +383,13 @@ def income_streams():
                 if action == 'update':
                     if kind != edited.kind:
                         raise BadRequest('Create a new stream to use a different type.')
+                    if forecast['income_mode'] == 'shifts' and edited.expected_gross_minor is not None:
+                        for field in ('expected_gross_minor', 'expected_gross_period', 'unpaid_holiday_weeks',
+                                      'unpaid_holiday_unit', 'forecast_starts_on', 'forecast_ends_on'):
+                            forecast[field] = getattr(edited, field)
+                    existing_currencies = db.session.scalars(db.select(IncomeShift.currency).where(IncomeShift.income_stream_id == edited.id).distinct()).all()
+                    if any(currency != forecast['expected_gross_currency'] for currency in existing_currencies):
+                        raise BadRequest('Remove this stream’s shifts before changing their currency.')
                     edited.name = name
                     for field, value in forecast.items():
                         setattr(edited, field, value)
@@ -386,6 +403,7 @@ def income_streams():
     counts = dict(db.session.execute(db.select(TransactionIncome.income_stream_id, db.func.count())
                                     .group_by(TransactionIncome.income_stream_id)).all())
     streams = db.session.scalars(db.select(IncomeStream).order_by(IncomeStream.archived, IncomeStream.name, IncomeStream.id)).all()
+    attach_shift_totals(streams)
     names = {stream.id: stream.name for stream in streams}
     query = db.select(Transaction).join(Transaction.income).options(
         load_only(Transaction.transaction_time, Transaction.counterparty_name, Transaction.amount_minor, Transaction.currency),
@@ -403,7 +421,7 @@ def income_streams():
                                   stream=selected_id or 'all', return_to='income-streams', page=page_number))
             for payment in page.items]
     return render_template('income_streams.html', streams=streams, selected_stream=selected_id,
-                           counts=counts, stream_kinds=STREAM_KINDS, withholding_modes=WITHHOLDING_MODES, create_values=create_values, error=error,
+                           counts=counts, stream_kinds=STREAM_KINDS, create_values=create_values, error=error,
                            forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES,
                            tax_years=TAX_YEARS, active_days=active_days,
                            editing_id=editing_id, editing_values=editing_values,
@@ -416,6 +434,7 @@ def income_streams():
 def tax_rules():
     """Show reviewed rules and their official-source verification status."""
     from services.tax.rules import cached_status, reviewed_rules, refresh_rules, start_rule_check
+    from services.tax import mileage_rules
 
     if request.authorization is not None or not current_user.is_authenticated:
         return redirect(url_for('login.sign_in'))
@@ -425,12 +444,14 @@ def tax_rules():
             raise BadRequest('Supply each form field once.')
         try:
             refresh_rules(current_app.instance_path, force=True)
+            mileage_rules.refresh_rules(current_app.instance_path, force=True)
         except OSError:
             raise BadRequest('Unable to save the rule check. Check the instance directory permissions.') from None
         return redirect(url_for('dashboard.tax_rules'), code=303)
     status = cached_status(current_app.instance_path)
     start_rule_check(current_app.instance_path)
     return render_template('tax_rules.html', rules=reviewed_rules(), status=status,
+                           mileage_rules=mileage_rules.reviewed_rules(), mileage_status=mileage_rules.cached_status(current_app.instance_path),
                            format_amount=format_amount, current_user=current_user)
 
 
@@ -449,7 +470,29 @@ def tax_estimate():
         IncomeStream.forecast_tax_year == '2026-27').order_by(IncomeStream.name, IncomeStream.id)).all()
     rules = reviewed_rules()
     status = cached_status(current_app.instance_path)
-    estimate = estimate_streams(streams, rules)
+    from services.tax.records import tax_records
+    attach_shift_totals(streams)
+    estimate = estimate_streams(streams, rules, **tax_records(rules))
     return render_template('tax_estimate.html', estimate=estimate, rules=rules, status=status,
                            format_amount=format_amount, rounded_minor=rounded_minor, stream_kinds=STREAM_KINDS,
-                           withholding_modes=WITHHOLDING_MODES, current_user=current_user)
+                           current_user=current_user)
+
+
+@dashboard.post('/test-data')
+def switch_test_data():
+    """Explicit, CSRF-protected selection; always return to an unfiltered ledger."""
+    if request.authorization is not None or not current_user.is_authenticated:
+        return redirect(url_for('login.sign_in'))
+    if (set(request.form) - {'csrf_token', 'enabled'} or
+            any(len(request.form.getlist(key)) != 1 for key in request.form) or
+            request.form.get('enabled') not in ('0', '1')):
+        raise BadRequest('Choose whether test data is enabled.')
+    enabled = request.form['enabled'] == '1'
+    if enabled:
+        from flask import g
+        g.use_test_data = True
+        ensure_sample_data()
+    session['use_test_data'] = enabled
+    # Reject edit/confirm forms opened before a dataset switch in another tab.
+    session.pop('csrf_token', None)
+    return redirect(url_for('dashboard.transactions_page'), code=303)

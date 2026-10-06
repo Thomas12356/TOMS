@@ -5,6 +5,8 @@
     const buttons = document.querySelectorAll('[data-sync-now]');
     const message = document.getElementById('sync-message');
     const timestamp = document.getElementById('last-synced');
+    const demo = controls.dataset.testData === 'true';
+    const syncLabel = demo ? 'Last simulated sync' : 'Last synced';
     let busy = false;
 
     async function status() {
@@ -12,13 +14,13 @@
         if (!response.ok) throw new Error('Unable to check sync status.');
         const run = (await response.json()).run;
         timestamp.textContent = run?.last_success_at ?
-            `Last synced: ${new Date(run.last_success_at).toLocaleString()}` : 'Last synced: never';
+            `${syncLabel}: ${new Date(run.last_success_at).toLocaleString()}` : `${syncLabel}: never`;
         return run;
     }
 
     function showLast(run) {
         message.textContent = run?.status === 'failed' ? 'Last sync failed. Try Sync now.' :
-            run?.status === 'completed' ? 'Up to date.' : 'No completed sync yet.';
+            run?.status === 'completed' ? (demo ? 'Sample data up to date. No bank calls.' : 'Up to date.') : 'No completed sync yet.';
     }
 
     async function sync(force) {
@@ -31,7 +33,7 @@
                 showLast(before);
                 return;
             }
-            message.textContent = 'Syncing transactions…';
+            message.textContent = demo ? 'Simulating sync…' : 'Syncing transactions…';
             const response = await fetch(`${controls.dataset.syncUrl}?force=${force ? '1' : '0'}`, {
                 method: 'POST', credentials: 'same-origin', headers: {'X-CSRFToken': controls.dataset.csrf}
             });

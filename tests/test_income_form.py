@@ -185,45 +185,16 @@ class IncomeFormTests(SavedTransactionTestCase):
         data['csrf_token'] = re.search(r'name="csrf_token" value="([^"]+)"', html)[1]
         return self.client.post('/dashboard/income-streams', data=data)
 
-    def test_forecast_withholding_save_prefill_and_payment_independence(self):
+    def test_forecasts_do_not_change_logged_deductions(self):
         self.assertEqual(self.submit().status_code, 303)
-        response = self.stream_post(action='update', stream_id=self.stream, name='My job', kind='employed',
-                                    withholding_mode='manual', expected_tax_deducted='3486.01')
+        response = self.stream_post(action='update', stream_id=self.stream, name='My job', kind='employed')
         self.assertEqual(response.status_code, 303)
-        saved = self.session.get(IncomeStream, self.stream)
-        self.assertEqual(saved.expected_tax_deducted_minor, 348601)
-        self.assertEqual(saved.withholding_mode, 'manual')
         self.assertEqual(self.payment().income.tax_deducted_minor, 500)
-        html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
-        self.assertIn('value="3486.01"', html)
-        self.assertEqual(self.stream_post(action='update', stream_id=self.stream, name='My job', kind='employed',
-                                        withholding_mode='paye_estimate').status_code, 303)
-        self.assertIsNone(saved.expected_tax_deducted_minor)
+        self.assertNotIn('name="withholding_mode"', self.client.get('/dashboard/income-streams').get_data(as_text=True))
 
-    def test_forecast_deduction_validation_and_invalid_input_retention(self):
-        for fields in ({'withholding_mode': 'manual'}, {'withholding_mode': 'manual', 'expected_tax_deducted': '-1'},
-                       {'withholding_mode': 'manual', 'expected_tax_deducted': '30000.01'},
-                       {'withholding_mode': 'manual', 'expected_tax_deducted': '1.001'},
-                       {'withholding_mode': 'manual', 'expected_tax_deducted': '999999999999999999999999'},
-                       {'withholding_mode': 'none', 'expected_tax_deducted': '1'},
-                       {'withholding_mode': 'invalid'}, {'withholding_mode': 'paye_estimate', 'kind': 'cis'}):
-            values = dict(action='create', name='New stream', kind='employed')
-            values.update(fields)
-            self.assertEqual(self.stream_post(**values).status_code, 400)
-        response = self.stream_post(action='update', stream_id=self.stream, name='My job', kind='employed',
-                                    withholding_mode='manual', expected_tax_deducted='30000.01')
-        self.assertIn('value="30000.01"', response.get_data(as_text=True))
-        self.assertEqual(self.stream_post(action='create', name='CIS business', kind='cis',
-                                        withholding_mode='manual', expected_tax_deducted='6000').status_code, 303)
-
-    def test_duplicate_forecast_deductions_cannot_override_validation(self):
-        html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
-        data = MultiDict(dict(action='create', name='Duplicate probe', kind='employed',
-                         expected_gross='30000', expected_gross_period='yearly', expected_gross_currency='GBP',
-                         forecast_tax_year='2026-27', withholding_mode='manual', expected_tax_deducted='3000',
-                         csrf_token=re.search(r'name="csrf_token" value="([^"]+)"', html)[1]))
-        data.add('withholding_mode', 'none')
-        self.assertEqual(self.client.post('/dashboard/income-streams', data=data).status_code, 400)
+    def test_retired_forecast_deduction_fields_are_rejected(self):
+        for fields in ({'withholding_mode': 'paye_estimate'}, {'expected_tax_deducted': '3000'}):
+            self.assertEqual(self.stream_post(action='create', name='New', kind='employed', **fields).status_code, 400)
 
     def test_create_rename_archive_restore_and_no_tax_assumptions(self):
         for kind in ('self_employed', 'employed', 'cis'):

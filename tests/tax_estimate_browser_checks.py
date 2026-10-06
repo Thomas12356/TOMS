@@ -12,7 +12,7 @@ from flask import render_template
 from playwright.sync_api import sync_playwright
 from services.tax.estimate import estimate_streams, rounded_minor
 from services.tax.rules import reviewed_rules
-from services.transactions.income_streams import STREAM_KINDS, WITHHOLDING_MODES
+from services.transactions.income_streams import STREAM_KINDS
 from routes.dashboard import format_amount
 from test_tax_estimate import stream
 
@@ -20,7 +20,7 @@ rules = reviewed_rules()
 states = {
     'complete': [stream(4000000, 'employed', 'paye_estimate'), stream(2000000, name='Independent work with a long readable name')],
     'cis': [stream(3000000, 'cis', 'manual', 600000)],
-    'unknown': [stream(3000000, 'cis', 'unknown', name='<script>alert(1)</script>')],
+    'unknown': [stream(None, 'cis', 'unknown', name='<script>alert(1)</script>')],
     'foreign': [stream(3000000, expected_gross_currency='EUR')],
     'empty': [],
 }
@@ -28,9 +28,9 @@ with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
     for state, streams in states.items():
         with app.test_request_context('/dashboard/tax-estimate'):
-            html = render_template('tax_estimate.html', estimate=estimate_streams(streams, rules), rules=rules,
+            html = render_template('tax_estimate.html', estimate=estimate_streams(streams, rules, credits={streams[0].id: 600000} if state == 'cis' else {}), rules=rules,
                                    status=None, format_amount=format_amount, rounded_minor=rounded_minor,
-                                   stream_kinds=STREAM_KINDS, withholding_modes=WITHHOLDING_MODES,
+                                   stream_kinds=STREAM_KINDS,
                                    current_user=SimpleNamespace(is_authenticated=True))
         for width in (320, 390, 640, 768, 1280):
             page = browser.new_page(viewport={'width': width, 'height': 900})

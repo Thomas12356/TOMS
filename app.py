@@ -3,7 +3,7 @@ import sys
 
 from sqlalchemy.exc import SQLAlchemyError
 import click
-from flask import Flask, jsonify, render_template, request, redirect, url_for
+from flask import Flask, jsonify, render_template, request, redirect, url_for, session
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from routes.starling import starling
@@ -11,6 +11,8 @@ from routes.sync import sync
 from routes.transactions import transactions
 from routes.reports import reports
 from routes.dashboard import dashboard
+from routes.deductions import deductions
+from routes.shifts import shifts
 from routes.review import review
 from routes.login import login
 from services.web.sessions import login_manager, csrf, SESSION_LIFETIME, lock_owner_setup, validate_owner_credentials
@@ -22,6 +24,7 @@ from models import (Account, BrowserSession, Category, OwnerLogin, OwnerSetup, T
                     TransactionClassification, TransactionIncome, SyncRun, SyncTarget)
 from services.database.migrations import upgrade_database
 from services.database.migration_connection import migration_engine
+from services.database.demo_schema import prepare_demo_schema
 from services.error_logging import log_failure
 from services.web.request_limits import BoundedRequest
 from services.web.setup import announce_setup, create_setup_token
@@ -51,6 +54,8 @@ app.register_blueprint(sync)
 app.register_blueprint(transactions)
 app.register_blueprint(reports)
 app.register_blueprint(dashboard)
+app.register_blueprint(deductions)
+app.register_blueprint(shifts)
 app.register_blueprint(review)
 init_database(app)
 
@@ -58,6 +63,11 @@ init_database(app)
 @app.errorhandler(RequestEntityTooLarge)
 def request_too_large(error):
     return jsonify(error="Request body is too large.", max_bytes=app.config["MAX_CONTENT_LENGTH"]), 413
+
+
+@app.context_processor
+def test_data_context():
+    return {'using_test_data': session.get('use_test_data') is True and request.authorization is None}
 
 
 @app.shell_context_processor
@@ -114,6 +124,7 @@ def db_upgrade():
         try:
             with engine.begin() as connection:
                 applied = upgrade_database(connection)
+                prepare_demo_schema(connection, rebuild=bool(applied))
                 connection.exec_driver_sql("REVOKE ALL ON TABLE toms.schema_migrations FROM PUBLIC, toms_app")
         finally:
             engine.dispose()
@@ -172,6 +183,9 @@ def refresh_tax_rules():
     except OSError:
         raise click.ClickException("Unable to save the rule check in the instance directory.") from None
     click.echo(result['status'] + ': ' + result['message'])
+    from services.tax.mileage_rules import refresh_rules as refresh_mileage
+    mileage = refresh_mileage(app.instance_path, force=True)
+    click.echo(mileage['status'] + ': ' + mileage['message'])
 
 
 @app.cli.command("sync-transactions")

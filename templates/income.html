@@ -12,6 +12,7 @@
         <nav aria-label="Main navigation"><a href="{{ back_url }}">← {{ 'Income streams' if request.args.get('return_to') == 'income-streams' else 'Transactions' }}</a></nav>
     </header>
     <main class="classification-page">
+        {% include 'test_data_notice.html' %}
         <div class="page-heading"><p class="eyebrow">TOMS / INCOME</p><h1>Income details</h1></div>
         <section class="payment-summary">
             <h2>{{ transaction.counterparty_name or 'Unnamed payment' }}</h2>

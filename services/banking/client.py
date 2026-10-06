@@ -8,6 +8,7 @@ from pathlib import Path
 import httpx
 from dotenv import load_dotenv
 from services.banking.rate_limit import RateLimitError, acquire_slot
+from services.database.session import test_data_active
 
 
 # This module is in services/banking; configuration lives at the repository root.
@@ -46,6 +47,8 @@ def response_error(code, scope):
 def starling_request(path, *, method="GET", params=None, body=None,
                      accept="application/json", scope=None):
     """Call a fixed API path; keep credentials and upstream error bodies private."""
+    if test_data_active():
+        raise StarlingError("Bank requests are disabled while browsing test data.", 403)
     token = os.getenv("STARLING_ACCESS_TOKEN", "").strip()
     if not token:
         raise StarlingError("STARLING_ACCESS_TOKEN is missing from .env.", 503)

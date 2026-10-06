@@ -1,4 +1,4 @@
-"""Owner-created stream names and types; deduction forecasts never change recorded payments."""
+"""Owner-created streams, gross forecasts, active dates and unpaid absence."""
 import re
 from decimal import Decimal
 from datetime import date
@@ -12,12 +12,6 @@ STREAM_KINDS = {'self_employed': 'Self employed', 'employed': 'Employed', 'cis':
 
 FORECAST_PERIODS = {'weekly': 'Weekly', 'monthly': 'Monthly', 'yearly': 'Yearly'}
 FORECAST_CURRENCIES = ('GBP', 'EUR', 'USD')
-WITHHOLDING_MODES = {
-    'unknown': 'Not set yet',
-    'none': 'No tax taken automatically',
-    'paye_estimate': 'Estimate standard PAYE (employed only)',
-    'manual': 'Enter expected annual PAYE / CIS deductions',
-}
 TAX_YEARS = {'2026-27': (date(2026, 4, 6), date(2027, 4, 5))}
 
 
@@ -29,7 +23,7 @@ def stream_id(value):
 
 
 def stream_fields(form):
-    if set(form) - {'csrf_token', 'action', 'stream_id', 'name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'withholding_mode', 'expected_tax_deducted'} or any(len(form.getlist(key)) != 1 for key in form):
+    if set(form) - {'csrf_token', 'action', 'stream_id', 'name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'income_mode'} or any(len(form.getlist(key)) != 1 for key in form):
         raise BadRequest('Supply each form field once.')
     action = form.get('action', '')
     if action not in ('create', 'update', 'archive', 'restore'):
@@ -45,19 +39,22 @@ def stream_fields(form):
     kind = form.get('kind')
     if kind not in STREAM_KINDS:
         raise BadRequest('Choose Self employed, Employed or CIS.')
-    period = form.get('expected_gross_period')
+    mode = form.get('income_mode', 'forecast')
+    if mode not in ('forecast', 'shifts'):
+        raise BadRequest('Choose Regular forecast or Individual shifts.')
+    period = 'yearly' if mode == 'shifts' else form.get('expected_gross_period')
     currency = form.get('expected_gross_currency')
     if period not in FORECAST_PERIODS:
         raise BadRequest('Choose weekly, monthly or yearly for expected income.')
     if currency not in FORECAST_CURRENCIES:
         raise BadRequest('Choose a supported currency for expected income.')
-    gross = parse_amount(form.get('expected_gross', ''), currency)
+    gross = 0 if mode == 'shifts' else parse_amount(form.get('expected_gross', ''), currency)
     if gross is None or gross > 2**63 - 1:
         raise BadRequest('Enter expected gross income, including zero if none is expected.')
-    unit = form.get('unpaid_holiday_unit', 'weeks')
+    unit = 'weeks' if mode == 'shifts' else form.get('unpaid_holiday_unit', 'weeks')
     if unit not in ('days', 'weeks'):
         raise BadRequest('Choose days or weeks for unpaid holiday.')
-    holiday = form.get('unpaid_holiday', '').strip() or '0'
+    holiday = '0' if mode == 'shifts' else form.get('unpaid_holiday', '').strip() or '0'
     maximum = 260 if unit == 'days' else 52
     if len(holiday) > 6 or not re.fullmatch(r'[0-9]+(?:\.[0-9]{1,2})?', holiday) or Decimal(holiday) > maximum:
         raise BadRequest(f'Enter unpaid holiday between 0 and {maximum} {unit}, with at most two decimal places.')
@@ -65,26 +62,16 @@ def stream_fields(form):
     year = form.get('forecast_tax_year')
     if year not in TAX_YEARS:
         raise BadRequest('Choose a supported tax year: 2026–27.')
-    starts = forecast_date(form.get('forecast_starts_on', ''))
-    ends = forecast_date(form.get('forecast_ends_on', ''))
+    starts = None if mode == 'shifts' else forecast_date(form.get('forecast_starts_on', ''))
+    ends = None if mode == 'shifts' else forecast_date(form.get('forecast_ends_on', ''))
     if starts and ends and starts > ends:
         raise BadRequest('The end date must be on or after the start date.')
-    forecast = dict(expected_gross_minor=gross, expected_gross_period=period,
+    forecast = dict(income_mode=mode, expected_gross_minor=gross, expected_gross_period=period,
                     expected_gross_currency=currency, unpaid_holiday_weeks=weeks, unpaid_holiday_unit=unit,
                     forecast_tax_year=year, forecast_starts_on=starts, forecast_ends_on=ends)
     active, total = active_days(SimpleNamespace(**forecast))
     if int(weeks * 10000) * total > active * 520000:
         raise BadRequest('Unpaid absence cannot exceed the time this stream is active in the selected tax year.')
-    mode = form.get('withholding_mode', 'unknown')
-    if mode not in WITHHOLDING_MODES or (mode == 'paye_estimate' and kind != 'employed'):
-        raise BadRequest('Choose a valid deduction option. Standard PAYE is for employed streams only.')
-    deducted = parse_amount(form.get('expected_tax_deducted', ''), currency)
-    if mode == 'manual':
-        if deducted is None or deducted > 2**63 - 1 or deducted > annual_gross(SimpleNamespace(**forecast)):
-            raise BadRequest('Enter expected annual tax deductions between zero and the gross forecast for these dates.')
-    elif deducted not in (None, 0):
-        raise BadRequest('Choose Enter expected annual PAYE / CIS deductions to save an amount.')
-    forecast.update(withholding_mode=mode, expected_tax_deducted_minor=deducted if mode == 'manual' else None)
     return action, name, kind, forecast
 
 
@@ -117,6 +104,8 @@ def holiday_amount(stream):
 
 def annual_gross(stream):
     """Gross forecast for the active part of the tax year, minus planned absence."""
+    if getattr(stream, 'income_mode', 'forecast') == 'shifts':
+        return getattr(stream, 'shift_gross_minor', None)
     if stream.expected_gross_minor is None:
         return None
     full_year = stream.expected_gross_minor * {'weekly': 52, 'monthly': 12, 'yearly': 1}[stream.expected_gross_period]
@@ -125,4 +114,6 @@ def annual_gross(stream):
     denominator = total * 520000
     paid_fraction = max(0, active * 520000 - unpaid_units * total)
     # Keep the existing 52-week/12-month annual rates, prorated by calendar days.
-    return (full_year * paid_fraction + denominator // 2) // denominator
+    regular = (full_year * paid_fraction + denominator // 2) // denominator
+    # Overtime is an explicit extra amount, not recurring pay or bank receipts.
+    return regular + getattr(stream, 'overtime_gross_minor', 0)
