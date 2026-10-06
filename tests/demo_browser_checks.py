@@ -205,6 +205,14 @@ with sync_playwright() as playwright:
             assert page.locator('#expense-payment').count() == 0
             page.locator('#mileage-stream').select_option(shift_stream_id)
             page.locator('#mileage-shift').select_option(shift_identity)
+            assert page.locator('#journey-date').input_value() == '2026-10-06'
+            assert 'Sample variable-rate shift' in page.locator('#mileage-purpose').input_value()
+            page.locator('#journey-date').fill('2026-04-10')
+            page.locator('#mileage-purpose').fill('Actual trip purpose')
+            page.locator('#mileage-shift').select_option('')
+            page.locator('#mileage-shift').select_option(shift_identity)
+            assert page.locator('#journey-date').input_value() == '2026-04-10'
+            assert page.locator('#mileage-purpose').input_value() == 'Actual trip purpose'
             page.locator('#mileage-vehicle').fill('DEMO CAR')
             page.locator('#mileage-miles').fill('100')
             page.locator('#mileage-purpose').fill('Sample customer journey')

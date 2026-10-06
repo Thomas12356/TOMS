@@ -1,6 +1,6 @@
 """Owner-managed links to bank expenses and manual business mileage logs."""
 import hmac
-from datetime import date
+from datetime import datetime
 from uuid import uuid4
 
 from flask import Blueprint, current_app, redirect, render_template, request, url_for
@@ -23,7 +23,7 @@ from services.validation import uid
 from routes.helpers import query_values
 from routes.dashboard import format_amount, database_error
 from services.transactions.income_form import display_amount
-from services.transactions.shifts import shift_label
+from services.transactions.shifts import LOCAL_TIME, journey_defaults, shift_label
 
 
 deductions = Blueprint('deductions', __name__, url_prefix='/dashboard/deductions')
@@ -54,6 +54,9 @@ def page():
                 raise ValueError('Shift not found.')
             values = dict(shift_id=linked_shift.id, stream_id=linked_shift.income_stream_id,
                           action='save_mileage' if deduction_type == 'mileage' else 'save_expense')
+            if deduction_type == 'mileage':
+                stream = db.session.get(IncomeStream, linked_shift.income_stream_id)
+                values.update(journey_defaults(linked_shift, stream.name))
         if options.get('expense'):
             selected = db.session.get(Transaction, payment_key(options['expense']))
             if selected is None:
@@ -155,11 +158,13 @@ def page():
     if record and request.method != 'POST':
         values = dict(stream_id=record.income_stream_id, amount=display_amount(record.amount_minor, 'GBP'), purpose=record.purpose,
                       category=record.category, vehicle_key=record.vehicle_key, shift_id=record.shift_id)
+    names = {stream.id: stream.name for stream in streams}
     available_shifts = db.session.scalars(db.select(IncomeShift).order_by(IncomeShift.starts_at.desc(), IncomeShift.id)).all()
     return render_template('deductions.html', streams=streams, expenses=expenses, journeys=journeys, payments=payments,
         available_shifts=available_shifts, shift_names={shift.id: shift_label(shift) for shift in available_shifts}, shift_label=shift_label,
-        deduction_type=deduction_type, names={stream.id: stream.name for stream in streams}, selected=selected, values=values, error=error,
-        entry_id=values.get('entry_id') or str(uuid4()), today=date.today(), locations=LOCATIONS, vehicles=VEHICLES,
+        journey_suggestions={shift.id: journey_defaults(shift, names[shift.income_stream_id]) for shift in available_shifts},
+        deduction_type=deduction_type, names=names, selected=selected, values=values, error=error,
+        entry_id=values.get('entry_id') or str(uuid4()), today=datetime.now(LOCAL_TIME).date(), locations=LOCATIONS, vehicles=VEHICLES,
         rules=reviewed_rules(), status=cached_status(current_app.instance_path), format_amount=format_amount,
         expense_current=expense_current, expense_version=expense_version, mileage_version=mileage_version, allowance=mileage_allowances(journeys),
         current_user=current_user), 400 if error else 200

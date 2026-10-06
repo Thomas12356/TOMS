@@ -67,7 +67,9 @@ does not automatically establish its tax treatment.
    earnings; bank receipts are not added to those forecasts a second time.
 5. Open Expenses and mileage, choose the deduction type, and record an eligible
    bank expense or completed journey. Linking a deduction to a shift or overtime
-   record adds context; it does not claim the deduction twice.
+   record adds context; it does not claim the deduction twice. For mileage, the
+   shift suggests its local date and a purpose based on its stream and notes.
+   Check these against the actual journey; your manual changes are preserved.
 6. Open Tax estimate to see the calculation and the suggested business income-tax
    reserve. Resolve missing or changed records before relying on that target.
    This is an income-tax estimate, not a complete tax bill: National Insurance,
