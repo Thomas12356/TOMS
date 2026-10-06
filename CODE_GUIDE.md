@@ -399,3 +399,28 @@ existing records as ordinary shifts. Tests in `test_shifts.py` and
 `app.py` sets the browser Content Security Policy. Keep JavaScript in local
 `static/js/` files and styles in `static/css/`; inline scripts and handlers are
 blocked. Chromium wait predicates use arrow functions to work under this policy.
+
+## Relating streams for mileage
+
+`services/transactions/mileage_relationships.py` sets a shared opaque
+`IncomeStream.mileage_pool_id` after the owner selects an existing related
+stream. Independent streams get distinct IDs. A stream copies the related
+stream's current pool rather than pointing at a root stream: changing one
+member never silently moves other members. Creation and settings changes use
+the same advisory lock as mileage writes, plus fresh row locks. The UUID itself
+is never accepted from the browser; only an existing stream selection is valid.
+Employment cannot join a self-employed/CIS business.
+
+`templates/mileage_relationship_fields.html` supplies the one-time dropdown;
+`static/js/income-streams.js` filters its choices and the backend enforces the
+same boundary. `mileage_partners()` supplies readable card summaries without
+additional queries. `services/tax/mileage.py` counts related journeys together
+and allocates their combined relief back to their original streams. Journeys
+still belong to exactly one stream/shift; linked expenses are not grouped.
+
+Migrations 019 and 020 retire per-journey groups and introduce stream
+relationships. `tests/test_mileage_relationships.py` covers shared historical
+thresholds, reimbursement offsets, creation, independent jobs, moving and
+archiving members, incompatible/forged IDs and form authentication. The demo
+browser script creates a related stream, checks the threshold and then
+separates it to check recalculation.
