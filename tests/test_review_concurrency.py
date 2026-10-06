@@ -121,3 +121,33 @@ class ReviewConcurrencyTests(ApiTestCase):
         with self.bound.connect() as connection:
             self.assertIsNone(connection.scalar(db.select(Transaction.confirmed_at)))
             self.assertEqual(connection.scalar(db.select(Transaction.amount_minor)), 1200)
+
+    def test_simultaneous_income_form_saves_reject_the_stale_edit(self):
+        from models import IncomeStream, TransactionIncome
+        from services.transactions.classification import save_classification
+        stream_id = str(uuid4())
+        self.sessions.add(IncomeStream(id=stream_id, name='Example employer', kind='employed'))
+        payment = self.sessions.get(Transaction, (self.account, self.category, self.item))
+        save_classification(payment, 'income', None)
+        self.sessions.commit()
+        path = f'/dashboard/transactions/{self.account}/{self.category}/{self.item}/income'
+        forms = []
+        for client, csrf, record in self.clients:
+            with app.app_context():
+                html = client.get(path).get_data(as_text=True)
+                version = re.search(r'name="version" value="([^"]+)"', html)[1]
+                forms.append((client, csrf, version))
+        barrier = Barrier(2)
+        def save(index):
+            client, csrf, version = forms[index]
+            try:
+                barrier.wait(timeout=10)
+                return client.post(path, data={'csrf_token': csrf, 'version': version, 'income_stream_id': stream_id,
+                    'tax_treatment': 'unknown', 'gross': '10.00'}).status_code
+            finally:
+                self.sessions.remove()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(sorted(pool.map(save, (0, 1))), [303, 409])
+        with self.bound.connect() as connection:
+            self.assertEqual(connection.scalar(db.select(db.func.count()).select_from(TransactionIncome)), 1)
+            self.assertEqual(connection.scalar(db.select(TransactionIncome.gross_minor)), 1000)

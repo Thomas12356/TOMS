@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only, selectinload
 from werkzeug.exceptions import BadRequest
 
-from models import Transaction
+from models import Transaction, TransactionIncome
 from routes.dashboard import format_amount, requested_account, requested_page
 from routes.helpers import query_values
 from services.database.connection import db
@@ -16,6 +16,7 @@ from services.error_logging import log_failure
 from services.transactions.classification import CLASSIFICATION_TYPES, classification_details
 from services.transactions.income import INCOME_TYPES, TAX_TREATMENTS, income_details
 from services.transactions.review import REVIEW_FIELDS, review_version
+from services.transactions.income_streams import STREAM_KINDS
 from services.web.sessions import require_dashboard_login
 
 review = Blueprint('review', __name__, url_prefix='/dashboard')
@@ -37,7 +38,7 @@ def database_error(error):
 def transaction_query():
     return db.select(Transaction).options(
         load_only(*(getattr(Transaction, field) for field in REVIEW_FIELDS), Transaction.confirmed_at),
-        selectinload(Transaction.classification), selectinload(Transaction.income))
+        selectinload(Transaction.classification), selectinload(Transaction.income).selectinload(TransactionIncome.income_stream))
 
 
 @review.get('/review')
@@ -67,7 +68,9 @@ def next_transaction():
     ]
     income = income_details(transaction)
     if income:
-        details.extend([['Income type', INCOME_TYPES[income['income_type']]],
+        stream = transaction.income.income_stream
+        details.append(['Income stream', stream.name if stream else 'Not assigned'])
+        details.extend([['Income type', STREAM_KINDS[stream.kind] if stream else INCOME_TYPES[income['income_type']]],
                         ['Tax treatment', TAX_TREATMENTS[income['tax_treatment']]],
                         ['Income source', income['source_name'] or 'Not specified'],
                         ['Income currency', income['recorded_currency']]])

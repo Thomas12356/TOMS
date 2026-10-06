@@ -1,0 +1,71 @@
+{% from 'income_forecast_fields.html' import forecast_fields %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Income streams · TOMS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+<header class="site-header">
+    <a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+    {% with navigation_page='income-streams', navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}
+</header>
+<main>
+    <div class="page-heading"><p class="eyebrow">TOMS / INCOME</p><h1>Income streams</h1></div>
+    <p class="secondary">Create a stream for each job or business, then assign income payments to it.</p>
+    {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+    <section class="stream-create" aria-labelledby="create-stream-heading">
+        <h2 id="create-stream-heading">Create a stream</h2>
+        <form class="login-form" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label for="stream-name">Name</label><input id="stream-name" name="name" value="{{ create_values.name }}" placeholder="e.g. My roofing business" maxlength="200" required>
+            <label for="stream-kind">Type</label>
+            <select id="stream-kind" name="kind" required><option value="">Choose a type</option>
+                {% for key, label in stream_kinds.items() %}<option value="{{ key }}" {{ 'selected' if create_values.kind == key else '' }}>{{ label }}</option>{% endfor %}
+            </select>
+            {{ forecast_fields('stream', create_values, forecast_periods, forecast_currencies) }}
+            <p class="secondary">A planning estimate: weekly × 52 or monthly × 12, reduced for unpaid holiday or absence. Update it if your income changes.</p>
+            <button name="action" value="create">Create stream</button>
+        </form>
+    </section>
+    <section aria-labelledby="your-streams-heading">
+        <h2 id="your-streams-heading">Your streams</h2>
+        {% for stream in streams %}
+        <article class="stream-manage">
+            <div><a href="{{ url_for('dashboard.income_streams', stream=stream.id) }}"{% if selected_stream == stream.id %} aria-current="page"{% endif %}><strong>{{ stream.name }}</strong></a>
+                <p class="secondary">{{ stream_kinds[stream.kind] }} · {{ counts.get(stream.id, 0) }} payments{{ ' · Archived' if stream.archived else '' }}</p></div>
+            {% if stream.expected_gross_minor is not none %}
+            <p class="secondary">Expected gross: {{ format_amount(stream.expected_gross_minor, stream.expected_gross_currency) }} {{ stream.expected_gross_period }} · {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} per year after {{ holiday_amount(stream) }} {{ stream.unpaid_holiday_unit }} unpaid holiday / absence</p>
+            {% else %}<p class="secondary">Expected gross income not set.</p>{% endif %}
+            <details{% if editing_id == stream.id and error %} open{% endif %}><summary>Manage</summary>
+                <form class="login-form" method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="stream_id" value="{{ stream.id }}"><input type="hidden" name="kind" value="{{ stream.kind }}">
+                    <label for="rename-{{ stream.id }}">Name</label><input id="rename-{{ stream.id }}" name="name" value="{{ editing_values.name if editing_id == stream.id and error else stream.name }}" maxlength="200" required>
+                    {% set forecast_values = editing_values if editing_id == stream.id and error else dict(expected_gross=display_amount(stream.expected_gross_minor, stream.expected_gross_currency), expected_gross_period=stream.expected_gross_period or 'yearly', expected_gross_currency=stream.expected_gross_currency or 'GBP', unpaid_holiday=holiday_amount(stream), unpaid_holiday_unit=stream.unpaid_holiday_unit) %}
+                    {{ forecast_fields('forecast-' ~ stream.id, forecast_values, forecast_periods, forecast_currencies) }}
+                    <button name="action" value="update">Save changes</button>
+                    <button name="action" value="{{ 'restore' if stream.archived else 'archive' }}" formnovalidate>{{ 'Restore' if stream.archived else 'Archive' }}</button>
+                </form>
+                <p class="secondary">Archiving keeps existing payments. Create a new stream for a different type.</p>
+            </details>
+        </article>
+        {% else %}<p>No streams yet. Create your first one above.</p>{% endfor %}
+    </section>
+    <section class="stream-records" aria-labelledby="income-payments-heading">
+        <h2 id="income-payments-heading">{{ selected_name }} payments</h2>
+        {% if selected_stream %}<a href="{{ url_for('dashboard.income_streams') }}">Show all income</a>{% endif %}
+        <p class="secondary">Assign payments through Edit income details in Transactions. Each payment keeps its own amounts and tax treatment.</p>
+        {% for row in rows %}<article class="stream-payment">
+            <div><h3>{{ row.source }}</h3><p class="secondary">{{ row.kind }} · {{ row.date }}</p>{% if row.needs_review %}<p class="message">Needs review: the bank changed this payment.</p>{% endif %}</div>
+            <strong class="amount incoming">{{ row.amount }}</strong><a href="{{ row.edit_url }}">Edit income details</a>
+        </article>{% else %}<p>No recorded income here yet.</p>{% endfor %}
+        {% if page.pages > 1 %}<nav class="pagination" aria-label="Income pages">
+            {% if page.has_prev %}<a href="{{ url_for('dashboard.income_streams', stream=selected_stream, page=page.prev_num) }}">Previous</a>{% endif %}
+            <span>Page {{ page.page }} of {{ page.pages }}</span>
+            {% if page.has_next %}<a href="{{ url_for('dashboard.income_streams', stream=selected_stream, page=page.next_num) }}">Next</a>{% endif %}
+        </nav>{% endif %}
+    </section>
+</main>
+</body>
+</html>

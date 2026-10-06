@@ -14,7 +14,7 @@ from services.web.auth import require_api_key
 from services.transactions.classification import CLASSIFICATION_TYPES, classification_details, effective_type, save_classification, clear_classification as restore_classification
 from services.database.connection import db
 from services.error_logging import log_failure
-from services.transactions.income import INCOME_TYPES, TAX_TREATMENTS, income_body, income_details, validate_reconciliation
+from services.transactions.income import INCOME_TYPES, TAX_TREATMENTS, income_body, income_details, save_income
 from services.validation import uid, optional_text
 
 
@@ -218,17 +218,7 @@ def put_income(account_uid, category_uid, feed_item_uid):
         raise BadRequest("Send income details as a JSON object.")
     values = income_body(request.get_json())
     transaction = saved_transaction(account_uid, category_uid, feed_item_uid, lock=True)
-    if transaction.direction != "IN" or classification_details(transaction)["type"] != "income":
-        raise BadRequest("Income details require an incoming transaction classified as income.")
-    validate_reconciliation(values, transaction.amount_minor)
-    # Only a successful edit against the current bank amount clears the review flag.
-    values.update(recorded_currency=transaction.currency, needs_review=False)
-    transaction.confirmed_at = None
-    if transaction.income is None:
-        transaction.income = TransactionIncome(**values)
-    else:
-        for field, value in values.items():
-            setattr(transaction.income, field, value)
+    save_income(transaction, values)
     db.session.commit()
     return jsonify(income=income_details(transaction))
 

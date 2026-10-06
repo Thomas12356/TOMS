@@ -83,10 +83,27 @@ def income_details(transaction):
     record = transaction.income
     if record is None:
         return None
-    return {"income_type": record.income_type, "tax_treatment": record.tax_treatment,
+    return {"income_stream_id": getattr(record, "income_stream_id", None), "income_type": record.income_type, "tax_treatment": record.tax_treatment,
             "source_name": record.source_name, "gross_minor": record.gross_minor,
             "tax_deducted_minor": record.tax_deducted_minor,
             "adjustment_minor": record.adjustment_minor, "adjustment_notes": record.adjustment_notes,
             "net_received_minor": transaction.amount_minor, "currency": transaction.currency,
             "recorded_currency": record.recorded_currency, "needs_review": record.needs_review,
             "updated_at": record.updated_at.astimezone(timezone.utc).isoformat()}
+
+
+def save_income(transaction, values):
+    """Shared API/form save: reconcile the deposit and reopen owner confirmation."""
+    from models import TransactionIncome
+    from services.transactions.classification import classification_details
+
+    if transaction.direction != "IN" or classification_details(transaction)["type"] != "income":
+        raise BadRequest("Income details require an incoming transaction classified as income.")
+    validate_reconciliation(values, transaction.amount_minor)
+    values = dict(values, recorded_currency=transaction.currency, needs_review=False)
+    if transaction.income is None:
+        transaction.income = TransactionIncome(**values)
+    else:
+        for field, value in values.items():
+            setattr(transaction.income, field, value)
+    transaction.confirmed_at = None
