@@ -178,6 +178,7 @@ class IncomeFormTests(SavedTransactionTestCase):
     def stream_post(self, **data):
         html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
         if data.get('action') in ('create', 'update'):
+            data.setdefault('forecast_tax_year', '2026-27')
             data.setdefault('expected_gross', '30000.00')
             data.setdefault('expected_gross_period', 'yearly')
             data.setdefault('expected_gross_currency', 'GBP')
@@ -274,7 +275,7 @@ class IncomeFormTests(SavedTransactionTestCase):
         self.assertEqual(annual_gross(stream), 2400000)
         self.assertEqual(self.payment().income.gross_minor, 3000)
         html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
-        self.assertIn('GBP 24,000.00 per year', html)
+        self.assertIn('GBP 24,000.00 for 2026-27', html)
         self.assertIn('value="4.00"', html)
         self.assertEqual(self.stream_post(action='create', name='Holiday business', kind='self_employed',
             expected_gross='500', expected_gross_period='weekly', unpaid_holiday='2.5').status_code, 303)
@@ -370,3 +371,77 @@ class IncomeFormTests(SavedTransactionTestCase):
             ('csrf_token', token), ('action', 'archive'), ('stream_id', self.stream), ('stream_id', str(uuid4()))])).status_code, 400)
         self.assertEqual(self.stream_post(action='archive', stream_id="' OR 1=1 --").status_code, 400)
         self.assertFalse(self.session.get(IncomeStream, self.stream).archived)
+
+    def test_part_year_forecasts_clip_dates_and_keep_inclusive_boundaries(self):
+        from datetime import date
+        from types import SimpleNamespace
+        from services.transactions.income_streams import annual_gross, active_days
+        for starts, ends, days, expected in (
+            (None, None, 365, 3650000),
+            (date(2026, 10, 6), None, 182, 1820000),
+            (date(2026, 4, 6), date(2026, 4, 6), 1, 10000),
+            (date(2027, 4, 5), date(2027, 4, 5), 1, 10000),
+            (date(2025, 1, 1), date(2028, 1, 1), 365, 3650000),
+            (date(2025, 1, 1), date(2026, 4, 5), 0, 0),
+            (date(2027, 4, 6), None, 0, 0)):
+            with self.subTest(starts=starts, ends=ends):
+                stream = SimpleNamespace(expected_gross_minor=3650000, expected_gross_period='yearly',
+                    forecast_tax_year='2026-27', forecast_starts_on=starts, forecast_ends_on=ends, unpaid_holiday_weeks=0)
+                self.assertEqual(active_days(stream), (days, 365))
+                self.assertEqual(annual_gross(stream), expected)
+
+        for period, amount, expected in (('weekly', 36500, 946400), ('monthly', 36500, 218400), ('yearly', 3650000, 1820000)):
+            stream = SimpleNamespace(expected_gross_minor=amount, expected_gross_period=period,
+                forecast_tax_year='2026-27', forecast_starts_on=date(2026, 10, 6), forecast_ends_on=None, unpaid_holiday_weeks=0)
+            self.assertEqual(annual_gross(stream), expected)
+
+    def test_dates_persist_and_update_forecast_without_changing_payments(self):
+        from datetime import date
+        from services.transactions.income_streams import annual_gross
+        self.assertEqual(self.submit().status_code, 303)
+        response = self.stream_post(action='update', stream_id=self.stream, name='My job', kind='employed',
+            expected_gross='500', expected_gross_period='weekly', forecast_starts_on='2026-10-06',
+            forecast_ends_on='2027-04-05', unpaid_holiday='4')
+        self.assertEqual(response.status_code, 303)
+        self.session.expire_all()
+        stream = self.session.get(IncomeStream, self.stream)
+        self.assertEqual(stream.forecast_starts_on, date(2026, 10, 6))
+        self.assertEqual(stream.forecast_ends_on, date(2027, 4, 5))
+        self.assertEqual(stream.forecast_tax_year, '2026-27')
+        self.assertEqual(annual_gross(stream), 1096438)
+        self.assertEqual(self.payment().income.gross_minor, 3000)
+        html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
+        self.assertIn('GBP 10,964.38 for 2026-27', html)
+        self.assertIn('value="2026-10-06"', html)
+        self.assertIn('182 active days', html)
+        self.bank.assert_not_called()
+
+    def test_invalid_year_dates_and_excess_part_year_absence_are_rejected(self):
+        for values in ({'forecast_tax_year': '2025-26'}, {'forecast_tax_year': ''},
+                       {'forecast_starts_on': '2026-02-29'}, {'forecast_starts_on': '2026-W15-1'},
+                       {'forecast_starts_on': '2027-02-01', 'forecast_ends_on': '2026-10-06'},
+                       {'forecast_starts_on': '2027-04-05', 'unpaid_holiday': '1'},
+                       {'forecast_starts_on': '2027-04-06', 'unpaid_holiday': '0.01'}):
+            with self.subTest(values=values):
+                self.assertEqual(self.stream_post(action='create', name='Invalid dates', kind='employed', **values).status_code, 400)
+        self.assertIsNone(self.session.scalar(select(IncomeStream).where(IncomeStream.name == 'Invalid dates')))
+        response = self.stream_post(action='update', stream_id=self.stream, name='My job', kind='employed',
+                                   forecast_starts_on='2027-02-01', forecast_ends_on='2026-10-06')
+        self.assertIn('value="2027-02-01"', response.get_data(as_text=True))
+        self.session.expire_all()
+        self.assertIsNone(self.session.get(IncomeStream, self.stream).forecast_starts_on)
+
+    def test_database_rejects_unsupported_year_and_reversed_forecast_dates(self):
+        from datetime import date
+        from sqlalchemy.exc import IntegrityError
+        for fields in ({'forecast_tax_year': '2025-26'},
+                       {'forecast_starts_on': date(2027, 1, 1), 'forecast_ends_on': date(2026, 1, 1)}):
+            with self.assertRaises(IntegrityError):
+                with self.session.begin_nested():
+                    stream = self.session.get(IncomeStream, self.stream)
+                    for key, value in fields.items():
+                        setattr(stream, key, value)
+                    self.session.flush()
+            self.session.expire_all()
+        self.assertEqual(self.session.get(IncomeStream, self.stream).forecast_tax_year, '2026-27')
+        self.assertIsNone(self.session.get(IncomeStream, self.stream).forecast_starts_on)

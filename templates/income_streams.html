@@ -24,8 +24,8 @@
             <select id="stream-kind" name="kind" required><option value="">Choose a type</option>
                 {% for key, label in stream_kinds.items() %}<option value="{{ key }}" {{ 'selected' if create_values.kind == key else '' }}>{{ label }}</option>{% endfor %}
             </select>
-            {{ forecast_fields('stream', create_values, forecast_periods, forecast_currencies) }}
-            <p class="secondary">A planning estimate: weekly × 52 or monthly × 12, reduced for unpaid holiday or absence. Update it if your income changes.</p>
+            {{ forecast_fields('stream', create_values, forecast_periods, forecast_currencies, tax_years) }}
+            <p class="secondary">Enter normal weekly/monthly pay or a full-year salary. We prorate it by active calendar days within the tax year, then subtract unpaid absence. Update it if your income changes.</p>
             <button name="action" value="create">Create stream</button>
         </form>
     </section>
@@ -36,14 +36,15 @@
             <div><a href="{{ url_for('dashboard.income_streams', stream=stream.id) }}"{% if selected_stream == stream.id %} aria-current="page"{% endif %}><strong>{{ stream.name }}</strong></a>
                 <p class="secondary">{{ stream_kinds[stream.kind] }} · {{ counts.get(stream.id, 0) }} payments{{ ' · Archived' if stream.archived else '' }}</p></div>
             {% if stream.expected_gross_minor is not none %}
-            <p class="secondary">Expected gross: {{ format_amount(stream.expected_gross_minor, stream.expected_gross_currency) }} {{ stream.expected_gross_period }} · {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} per year after {{ holiday_amount(stream) }} {{ stream.unpaid_holiday_unit }} unpaid holiday / absence</p>
+            <p class="secondary">Expected gross: {{ format_amount(stream.expected_gross_minor, stream.expected_gross_currency) }} {{ stream.expected_gross_period }} · {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} for {{ stream.forecast_tax_year }} after {{ holiday_amount(stream) }} {{ stream.unpaid_holiday_unit }} unpaid holiday / absence</p>
             {% else %}<p class="secondary">Expected gross income not set.</p>{% endif %}
+            <p class="secondary">{{ stream.forecast_tax_year }} · {{ stream.forecast_starts_on or 'Tax-year start' }} to {{ stream.forecast_ends_on or 'Tax-year end' }} · {{ active_days(stream)[0] }} active days in the tax year</p>
             <details{% if editing_id == stream.id and error %} open{% endif %}><summary>Manage</summary>
                 <form class="login-form" method="post">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="stream_id" value="{{ stream.id }}"><input type="hidden" name="kind" value="{{ stream.kind }}">
                     <label for="rename-{{ stream.id }}">Name</label><input id="rename-{{ stream.id }}" name="name" value="{{ editing_values.name if editing_id == stream.id and error else stream.name }}" maxlength="200" required>
-                    {% set forecast_values = editing_values if editing_id == stream.id and error else dict(expected_gross=display_amount(stream.expected_gross_minor, stream.expected_gross_currency), expected_gross_period=stream.expected_gross_period or 'yearly', expected_gross_currency=stream.expected_gross_currency or 'GBP', unpaid_holiday=holiday_amount(stream), unpaid_holiday_unit=stream.unpaid_holiday_unit) %}
-                    {{ forecast_fields('forecast-' ~ stream.id, forecast_values, forecast_periods, forecast_currencies) }}
+                    {% set forecast_values = editing_values if editing_id == stream.id and error else dict(expected_gross=display_amount(stream.expected_gross_minor, stream.expected_gross_currency), expected_gross_period=stream.expected_gross_period or 'yearly', expected_gross_currency=stream.expected_gross_currency or 'GBP', unpaid_holiday=holiday_amount(stream), unpaid_holiday_unit=stream.unpaid_holiday_unit, forecast_tax_year=stream.forecast_tax_year, forecast_starts_on=stream.forecast_starts_on or '', forecast_ends_on=stream.forecast_ends_on or '') %}
+                    {{ forecast_fields('forecast-' ~ stream.id, forecast_values, forecast_periods, forecast_currencies, tax_years) }}
                     <button name="action" value="update">Save changes</button>
                     <button name="action" value="{{ 'restore' if stream.archived else 'archive' }}" formnovalidate>{{ 'Restore' if stream.archived else 'Archive' }}</button>
                 </form>

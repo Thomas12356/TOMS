@@ -1,6 +1,6 @@
 # Security checks — 6 October 2026
 
-The full suite passed: **236 tests**, with PostgreSQL checks enabled. This
+The full suite passed: **240 tests**, with PostgreSQL checks enabled. This
 includes **24 adversarial tests** in `tests/test_security.py`, plus the
 existing login, API protection, request-boundary and bank-client tests.
 Ten classification-form tests also cover saves, automatic reset, income
@@ -287,7 +287,7 @@ allowance rules are checked automatically; no completed tax calculation is claim
 
 ## Security review and regression tests — 6 October 2026
 
-The complete PostgreSQL-enabled suite passes **236 tests** (13 new regressions).
+The complete PostgreSQL-enabled suite passes **240 tests** (13 new regressions).
 The dashboard, review popup, income/stream forms and Tax rules Chromium scripts
 all pass at their configured mobile and desktop widths. Tests use synthetic,
 rollback-only transactions or disposable schemas, and block bank requests.
@@ -325,3 +325,16 @@ and separate migration credentials. This review did not change database roles.
 Current configuration has Secure/HttpOnly/SameSite=Lax cookies, a sufficiently
 long signing key and debug disabled. Tailnet HTTPS configuration and the live
 owner login were not externally penetration-tested.
+
+## Part-year forecast checks — 6 October 2026
+
+The PostgreSQL-enabled suite passes 240 tests. Four new tests cover inclusive
+boundaries, full-year preservation, outside-year overlap and zero income,
+weekly/monthly/yearly estimates, absence deducted within an active window,
+date persistence/prefilling, unchanged saved payments, unsupported years,
+invalid dates, reversed dates, excessive absence and retained invalid inputs.
+PostgreSQL constraints independently reject invalid years and reversed dates.
+
+Chromium income/streams and tax-page checks pass on mobile and desktop, including
+submission of selected tax year and date fields. Ruff checks pass and Bandit
+reports no application findings. No dependencies or authentication settings changed.

@@ -1054,3 +1054,25 @@ It is enabled on the current development machine. Run a check manually with
 
 Official sources: [HMRC published rates](https://www.gov.uk/income-tax-rates) and
 [rates after allowances](https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past).
+
+## Part-year income forecasts
+
+Stream creation and **Manage** now include a **Tax year**, **Start date** and
+**End date**. The first supported year is **2026–27**, from 6 April 2026 to
+5 April 2027. Blank dates mean the boundaries of that tax year. Dates can extend
+outside the year: only the overlap contributes to its forecast. Start and end
+are inclusive, and an end before a start is rejected.
+
+Enter normal weekly/monthly pay or a full-year salary. The forecast keeps the
+52-week/12-month annual rate and prorates it by active calendar days divided by
+the 365 days in this tax year. Unpaid holiday/absence is then subtracted for the
+active dates, rather than prorated again. Absence cannot exceed the active period.
+For example, £500 weekly from 6 October 2026 to 5 April 2027 with four unpaid
+weeks estimates £10,964.38 for 2026–27. This assumes a steady income rate and is
+an estimate, not a payroll calculation. Recorded payments are unchanged.
+
+Migration `013_income_stream_tax_year_dates.sql` places existing forecasts in
+2026–27 with blank dates, preserving their previous full-year estimates. Apply
+it with `.venv/bin/flask db-upgrade` when updating another installation. Only
+this supported year is selectable; retaining separate forecasts for multiple
+years will be needed when support for another tax year is added.

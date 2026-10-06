@@ -1,4 +1,12 @@
-{% macro forecast_fields(prefix, values, periods, currencies) %}
+{% macro forecast_fields(prefix, values, periods, currencies, years) %}
+<label for="{{ prefix }}-year">Tax year</label>
+<select id="{{ prefix }}-year" name="forecast_tax_year" required>
+    {% for year, dates in years.items() %}<option value="{{ year }}" {{ 'selected' if values.forecast_tax_year == year else '' }}>{{ year }} · 6 April – 5 April</option>{% endfor %}
+</select>
+<label for="{{ prefix }}-starts">Start date <span class="secondary">Optional; blank means the start of the tax year</span></label>
+<input id="{{ prefix }}-starts" name="forecast_starts_on" type="date" value="{{ values.forecast_starts_on }}">
+<label for="{{ prefix }}-ends">End date <span class="secondary">Optional; blank means the end of the tax year</span></label>
+<input id="{{ prefix }}-ends" name="forecast_ends_on" type="date" value="{{ values.forecast_ends_on }}">
 <label for="{{ prefix }}-period">Income period</label>
 <select id="{{ prefix }}-period" name="expected_gross_period" required><option value="">Choose a period</option>
     {% for key, label in periods.items() %}<option value="{{ key }}" {{ 'selected' if values.expected_gross_period == key else '' }}>{{ label }}</option>{% endfor %}
@@ -14,8 +22,8 @@
     <option value="weeks" {{ 'selected' if values.unpaid_holiday_unit == 'weeks' else '' }}>Weeks</option>
     <option value="days" {{ 'selected' if values.unpaid_holiday_unit == 'days' else '' }}>Days</option>
 </select>
-<label for="{{ prefix }}-holiday">Unpaid holiday / absence per year</label>
+<label for="{{ prefix }}-holiday">Unpaid holiday / absence during these dates</label>
 <input id="{{ prefix }}-holiday" name="unpaid_holiday" value="{{ values.unpaid_holiday }}" type="number" min="0" max="260" step="0.01" inputmode="decimal" placeholder="0">
 <p class="secondary">Days are working days, using 5 days per week. Maximum 52 weeks or 260 days.</p>
-<p class="secondary">Only include time off without income. Paid holiday does not reduce the estimate. If your income figure already includes unpaid time off, enter 0 to avoid subtracting it twice.</p>
+<p class="secondary">Enter planned unpaid time off within the active dates of the selected tax year. Paid holiday does not reduce the estimate. If your income figure already includes unpaid time off, enter 0 to avoid subtracting it twice.</p>
 {% endmacro %}
