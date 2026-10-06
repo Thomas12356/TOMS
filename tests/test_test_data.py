@@ -18,7 +18,7 @@ from werkzeug.datastructures import MultiDict
 from werkzeug.security import generate_password_hash
 
 from app import app
-from models import Account, BrowserSession, Category, IncomeStream, OwnerLogin, Transaction
+from models import Account, BrowserSession, Category, IncomeStream, MileageEntry, OwnerLogin, Transaction
 from services.banking.client import StarlingError, starling_request
 from services.database.connection import db
 from services.database.migration_connection import migration_engine
@@ -257,3 +257,81 @@ class TestDataTests(unittest.TestCase):
             self.assertEqual(connection.scalar(text(f'SELECT count(*) FROM {self.demo_schema}.transactions')), 7)
             self.assertEqual(connection.scalar(text(f'SELECT count(*) FROM {self.demo_schema}.income_streams')), 3)
             self.assertIsNone(connection.scalar(text('SELECT to_regclass(:table)'), {'table': self.demo_schema + '.owner_login'}))
+
+
+    def test_sample_payroll_reconciles_and_overtime_is_counted_once(self):
+        self.toggle(True)
+        with self.admin.connect() as connection:
+            rows = connection.execute(text(f"""SELECT t.amount_minor, i.gross_minor,
+                i.tax_deducted_minor, i.adjustment_minor FROM {self.demo_schema}.transaction_income i
+                JOIN {self.demo_schema}.transactions t USING (account_uid, category_uid, feed_item_uid)""")).all()
+            self.assertEqual(len(rows), 3)
+            for net, gross, tax, adjustment in rows:
+                self.assertEqual(net, gross - tax + adjustment)
+            self.assertEqual(connection.scalar(text(f'SELECT count(*) FROM {self.demo_schema}.income_shifts WHERE is_overtime')), 1)
+        self.assertTrue('GBP 70,000.00' in self.client.get('/dashboard/tax-estimate').get_data(as_text=True))
+        path = f'/dashboard/income-streams/{sample_id(21)}/shifts'
+        self.assertTrue('Sample overtime' in self.client.get(path).get_data(as_text=True))
+        self.toggle(False)
+        self.toggle(True)
+        with self.admin.connect() as connection:
+            self.assertEqual(connection.scalar(text(f'SELECT count(*) FROM {self.demo_schema}.income_shifts')), 1)
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.income_shifts'), 0)
+        self.bank.assert_not_called()
+
+    def test_demo_mileage_relationship_preserves_real_pool_and_rejects_stale_form(self):
+        original = self.live_value('SELECT mileage_pool_id FROM SCHEMA.income_streams LIMIT 1')
+        self.toggle(True)
+        fields = dict(action='update', stream_id=sample_id(22), name='Demo freelance work', kind='self_employed',
+            income_mode='forecast', expected_gross='20000', expected_gross_period='yearly',
+            expected_gross_currency='GBP', forecast_tax_year='2026-27', mileage_with_stream=sample_id(23),
+            csrf_token=self.csrf(path='/dashboard/income-streams'))
+        self.assertEqual(self.client.post('/dashboard/income-streams', data=fields).status_code, 303)
+        with self.admin.connect() as connection:
+            pools = connection.execute(text(f'SELECT mileage_pool_id FROM {self.demo_schema}.income_streams WHERE kind != :kind'), {'kind': 'employed'}).scalars().all()
+            self.assertEqual(len(set(pools)), 1)
+        self.toggle(False)
+        self.assertEqual(self.client.post('/dashboard/income-streams', data=fields).status_code, 400)
+        self.assertEqual(self.live_value('SELECT mileage_pool_id FROM SCHEMA.income_streams LIMIT 1'), original)
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.mileage_entries'), 0)
+        self.bank.assert_not_called()
+
+    def test_sample_overtime_write_isolated_and_old_form_rejected_after_switch(self):
+        self.toggle(True)
+        path = f'/dashboard/income-streams/{sample_id(21)}/shifts'
+        fields = dict(action='create', shift_id=str(uuid4()), income_mode='forecast',
+            starts_at='2026-04-11T09:00', ends_at='2026-04-11T11:00', unpaid_break_minutes='0',
+            payment_mode='total', total_payment='100', hourly_rate='', notes='Extra sample overtime',
+            csrf_token=self.csrf(path=path))
+        self.assertEqual(self.client.post(path, data=fields).status_code, 303)
+        self.assertTrue('GBP 70,100.00' in self.client.get('/dashboard/tax-estimate').get_data(as_text=True))
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.income_shifts'), 0)
+        self.toggle(False)
+        self.assertEqual(self.client.post(path, data=fields).status_code, 400)
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.income_shifts'), 0)
+        self.bank.assert_not_called()
+
+
+    def test_demo_mileage_shares_band_across_streams_without_real_writes(self):
+        from services.tax.mileage import mileage_allowances
+        self.toggle(True)
+        values = dict(action='update', stream_id=sample_id(23), name='Demo CIS work', kind='cis',
+            income_mode='forecast', expected_gross='10000', expected_gross_period='yearly',
+            expected_gross_currency='GBP', forecast_tax_year='2026-27', mileage_with_stream=sample_id(22),
+            csrf_token=self.csrf(path='/dashboard/income-streams'))
+        self.assertEqual(self.client.post('/dashboard/income-streams', data=values).status_code, 303)
+        for stream, miles, day in ((22, '8000', '2026-04-10'), (23, '4000', '2026-04-11')):
+            values = dict(action='save_mileage', entry_id=str(uuid4()), stream_id=sample_id(stream),
+                journey_date=day, location='england', vehicle_type='car_van', vehicle_key='DEMO CAR',
+                miles=miles, purpose='Synthetic accumulated mileage for testing the annual band',
+                start_postcode='SW1A 1AA', end_postcode='SW1A 2AA', reimbursed='0', eligible='1',
+                csrf_token=self.csrf(path='/dashboard/deductions'))
+            self.assertEqual(self.client.post('/dashboard/deductions', data=values).status_code, 303)
+        with app.test_request_context('/dashboard'):
+            g.use_test_data = True
+            entries = db.session.scalars(db.select(MileageEntry)).all()
+            self.assertEqual(mileage_allowances(entries), {sample_id(22): 440000, sample_id(23): 160000})
+        db.session.remove()
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.mileage_entries'), 0)
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.expense_deductions'), 0)
+        self.bank.assert_not_called()

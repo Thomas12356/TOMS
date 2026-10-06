@@ -1228,6 +1228,12 @@ its tables with the maintenance login; regular requests use the restricted app
 login for sample data as well. Restart Flask after updating. Sample data is
 seeded on the first authenticated switch-on, not copied from real records.
 
+Fresh sample data includes a £39,800 employment forecast and an eight-hour
+overtime shift at £25/hour, giving £40,000 for that stream and £70,000 across
+all three sample streams. Existing sample datasets keep your edits; this example
+is added only when seeding a fresh dataset. You can create shifts, link deductions
+and connect related mileage streams using the same forms as real mode.
+
 ## Irregular work and shifts
 
 In **Income streams**, choose **Individual shifts · variable hours / pay** as the

@@ -546,3 +546,25 @@ identifiers until the owner selects their business/employer relationship. This
 is a declared relationship, not an inference from names, vehicles or bank
 payments. Related employment must meet HMRC's associated-employment rules;
 employment cannot combine with a self-employed/CIS business.
+
+
+## Sample-data checks after stream mileage relationships
+
+Four additional PostgreSQL tests verify that sample payroll net amounts reconcile
+with recorded gross, tax and adjustments; seeded overtime is counted once and
+survives repeated mode changes; overtime writes and business relationships remain
+in the sample schema even when real records use the same IDs; and stale forms
+cannot write into real data after switching mode. Sample mileage entered through
+the owner forms crosses the shared 10,000-mile band across freelance and CIS
+streams: 8,000 miles receives £4,400 and the next 4,000 receives £1,600 under the
+reviewed 2026–27 rules. Bank requests remain forbidden throughout these tests.
+
+Fresh sample datasets include an overtime example without changing the £70,000
+combined forecast. Existing sample edits are preserved rather than overwritten.
+
+Verification: all **333 backend tests** pass with PostgreSQL enabled. All five
+Chromium checks pass, covering live sample workflows, income/rules pages, tax
+estimate states, transaction review and dashboard layouts. Ruff and Bandit pass;
+the installed-dependency audit reports no known vulnerabilities in 20 packages.
+These checks cover the application; they do not verify deployment firewall or
+tailnet access policies.
