@@ -252,6 +252,21 @@ class ShiftPageTests(DeductionOwnerCase):
             self.assertTrue(f'value="{self.stream}" selected' in html)
         self.assertEqual(self.client.get('/dashboard/deductions?shift=bad').status_code,400)
 
+    def test_mileage_suggestions_use_local_shift_date_and_preserve_submitted_edits(self):
+        identity = str(uuid4())
+        self.assertEqual(self.post_shift(identity=identity, starts_at='2026-10-05T23:30',
+            ends_at='2026-10-06T01:00', notes='Client delivery').status_code, 303)
+        html = self.client.get('/dashboard/deductions?type=mileage&shift=' + identity).get_data(as_text=True)
+        self.assertTrue('value="2026-10-05" required' in html)
+        self.assertTrue('Business travel for Test business: Client delivery</textarea>' in html)
+        response = self.mileage(shift_id=identity, journey_date='2026-04-10',
+            purpose='Actual journey to customer', miles='bad')
+        self.assertEqual(response.status_code, 400)
+        html = response.get_data(as_text=True)
+        self.assertTrue('value="2026-04-10" required' in html)
+        self.assertTrue('Actual journey to customer</textarea>' in html)
+        self.assertFalse('Business travel for Test business: Client delivery</textarea>' in html)
+
     def test_validation_preserves_input_and_stale_versions_rejected(self):
         response=self.post_shift(hourly_rate='oops')
         self.assertEqual(response.status_code,400)

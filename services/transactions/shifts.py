@@ -80,6 +80,15 @@ def shift_label(shift):
     return f'{start:%d %b %Y %H:%M} – {end:%d %b %H:%M}'
 
 
+def journey_defaults(shift, stream_name):
+    """Editable suggestions, never a claim that the travel itself qualifies."""
+    purpose = f'Business travel for {stream_name}'
+    if shift.notes:
+        purpose += f': {shift.notes}'
+    return dict(journey_date=shift.starts_at.astimezone(LOCAL_TIME).date().isoformat(),
+                purpose=purpose[:1000])
+
+
 def attach_shift_totals(streams):
     """One query: all work for shift mode, only overtime for regular forecasts."""
     selected = list(streams)
