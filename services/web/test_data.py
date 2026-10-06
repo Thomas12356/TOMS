@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from flask import g, request, session
 from flask_login import current_user
 
-from models import Account, Category, IncomeStream, Transaction, TransactionIncome, SyncRun
+from models import Account, Category, IncomeStream, IncomeShift, Transaction, TransactionIncome, SyncRun
 from services.database.connection import db
 from services.database.session import test_data_active
 
@@ -36,7 +36,7 @@ def ensure_sample_data():
     for number in (1, 2):
         db.session.add(Category(account_uid=sample_id(number), category_uid=sample_id(number + 10), kind='main'))
     db.session.add_all([
-        IncomeStream(id=sample_id(21), name='Demo employment', kind='employed', expected_gross_minor=4000000,
+        IncomeStream(id=sample_id(21), name='Demo employment', kind='employed', expected_gross_minor=3980000,
                      expected_gross_period='yearly', expected_gross_currency='GBP'),
         IncomeStream(id=sample_id(22), name='Demo freelance work', kind='self_employed', expected_gross_minor=2000000,
                      expected_gross_period='yearly', expected_gross_currency='GBP'),
@@ -44,6 +44,13 @@ def ensure_sample_data():
                      expected_gross_period='yearly', expected_gross_currency='GBP'),
     ])
     db.session.flush()
+    # The £200 overtime is additional to the £39,800 salary: £40,000 combined.
+    # Use a completed date in the reviewed year, not a future planned shift.
+    db.session.add(IncomeShift(id=sample_id(41), income_stream_id=sample_id(21),
+        starts_at=datetime(2026, 4, 10, 8, tzinfo=timezone.utc),
+        ends_at=datetime(2026, 4, 10, 16, tzinfo=timezone.utc),
+        payment_mode='hourly', hourly_rate_minor=2500, gross_minor=20000,
+        currency='GBP', is_overtime=True, notes='Sample overtime — test data only'))
     # A mix of income, spending, a pending payment and a savings transfer.
     examples = [(31, 1, 'IN', 280000, 'Demo employer', 'FASTER_PAYMENTS_IN', 'SETTLED', 0),
                 (32, 1, 'IN', 85000, 'Demo freelance client', 'FASTER_PAYMENTS_IN', 'SETTLED', 1),
