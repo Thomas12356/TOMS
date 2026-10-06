@@ -409,3 +409,25 @@ def income_streams():
                            display_amount=display_amount, format_amount=format_amount, annual_gross=annual_gross, holiday_amount=holiday_amount,
                            selected_name=names.get(selected_id, 'All income'), rows=rows, page=page,
                            current_user=current_user), 400 if error else 200
+
+
+@dashboard.route('/tax-rules', methods=['GET', 'POST'])
+def tax_rules():
+    """Show reviewed rules and their official-source verification status."""
+    from services.tax.rules import cached_status, reviewed_rules, refresh_rules, start_rule_check
+
+    if request.authorization is not None or not current_user.is_authenticated:
+        return redirect(url_for('login.sign_in'))
+    query_values(set())
+    if request.method == 'POST':
+        if set(request.form) - {'csrf_token'} or any(len(request.form.getlist(key)) != 1 for key in request.form):
+            raise BadRequest('Supply each form field once.')
+        try:
+            refresh_rules(current_app.instance_path, force=True)
+        except OSError:
+            raise BadRequest('Unable to save the rule check. Check the instance directory permissions.') from None
+        return redirect(url_for('dashboard.tax_rules'), code=303)
+    status = cached_status(current_app.instance_path)
+    start_rule_check(current_app.instance_path)
+    return render_template('tax_rules.html', rules=reviewed_rules(), status=status,
+                           format_amount=format_amount, current_user=current_user)

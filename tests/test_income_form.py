@@ -316,6 +316,22 @@ class IncomeFormTests(SavedTransactionTestCase):
         self.assertEqual(self.stream_post(action='create', name='Invalid unit', kind='employed',
                                          unpaid_holiday='1', unpaid_holiday_unit='hours').status_code, 400)
 
+    def test_tax_rules_page_login_csrf_and_source_check(self):
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as directory, patch.object(app, 'instance_path', directory), \
+             patch('services.tax.rules.start_rule_check') as start, patch('services.tax.rules.refresh_rules') as refresh:
+            response = self.client.get('/dashboard/tax-rules')
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('England, Wales and Northern Ireland', response.get_data(as_text=True))
+            start.assert_called_once_with(directory)
+            token = re.search(r'name="csrf_token" value="([^"]+)"', response.get_data(as_text=True))[1]
+            self.assertEqual(self.client.post('/dashboard/tax-rules', data={'csrf_token': token}).status_code, 303)
+            refresh.assert_called_once_with(directory, force=True)
+            self.assertEqual(self.client.post('/dashboard/tax-rules').status_code, 400)
+            self.assertEqual(self.client.get('/dashboard/tax-rules', headers=self.headers).status_code, 302)
+            with self.client.session_transaction() as cookie:
+                cookie.clear()
+            self.assertEqual(self.client.get('/dashboard/tax-rules').status_code, 302)
 
     def test_stale_income_form_cannot_save_old_amounts_in_new_currency(self):
         html = self.client.get(self.path()).get_data(as_text=True)
