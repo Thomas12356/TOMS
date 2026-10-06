@@ -79,7 +79,7 @@ with sync_playwright() as playwright:
                 route.abort()
         page.route('**/*', respond)
         page.goto('http://toms.test/dashboard')
-        page.wait_for_function("document.querySelector('#transaction-review').open")
+        page.wait_for_function("() => document.querySelector('#transaction-review').open")
         assert page.locator('#review-details img, #review-details script').count() == 0
         assert not page.evaluate('Boolean(window.injected)')
         box = page.locator('#transaction-review').bounding_box()
@@ -88,19 +88,19 @@ with sync_playwright() as playwright:
         assert not page.locator('#transaction-review').is_visible()
         assert state['remaining'] == 2 and not state['posted']
         page.locator('#review-open').click()
-        page.wait_for_function("document.querySelector('#transaction-review').open")
+        page.wait_for_function("() => document.querySelector('#transaction-review').open")
         page.keyboard.press('Escape')
         assert not page.locator('#transaction-review').is_visible()
         page.locator('#review-open').click()
-        page.wait_for_function("document.querySelector('#transaction-review').open")
+        page.wait_for_function("() => document.querySelector('#transaction-review').open")
 
         state['mode'] = 'conflict'
         page.locator('#review-confirm').click()
-        page.wait_for_function("document.querySelector('#review-error').textContent.includes('Details changed')")
+        page.wait_for_function("() => document.querySelector('#review-error').textContent.includes('Details changed')")
         assert page.locator('.is-unconfirmed').count() == 2 and state['remaining'] == 2
         state['mode'] = 'failure'
         page.locator('#review-confirm').click()
-        page.wait_for_function("document.querySelector('#review-error').textContent.includes('Unable to complete')")
+        page.wait_for_function("() => document.querySelector('#review-error').textContent.includes('Unable to complete')")
         assert not page.locator('#review-confirm').is_disabled()
         assert state['remaining'] == 2
 
@@ -108,7 +108,7 @@ with sync_playwright() as playwright:
             state['mode'] = mode
             with page.expect_request(lambda request: request.url.endswith('/confirm')):
                 page.locator('#review-confirm').click()
-            page.wait_for_function("!document.querySelector('#review-confirm').disabled")
+            page.wait_for_function("() => !document.querySelector('#review-confirm').disabled")
             assert page.locator('.is-confirmed').count() == 0 and state['remaining'] == 2
 
         # Hold the request open so closing cannot be undone by its eventual response.
@@ -126,32 +126,32 @@ with sync_playwright() as playwright:
         page.locator('#review-close').click()
         state['remaining'] -= 1
         state['held'].fulfill(json={'confirmed': True})
-        page.wait_for_function("document.querySelectorAll('.is-confirmed').length === 1")
-        page.wait_for_function("document.querySelector('#review-count').textContent.startsWith('1')")
+        page.wait_for_function("() => document.querySelectorAll('.is-confirmed').length === 1")
+        page.wait_for_function("() => document.querySelector('#review-count').textContent.startsWith('1')")
         assert not page.locator('#transaction-review').is_visible()
 
         # A saved confirmation with a failed next fetch must not reconfirm the old item.
         state['mode'] = 'normal'
         page.locator('#review-open').click()
-        page.wait_for_function("document.querySelector('#transaction-review').open")
+        page.wait_for_function("() => document.querySelector('#transaction-review').open")
         state['fail_load'] = True
         page.locator('#review-confirm').click()
-        page.wait_for_function("document.querySelector('#review-error').textContent.includes('Confirmation saved')")
+        page.wait_for_function("() => document.querySelector('#review-error').textContent.includes('Confirmation saved')")
         assert page.locator('#review-confirm').is_disabled()
         assert page.locator('#review-retry').is_visible()
         assert state['remaining'] == 0 and page.locator('.is-confirmed').count() == 2
         state['fail_load'] = False
         page.locator('#review-retry').click()
-        page.wait_for_function("!document.querySelector('#transaction-review').open")
+        page.wait_for_function("() => !document.querySelector('#transaction-review').open")
         assert not page.locator('#review-open').is_visible()
 
         # Empty and failed initial lists are handled without a usable stale confirmation.
         page.reload()
-        page.wait_for_function("document.querySelector('#review-open').hidden")
+        page.wait_for_function("() => document.querySelector('#review-open').hidden")
         assert not page.locator('#transaction-review').is_visible()
         state['fail_load'] = True
         page.reload()
-        page.wait_for_function("document.querySelector('#transaction-review').open")
+        page.wait_for_function("() => document.querySelector('#transaction-review').open")
         assert page.locator('#review-retry').is_visible() and page.locator('#review-confirm').is_disabled()
         assert not errors, errors
         print(f'PASS: {width}px dismissal, escaping, overflow, stale versions, failures, retries and duplicate clicks')

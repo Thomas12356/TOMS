@@ -73,7 +73,7 @@ with sync_playwright() as playwright:
                 route.abort()
         page.route('**/*', respond)
         page.goto('http://toms.test/dashboard')
-        page.wait_for_function("document.querySelector('#sync-now').disabled === false")
+        page.wait_for_function("() => document.querySelector('#sync-now').disabled === false")
         assert not state['posts'], 'Fresh data must not start an import'
         assert page.locator('.balance-card h3').inner_text() == 'Total balance · All accounts'
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), f'Horizontal overflow at {width}px'
@@ -104,33 +104,33 @@ with sync_playwright() as playwright:
         assert abs(footer['y'] + footer['height'] - 850) < 2
         with page.expect_response(lambda response: '/dashboard/sync?force=1' in response.url):
             page.locator('[data-sync-now]').first.click()
-        page.wait_for_function("document.querySelector('#sync-message').textContent === 'Up to date.'", timeout=10000)
+        page.wait_for_function("() => document.querySelector('#sync-message').textContent === 'Up to date.'", timeout=10000)
         assert any('force=1' in url for url in state['posts'])
         # A recent partial import must not hide an older full-sync timestamp.
         state.update(posts=[], synced=False, stale=True)
         with page.expect_response(lambda response: '/dashboard/sync?force=0' in response.url):
             page.reload()
-        page.wait_for_function("document.querySelector('#sync-message').textContent === 'Up to date.'", timeout=10000)
+        page.wait_for_function("() => document.querySelector('#sync-message').textContent === 'Up to date.'", timeout=10000)
         assert any('force=0' in url for url in state['posts'])
         assert not errors, errors
         if width == 390:
             state['review_remaining'] = 3
             page.reload()
             dialog = page.locator('#transaction-review')
-            page.wait_for_function("document.querySelector('#transaction-review').open")
+            page.wait_for_function("() => document.querySelector('#transaction-review').open")
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             page.keyboard.press('Escape')
             assert not dialog.is_visible() and state['review_remaining'] == 3
             assert page.locator('.is-unconfirmed').count() == 3
             page.locator('#review-open').click()
-            page.wait_for_function("document.querySelector('#transaction-review').open")
+            page.wait_for_function("() => document.querySelector('#transaction-review').open")
             for remaining in (2, 1, 0):
                 with page.expect_response(lambda response: response.url.endswith('/confirm')):
                     page.locator('#review-confirm').click()
                 if remaining:
                     page.wait_for_function('(count) => document.querySelector("#review-count").textContent.startsWith(String(count))', arg=remaining)
                 else:
-                    page.wait_for_function("!document.querySelector('#transaction-review').open")
+                    page.wait_for_function("() => !document.querySelector('#transaction-review').open")
             assert page.locator('.is-confirmed').count() == 3
             print('PASS: dismissible mobile popup, individual confirmation and persistent labels')
         print(f'PASS: {width}px layout, navigation, totals, tooltip, footer and sync flow')
