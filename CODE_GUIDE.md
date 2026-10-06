@@ -289,3 +289,11 @@ once to a minor unit. Form validation rejects absence exceeding the active time.
 The shared macro includes the year/date fields in both create and edit forms;
 invalid edits retain entered values. Financial records and confirmations are
 not changed by forecast edits.
+
+
+Database logins are separated in `services/database/connection.py` (runtime)
+and `services/database/migration_connection.py` (maintenance only). The owner-run
+`deployment/restrict_database.py` provisions roles once. Normal routes and sync
+must continue using `db.session`; never load migration credentials in a route.
+PostgreSQL concurrency fixtures use the migration login to create disposable
+schemas, then run their actual requests with the restricted runtime login.

@@ -21,6 +21,7 @@ from services.database.connection import check_database, db, init_database
 from models import (Account, BrowserSession, Category, OwnerLogin, OwnerSetup, Transaction,
                     TransactionClassification, TransactionIncome, SyncRun, SyncTarget)
 from services.database.migrations import upgrade_database
+from services.database.migration_connection import migration_engine
 from services.error_logging import log_failure
 from services.web.request_limits import BoundedRequest
 from services.web.setup import announce_setup, create_setup_token
@@ -109,8 +110,13 @@ def database_health():
 def db_upgrade():
     """Apply versioned transaction-storage migrations to the configured database."""
     try:
-        with db.engine.begin() as connection:
-            applied = upgrade_database(connection)
+        engine = migration_engine()
+        try:
+            with engine.begin() as connection:
+                applied = upgrade_database(connection)
+                connection.exec_driver_sql("REVOKE ALL ON TABLE toms.schema_migrations FROM PUBLIC, toms_app")
+        finally:
+            engine.dispose()
     except SQLAlchemyError as error:
         log_failure("migrations.database", error)
         raise click.ClickException("Database migration failed. Check PostgreSQL and PG settings.") from None

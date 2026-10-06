@@ -284,7 +284,7 @@ Configure it in `.env`:
 PGHOST=localhost
 PGPORT=5432
 PGDATABASE=TOMS
-PGUSER=postgres
+PGUSER=toms_app
 PGPASSWORD=
 ```
 
@@ -1076,3 +1076,43 @@ Migration `013_income_stream_tax_year_dates.sql` places existing forecasts in
 it with `.venv/bin/flask db-upgrade` when updating another installation. Only
 this supported year is selectable; retaining separate forecasts for multiple
 years will be needed when support for another tax year is added.
+
+
+## Separate database permissions
+
+Normal web requests, bank sync and background timers use `toms_app` from `.env`.
+It can select, insert, update and delete application records, but cannot alter
+application tables, create schemas or read migration records. It has no
+superuser, role-management, database-creation, replication or RLS-bypass powers.
+
+For a new installation or an existing installation still using its administrator
+login, first put that administrator's PostgreSQL connection details in `.env`,
+then run these commands from the repository root:
+
+```sh
+.venv/bin/python deployment/restrict_database.py
+.venv/bin/flask db-upgrade
+```
+
+The one-time provisioning script creates `toms_app` and `toms_migrator`, transfers
+only the `toms` schema and its tables to the migrator, switches `.env` to the
+restricted app login, and writes migration credentials to `.env.migrations`.
+Both credential files are private (0600) and ignored by Git. The script refuses
+to overwrite existing roles or an existing migration credentials file. It also
+removes PUBLIC's ability to create objects in this database's `public` schema.
+Run it only against the database dedicated to this application.
+
+Restart the running Flask server after provisioning so existing connections are
+replaced. Scheduled sync commands automatically use `.env` on their next run.
+For subsequent updates, run `.venv/bin/flask db-upgrade`: only that maintenance
+command reads `.env.migrations`, opens a separate connection and closes it
+when finished. Missing migration credentials cause a clear error; the command
+never falls back to the runtime login. The migrator is also not a superuser,
+but owns the application schema and can create schemas in the app database.
+Future tables created by that role inherit runtime DML grants; migration records
+are explicitly kept private.
+
+Keep `.env.migrations` out of a web-server deployment where migrations are run
+on a separate maintenance host. On a single personal host, both logins belong
+to the same OS user: PostgreSQL privileges contain SQL-level compromise, while
+full code execution as that OS user could still read the maintenance file.

@@ -1,3 +1,4 @@
+from services.database.migration_connection import migration_engine
 """Real concurrent requests in a disposable schema; no live records are modified."""
 import os
 import re
@@ -27,12 +28,17 @@ class ReviewConcurrencyTests(ApiTestCase):
         self.enterContext(app.app_context())
         self.enterContext(patch.dict(app.config, {'SECRET_KEY': 'a' * 64, 'SESSION_COOKIE_SECURE': False}))
         self.engine = db.engine
+        self.admin_engine = migration_engine()
+        self.addCleanup(self.admin_engine.dispose)
         self.schema = 'review_' + uuid4().hex
-        with self.engine.begin() as connection:
+        with self.admin_engine.begin() as connection:
             connection.execute(text(f'CREATE SCHEMA {self.schema}'))
         self.addCleanup(self.drop_schema)
         self.bound = self.engine.execution_options(schema_translate_map={'toms': self.schema})
-        db.metadata.create_all(self.bound)
+        db.metadata.create_all(self.admin_engine.execution_options(schema_translate_map={"toms": self.schema}))
+        with self.admin_engine.begin() as connection:
+            connection.execute(text(f"GRANT USAGE ON SCHEMA {self.schema} TO toms_app"))
+            connection.execute(text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {self.schema} TO toms_app"))
         self.sessions = scoped_session(sessionmaker(bind=self.bound))
         self.addCleanup(self.sessions.remove)
         self.enterContext(patch.object(db, 'session', self.sessions))
@@ -61,7 +67,7 @@ class ReviewConcurrencyTests(ApiTestCase):
             self.clients.append((client, csrf, record))
 
     def drop_schema(self):
-        with self.engine.begin() as connection:
+        with self.admin_engine.begin() as connection:
             connection.execute(text(f'DROP SCHEMA {self.schema} CASCADE'))
 
     def submit(self, index):
