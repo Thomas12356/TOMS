@@ -1167,7 +1167,22 @@ Open **Deductions** in the navigation and select **Expense** or **Mileage** to s
 
 Manually log completed journeys with date, stream, UK location, vehicle, business miles, purpose and start/end postcodes. For 2026–27, HMRC's rates are **55p for the first 10,000 car/van miles, then 25p; motorcycles 24p; employee bicycles 20p**. Self-employed/CIS bicycles and company vehicles are not supported. The scheme covers the UK, including Scotland, but Scottish income tax is not calculated by the England/Wales/NI estimate.
 
-The car/van band is shared across vehicles in the same trade or employment. Each stream defaults to one trade/job. Enter a consistent shared group on every journey for streams that belong to the same trade or associated employments. Independent employments have separate bands. Employee reimbursements offset the total approved mileage amount for that group/vehicle type across the year, preventing per-journey overpayments from inflating relief. Business reimbursements should be logged as business income instead.
+The car/van band is shared across vehicles and income sources within the same
+business or associated employment. In **Income streams**, set **Business /
+employer for this income** once: choose **A separate business or employer**, or
+select an existing related stream. Every journey then uses that relationship
+automatically; there is no group field on the mileage form. Unrelated employers
+stay separate. Only link employments that share an employer or meet HMRC's
+associated-employment rules; matching vehicle registrations do not link jobs.
+
+The stream card shows which other streams share its mileage. Linking or
+separating a stream recalculates its existing journeys immediately, so check the
+updated tax estimate. Changing one stream moves only that stream, not everyone
+previously connected to it. Archiving retains its relationship and recorded
+miles. Employment and self-employed/CIS mileage cannot be linked together.
+Employee reimbursements offset the combined approved annual amount for related
+streams and that vehicle type, with relief allocated back to the original
+streams; business reimbursements are recorded as income.
 
 Mileage replaces qualifying vehicle purchase/running costs; the app rejects concurrent mileage and actual vehicle-cost claims for the same vehicle. Parking and tolls may be entered separately. Confirm that no incompatible prior-year capital allowances or acquisition claims exist, and keep the mileage method for the vehicle's business life. Exclude ordinary commuting and private travel. Records reduce forecast taxable earnings; they are not a pound-for-pound tax credit. Future expenses are not estimated. Do not subtract these expenses in expected gross income as well.
 
@@ -1270,3 +1285,21 @@ reload to see the current page and meaning.
 
 Migration `018_overtime.sql` preserves existing shifts as ordinary work records.
 Run `.venv/bin/flask db-upgrade` then restart Flask when updating an installation.
+
+## Business / employer relationships
+
+For example, two courier client streams within the same business can share a
+10,000-mile car/van band: 8,000 plus 4,000 miles gives 10,000 miles at the higher
+rate and 2,000 at the lower rate. Two unrelated employers retain separate bands.
+Choose an existing related stream when creating a source, or open **Edit stream
+settings** later. The form only offers compatible types; the server validates
+that choice independently. This setting affects mileage, not salary forecasts,
+bank payments, PAYE/CIS credits or the ownership of linked expenses.
+
+Migration 019 removes the old per-journey field and protects installations with
+nonempty legacy groups. Migration 020 gives existing streams separate mileage
+identifiers until you select their relationships. Run `.venv/bin/flask
+db-upgrade` and restart Flask when updating another installation. Sample tables
+are rebuilt by migrations; real journeys are preserved.
+
+Employment rules: [HMRC associated employments](https://www.gov.uk/hmrc-internal-manuals/employment-income-manual/eim31280).

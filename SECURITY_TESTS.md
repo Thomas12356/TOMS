@@ -509,3 +509,40 @@ local settings; it does not audit tailnet ACLs, firewall rules or a deployed pro
 The user workflow is now near the top of README.md. Clear overtime wording and
 Edit stream settings help, but a guided checklist would further reduce the
 learning curve around forecasts versus receipts and credits versus deductions.
+
+## Mileage groups removed — 6 October 2026
+
+Mileage now uses one income stream per business or employer; grouping across
+streams is no longer supported. The form, validator, calculator and model no
+longer accept the group field. Migration 019 refuses to remove nonempty groups
+on other installations, protecting their existing calculations. Locally there
+were no grouped journeys. A rollback-only migration probe verifies that grouped
+rows block the upgrade and ordinary journeys are preserved.
+
+The full PostgreSQL suite passes 322 tests, including the mileage suggestion
+regression. Chromium demo workflows pass at 320, 390 and 1280px with the group
+field absent; Ruff F and diff checks pass. Repeat upgrade is a no-op.
+
+## Stream business / employer relationships — 6 October 2026
+
+The full PostgreSQL suite passes **329 tests**. Seven new owner-route tests
+cover historical 8,000 + 4,000-mile thresholds shared across self-employed/CIS
+sources, employment reimbursement offsets, creation into an existing pool,
+chained selection, moving one member, archived members and separate vehicle
+types. Invalid, unknown, self-referencing, cross-scheme and duplicate selections
+are rejected; raw pool IDs are not accepted. CSRF and bearer/browser boundaries
+remain enforced. Shared advisory locking coordinates settings with mileage
+writes; row locks refresh current state before copying a pool identifier.
+
+Chromium passes creation, compatible-choice filtering, prefilled settings,
+shared threshold totals and separation/recalculation at 320, 390 and 1280px.
+Those workflows also check overtime, shifts, linked deductions and real/demo
+isolation. Existing income/rules layout checks pass at four widths. Ruff F,
+Bandit and whitespace checks pass. Migration 020 is applied through the
+maintenance login and repeat upgrade is a no-op.
+
+Per-journey group fields remain absent. Existing streams get independent pool
+identifiers until the owner selects their business/employer relationship. This
+is a declared relationship, not an inference from names, vehicles or bank
+payments. Related employment must meet HMRC's associated-employment rules;
+employment cannot combine with a self-employed/CIS business.
