@@ -60,6 +60,18 @@ class SecurityBoundaryTests(ApiTestCase):
                 mocked.assert_not_called()
         self.assertGreater(len(calls), 100)
 
+    def test_browser_security_policy_also_covers_errors_and_static_files(self):
+        for path in ('/login', '/does-not-exist', '/static/css/dashboard.css'):
+            response = self.client.get(path)
+            policy = response.headers['Content-Security-Policy']
+            for directive in ("script-src 'self'", "base-uri 'none'", "frame-ancestors 'none'", "form-action 'self'", "object-src 'none'"):
+                self.assertIn(directive, policy)
+            self.assertNotIn('unsafe-inline', policy)
+            self.assertNotIn('unsafe-eval', policy)
+            self.assertEqual(response.headers['X-Content-Type-Options'], 'nosniff')
+            self.assertEqual(response.headers['Permissions-Policy'], 'camera=(), microphone=(), geolocation=()')
+            response.close()
+
     def test_browser_cached_basic_credentials_cannot_authorize_state_changes(self):
         basic = "Basic " + base64.b64encode(b"api:test-key").decode()
         with patch.object(db.session, "execute") as execute:
