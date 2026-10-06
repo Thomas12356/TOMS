@@ -1,6 +1,6 @@
 # Security checks — 6 October 2026
 
-The full suite passed: **264 tests**, with PostgreSQL checks enabled. This
+The full suite passed: **276 tests**, with PostgreSQL checks enabled. This
 includes **24 adversarial tests** in `tests/test_security.py`, plus the
 existing login, API protection, request-boundary and bank-client tests.
 Ten classification-form tests also cover saves, automatic reset, income
@@ -388,3 +388,124 @@ Self Assessment calculation. PAYE estimates assume a standard employment-only
 allowance; entered forecasts account for tax-code differences. NI, reliefs,
 expenses, trading allowance, payments on account and money already saved/paid
 directly remain outside scope and are labelled on the page.
+
+## Browser test-data mode — 6 October 2026
+
+The full PostgreSQL-enabled suite passes **276 tests** under the restricted app
+login. Twelve new tests run actual DataSession routing against two disposable
+schemas containing identical live/demo account, stream and transaction UUIDs.
+They verify sample seeding, switching back, classifications, confirmations,
+income details, stream creation and tax estimates without changing the live
+fixture; fixed balances and simulated sync without calling the bank/importer;
+real authentication/logout; per-browser selection and unaffected API/background
+bindings; and stale CSRF tokens being rejected after either direction of switch.
+
+Additional probes cover missing CSRF, anonymous/bearer attempts, invalid and
+duplicate toggle fields, fixed redirect destinations, idempotent and concurrent
+first seeding, absence of demo login tables, refused raw/mixed-auth queries, and
+bank/background-sync guards. PostgreSQL independently denies runtime ALTER on
+demo tables, preserving restricted-role permissions in both schemas.
+
+`tests/demo_browser_checks.py` starts a temporary loopback Flask server and runs
+Chromium at 320, 390 and 1280px through real POST/redirect/cookie workflows:
+switch on, close review, check demo balances, simulate sync, confirm one payment,
+view tax estimates, create a stream and switch back to unchanged live fixtures.
+All three widths pass. Existing ledger/sync/review, income/streams/tax-rules and
+five-state tax-estimate layout checks pass. No external bank calls or real owner
+records are used by these browser tests. Ruff F checks, Bandit application scan
+and diff checks pass. Migration 015 is applied locally and repeat upgrade is a
+no-op; test schema/table DDL remains confined to the maintenance login.
+
+Test mode is browser-local and intentionally does not stop scheduled real bank
+sync, change owner credentials or substitute fake HMRC rules. These boundaries
+are labelled on screen. Demo edits persist across toggles, are shared by test-mode
+browsers and are rebuilt when new migrations are applied. Sample tables contain
+synthetic records only; no real account data is copied into them.
+
+## Logged deductions and UK mileage — 6 October 2026
+
+The forecast no longer credits hypothetical PAYE/CIS amounts. Payment tax credits
+are filtered by UK tax-year midnight in Europe/London, settled status, GBP,
+current income classification, assigned stream and review flags. Logged expenses
+reduce taxable earnings rather than subtracting tax pound for pound. Loss relief
+and incomplete/stale records block the business savings target.
+
+Coverage includes 55p/25p car/van thresholds for 2026–27, motorcycles, employee
+bicycles, fractional miles, shared trade/associated-employer bands across cars
+and vans, annual reimbursement offsets, unsupported location/year rejection,
+duplicate submissions and consistent groups. Owner form tests cover partial
+expense amounts, bank corrections, stale versions, validation, archiving,
+classification safeguards, mileage versus actual running-cost conflicts,
+CSRF, bearer/anonymous denial and escaped purposes. Rule tests validate both
+publications, changed years/rates, withdrawals and daily caching. Remote fetches
+reuse the bounded, unauthenticated, no-redirect GOV.UK client.
+
+Chromium exercises the creation dialog (including server validation and retained
+input), expense and mileage create/remove requests against actual Flask routes,
+mobile controls and sample/real database isolation at 320, 390 and 1280px.
+Income/streams/rules layouts pass at four widths; tax estimate passes five states
+at five widths. Ruff F, Bandit and whitespace checks pass. Migration 016 applies
+through the maintenance login; repeat upgrade is a no-op. Both live HMRC mileage
+publications verify successfully, and the existing daily timer includes them.
+No bank calls or new dependencies are needed for this feature.
+
+## Irregular shifts and deduction links — 6 October 2026
+
+The full PostgreSQL-enabled suite passes **314 tests**. New coverage checks exact
+hourly/total gross pay, unpaid breaks, penny rounding, overnight shifts, daylight
+saving elapsed time, invalid/ambiguous clock readings and tax-year boundaries.
+Owner routes reject duplicate submissions, stale edits, archived writes, forged
+cross-stream shift IDs and invalid currencies. CSRF and API/browser boundaries
+remain enforced. PostgreSQL rejects cross-stream deduction links, and linked
+shifts cannot be removed until associations are cleared. Mileage associations
+can be edited without changing allowance amounts; stream totals never add bank
+receipts or count a linked deduction twice. Switching income mode preserves
+regular forecast settings.
+
+Chromium passes complete hourly/total shift creation, stream-mode changes,
+combined tax totals and linked expense/mileage workflows at 320, 390 and 1280px.
+The browser checks confirm real shift tables remain empty during demo edits,
+mobile controls fit, and no JavaScript errors occur. Existing income/stream/rule
+layout checks also pass. Ruff F, Bandit and whitespace checks pass; migration 017
+is applied through the maintenance role and a repeated upgrade is a no-op.
+
+## Overtime and final security review — 6 October 2026
+
+The PostgreSQL-enabled suite passes **321 tests**. Seven new tests cover overtime
+addition after absence adjustments, regular/individual mode semantics, editing
+and removal, combined employment/business tax bands, escaped notes, and browser
+security headers. The existing shift, expense and mileage version tests now
+reject non-ASCII forged versions with a normal validation error. Stale form
+creation is rejected after a stream-pattern change. A regression simulates a
+writer changing a shift between the form snapshot and the locked read: fresh
+locked state prevents accepting the stale edit. Shift and expense locked reads
+explicitly refresh SQLAlchemy's identity map.
+
+The live Flask/Chromium demo workflow passes at 320, 390 and 1280px, including
+hourly overtime, retained validation errors, switching to total pay, edit/delete,
+exact tax-total changes, shifts, deduction links and sample/real isolation.
+All five browser scripts pass: ledger, review, income/rules, tax estimate and
+live demo workflows. Browser automation does not weaken the production CSP;
+its wait predicates use functions rather than string evaluation. The demo
+workflow checks for policy violations as well as JavaScript errors.
+
+A Content Security Policy limits scripts, styles and connections to this app,
+blocks inline scripts and eval, disallows embedding and base elements, and
+restricts form destinations. Permissions Policy disables camera, microphone and
+geolocation; MIME-sniffing protection covers static files and error pages too.
+Policy design follows the [OWASP CSP guidance](https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html).
+
+Ruff F, Bandit and whitespace checks pass. pip-audit examined **20 installed app
+packages** and found **no known vulnerabilities** on this review date. Existing
+security tests also exercise login throttling/concurrency, session revocation,
+CSRF, forged cookies/headers, API/browser separation, request-size limits,
+escaping, safe errors and restricted PostgreSQL privileges. Migration 018 is
+applied through the maintenance role; repeat upgrade is a no-op. Secure cookies
+are enabled, debug is disabled, and both environment files have mode 0600.
+The configured bind is 0.0.0.0 for LAN access; deployment should still use the
+intended private network and HTTPS. This review covers application code and
+local settings; it does not audit tailnet ACLs, firewall rules or a deployed proxy.
+
+The user workflow is now near the top of README.md. Clear overtime wording and
+Edit stream settings help, but a guided checklist would further reduce the
+learning curve around forecasts versus receipts and credits versus deductions.

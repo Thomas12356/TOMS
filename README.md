@@ -51,20 +51,46 @@ Monthly reports describe cash flow from bank deposits. They do not calculate
 annual tax. Unknown income amounts stay unknown, and choosing an income source
 does not automatically establish its tax treatment.
 
+## Using the system
+
+1. Open Transactions, choose an account and review new payments. Closing the
+   review popup leaves them marked as unconfirmed; it does not delete them.
+2. Create an income stream for each job or business. Choose **Regular forecast**
+   for normal weekly, monthly or annual gross pay, or **Individual shifts** for
+   work with variable hours or pay. Gross means before tax and deductions.
+3. For regular pay, use **Add overtime** for extra pay not already included in
+   the forecast. Enter times and an hourly rate, or a total gross payment. For
+   irregular work, **Manage shifts** records all known work, including planned
+   shifts. Unentered future shifts are not extrapolated.
+4. Assign incoming bank payments to their streams and record actual PAYE/CIS
+   tax withheld through Edit income details. Forecasts describe expected gross
+   earnings; bank receipts are not added to those forecasts a second time.
+5. Open Expenses and mileage, choose the deduction type, and record an eligible
+   bank expense or completed journey. Linking a deduction to a shift or overtime
+   record adds context; it does not claim the deduction twice.
+6. Open Tax estimate to see the calculation and the suggested business income-tax
+   reserve. Resolve missing or changed records before relying on that target.
+   This is an income-tax estimate, not a complete tax bill: National Insurance,
+   student loans and tax-return submission are not included.
+
+Regular forecasts add only explicitly logged overtime after the normal-pay
+absence adjustment. Older ordinary shift records remain excluded. Switching to
+Individual shifts replaces normal pay with all entered work, including overtime;
+check that a complete year's work is entered before using that mode's estimate.
+Overtime retains its label when edited or when the income pattern changes.
+
+Try the **Test data** switch to learn these steps with synthetic accounts.
+It changes the business records shown in your browser; authentication and real
+scheduled bank sync remain separate. Demo records are rebuilt on migrations.
+
 ## Next milestones
 
-1. **Income review:** add dashboard forms for income details and a queue for
-   incomplete or flagged incoming payments.
-2. **First-run setup:** choose and remember the working account.
-3. **Complete income inputs:** record income outside the connected account and
-   prevent it from being counted twice.
-4. **Annual tax calculation:** select a supported jurisdiction and tax year,
-   apply verified, versioned rules, and test allowances and band boundaries.
-5. **Tax summary:** show the calculation breakdown, recorded deductions,
-   incomplete records, and an export of the underlying income data.
-
-Deliver each milestone as a small change with focused commits and an explanation
-of the files involved.
+1. A guided checklist for streams, payment review, actual withholding and tax
+   estimate blockers, so the next action is clear without reading this guide.
+2. A tax-year export containing the calculation, income records, work records,
+   deductions and mileage evidence for checking and backup.
+3. Reconcile gross work records against bank payments to highlight missing pay
+   without adding the same earnings twice.
 
 ## Open the dashboard
 
@@ -1127,57 +1153,118 @@ including archived streams, applies one personal allowance and the reviewed
 Ending a job should use its end date: archiving it does not remove that year's
 income. Forecasts already account for active dates and unpaid absence.
 
-In **Income streams → Manage**, choose how each stream's tax is deducted:
+Create streams with **Create a Stream**, which opens a form. Forecasts still use expected gross income, active dates and unpaid absence. There are no forecast PAYE or CIS deduction fields: only actual amounts logged on income payments count as tax credits. Log income tax separately from NI, pensions and student loans.
 
-- **No tax taken automatically**: its automatic deduction credit is zero.
-- **Estimate standard PAYE**: employed streams share the employment-only annual
-  tax calculation and one allowance. This is a planning assumption, not an
-  implementation of payroll tax codes. When there are multiple jobs, the
-  estimated deduction pool is allocated by gross income, preserving pennies.
-- **Enter expected annual PAYE / CIS deductions**: enter tax already withheld
-  plus expected deductions for the rest of the stream's active dates. Use only
-  income-tax/PAYE or CIS deduction amounts, not NI, pensions or student loans.
-  This is a whole-year amount in the stream's currency: it is not multiplied by
-  weekly/monthly periods or reduced again for absence.
-- **Not set yet**: the tax liability can be shown if gross income is complete,
-  but the set-aside target remains unavailable until deductions are specified.
+**Forecast tax not yet covered** is the estimated annual income tax minus actual logged tax credits. It includes payroll deductions not yet taken, so it is not all a manual savings target. The **manual business set-aside** target is the extra income tax above employment-only income tax, minus actual logged business/CIS credits, floored at zero. Its percentage spreads the target over the whole year's business receipts after logged business withholding; it does not calculate a remaining-month balance or subtract money already saved or paid directly to HMRC.
 
-CIS credits are taken from your entered annual deduction forecast rather than
-assuming every receipt has a 20% deduction. Gross payment status, contractor
-verification, VAT and materials can change the deductions. This MVP does not
-subtract expenses or materials from taxable gross earnings.
+For example, £40,000 employment and £20,000 self-employment produce £11,432 income tax before expenses. Employment alone produces £5,486 income tax, so the business target is £5,946 (29.73% of business receipts) before logged business credits. The £5,486 baseline is used to choose the incremental liability, not presented as PAYE already paid.
 
-The annual set-aside target is **combined estimated income tax minus all
-expected automatic deductions**, floored at zero. An excess is labelled as a
-forecast, not a confirmed refund. A planning percentage spreads unpaid income
-tax over the forecast self-employed/CIS receipts after automatic tax deductions;
-it also covers any PAYE shortfall. No self-employed/CIS receipts means the page
-shows the amount without inventing a percentage. This is a whole-year target,
-not a remaining balance: money already saved or paid directly to HMRC is not
-subtracted, and the rate is not recalculated over remaining months.
+### Expenses and mileage
 
-For example, £40,000 employment and £20,000 self-employment produce £11,432
-estimated income tax. Standard PAYE is £5,486, leaving £5,946 to fund yourself:
-29.73% of that self-employed forecast. If employment alone is £100,000, another
-£10,000 adds £6,000 income tax because the personal allowance also falls.
+Open **Deductions** in the navigation and select **Expense** or **Mileage** to show its form. Existing records remain visible. For expenses, choose an existing settled GBP payment, or follow **Tax deduction** from its ledger row. Assign it to a stream, enter the eligible portion and purpose, and confirm eligibility. A payment can be claimed only once against one stream. Employee expenses must qualify for job-expense relief. Changed bank amounts, dates, currency, status or classification exclude incompatible expense records and require review. Remove the deduction before changing its expense classification.
 
-Missing gross forecasts and non-GBP streams block partial totals; foreign
-currencies need a separately reviewed conversion policy. Bank payments are not
-added again to stream forecasts. Existing recorded payment deductions and
-transaction confirmations remain independent of these planning fields.
+Manually log completed journeys with date, stream, UK location, vehicle, business miles, purpose and start/end postcodes. For 2026–27, HMRC's rates are **55p for the first 10,000 car/van miles, then 25p; motorcycles 24p; employee bicycles 20p**. Self-employed/CIS bicycles and company vehicles are not supported. The scheme covers the UK, including Scotland, but Scottish income tax is not calculated by the England/Wales/NI estimate.
 
-**Scope:** income tax only. Excludes National Insurance, expenses/write-offs,
-trading allowance, pension/other reliefs, savings/dividends, student loans,
-payments on account and tax already paid directly. The target is therefore not
-the complete Self Assessment bill. The page shows the source-check status and
-links to the reviewed rules.
+The car/van band is shared across vehicles in the same trade or employment. Each stream defaults to one trade/job. Enter a consistent shared group on every journey for streams that belong to the same trade or associated employments. Independent employments have separate bands. Employee reimbursements offset the total approved mileage amount for that group/vehicle type across the year, preventing per-journey overpayments from inflating relief. Business reimbursements should be logged as business income instead.
 
-Migration `014_income_stream_withholding.sql` adds the forecast deduction fields.
-Existing streams start as **Not set yet**, rather than guessing their deductions.
-Run `.venv/bin/flask db-upgrade` and restart Flask when updating another
-installation.
+Mileage replaces qualifying vehicle purchase/running costs; the app rejects concurrent mileage and actual vehicle-cost claims for the same vehicle. Parking and tolls may be entered separately. Confirm that no incompatible prior-year capital allowances or acquisition claims exist, and keep the mileage method for the vehicle's business life. Exclude ordinary commuting and private travel. Records reduce forecast taxable earnings; they are not a pound-for-pound tax credit. Future expenses are not estimated. Do not subtract these expenses in expected gross income as well.
+
+Only reviewed **2026–27 UK** mileage rules are supported. HMRC employee and business publications are fetched and compared against the versioned local rule file daily by the existing 07:55 timer, on visits to the rules/deductions pages (at most daily), and by `.venv/bin/flask refresh-tax-rules`. **Tax rules → Check GOV.UK now** checks both income-tax and mileage figures. No bank credentials are sent. Changed figures/year are flagged for review, never silently installed; mileage allowances are excluded from the estimate while a changed publication needs review. An outage retains the dated reviewed rules and displays check status. New years require a reviewed profile and validation before use.
+
+Missing/foreign-currency forecasts, stale records and unsupported loss relief block a reliable savings target. Income payments are not added again to gross forecasts. **Scope:** income tax with logged eligible expenses/mileage; excludes NI, loss relief, capital allowances, trading allowance, pensions/other reliefs, dividends/savings, student loans, payments on account and direct HMRC payments.
+
+Migration `016_logged_tax_deductions.sql` retires the old forecast withholding columns and adds expense/mileage records. Actual logged payment deductions are preserved. Run `.venv/bin/flask db-upgrade` and restart Flask on another installation. The maintenance login owns migrations; the restricted app login performs ordinary record operations. Applying a migration rebuilds sample business data.
+
+Official mileage sources: [self-employed vehicle expenses](https://www.gov.uk/simpler-income-tax-simplified-expenses/vehicles), [employee vehicle relief](https://www.gov.uk/tax-relief-for-employees/vehicles-you-use-for-work), [HMRC scheme conditions](https://www.gov.uk/hmrc-internal-manuals/business-income-manual/bim75005).
 
 Sources: [HMRC rates and personal allowance](https://www.gov.uk/income-tax-rates),
 [rates after allowances](https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past),
 [PAYE](https://www.gov.uk/income-tax/how-you-pay-income-tax) and
 [CIS deduction statements](https://www.gov.uk/what-you-must-do-as-a-cis-subcontractor/get-paid).
+
+## Test-data switch
+
+After signing in, turn on **Test data** in the navigation. On mobile, open the
+navigation menu first. The switch redirects to the unfiltered ledger and shows
+a test-mode banner. You get two sample GBP accounts, seven transactions and
+employment, freelance and CIS income streams with usable tax forecasts.
+
+Classifications, income details, review confirmations, stream creation/editing
+and tax estimates work through the normal screens, using separate sample tables.
+The displayed balances are fixed examples. **Sync now** simulates a successful
+sync and updates the test-mode footer; it never calls Starling or imports into
+real records. Switch off to return to your unchanged real data.
+
+Selection belongs to this signed-in browser, not the whole installation. Another
+browser, API requests with explicit bearer credentials, and scheduled bank sync
+continue using real data. Login/password settings remain real, and tax rules
+still use the reviewed HMRC rules and public source checks. Signing out clears
+the selection. Sample edits are shared by browsers in test mode, preserved when
+you switch off/on, and reset when an upgrade applies new database migrations.
+
+Switching datasets rotates the form token. A form opened before the switch,
+including one in another tab, must be reloaded before saving. This prevents an
+old sample form from being applied to a real transaction with the same ID.
+
+Migration 015 creates the sample schema. `.venv/bin/flask db-upgrade` creates
+its tables with the maintenance login; regular requests use the restricted app
+login for sample data as well. Restart Flask after updating. Sample data is
+seeded on the first authenticated switch-on, not copied from real records.
+
+## Irregular work and shifts
+
+In **Income streams**, choose **Individual shifts · variable hours / pay** as the
+income pattern when creating a stream or under **Edit stream settings**. Then select **Manage
+shifts** on that stream. Regular forecast settings are retained when switching
+an existing stream to shifts; normal pay is replaced by entered work for tax planning.
+
+Each shift records start/end dates and times in Europe/London, optional unpaid
+break minutes, and either an hourly rate or a total gross payment. Rates may vary
+from shift to shift. Use the next date for overnight work. Hourly pay uses actual
+elapsed minutes minus unpaid breaks and rounds once to pennies. Clock changes
+are accounted for; nonexistent or ambiguous start/end clock readings are
+rejected rather than assigned an assumed offset. Add notes or a Flex block
+reference if useful. Shifts must fit the supported 2026–27 tax year and last no
+more than 24 hours. Planned future shifts are allowed.
+
+For a shift-based stream, the tax page uses the gross total of entered shifts
+in the tax year. It does not extrapolate future shifts, apply unpaid absence a
+second time, or add bank receipts to that total. Add known planned shifts for a
+fuller estimate, or use a regular annual forecast when appropriate. Shifts do not
+create bank transactions or invent PAYE/CIS deductions; log actual withholding
+through the income-payment forms as before.
+
+Use **Link expense** or **Log mileage** on a shift to preselect its stream and
+shift on the Deductions page. The optional **Specific shift** selection can also
+be made directly there. Existing expenses can be edited to add/remove a shift
+link; existing mileage records have **Save shift link**. Each deduction remains
+claimed once against its stream. Shift associations do not create another
+expense, additional mileage or a new tax credit. A shift from another stream is
+rejected by both the forms and PostgreSQL foreign keys.
+
+Shifts support editing with stale-version checks. Remove linked deductions or
+clear their shift links before deleting a shift. Restore archived streams before
+changing shifts, and remove existing shifts before changing their currency.
+Demo mode uses separate shift records and cannot write to real records.
+Migration `017_income_shifts.sql` adds the stream pattern, shift records and
+optional deduction links. Run `.venv/bin/flask db-upgrade` and restart Flask when
+updating another installation; upgrading rebuilds sample data.
+
+## Overtime for regular forecasts
+
+Use **Add overtime** next to a regular-forecast stream to open its overtime
+form. Enter a start/end time and either an hourly rate or a total gross amount.
+The overtime rate can differ from normal pay. Edit or remove overtime through
+that page; expenses and mileage can link to its work records too.
+
+Add only pay above the normal forecast. If a yearly salary already includes
+expected overtime, do not also enter it here. Overtime is added once, after the
+regular pay's active-date and unpaid-absence calculation. It is not multiplied
+by remaining weeks or reduced for unpaid holidays. Old ordinary shift records
+are labelled and excluded from regular forecasts. Changing to Individual shifts
+uses all entered work, including overtime, instead of the regular forecast.
+Creating work from a form opened before an income-pattern change is rejected;
+reload to see the current page and meaning.
+
+Migration `018_overtime.sql` preserves existing shifts as ordinary work records.
+Run `.venv/bin/flask db-upgrade` then restart Flask when updating an installation.

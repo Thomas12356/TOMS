@@ -308,10 +308,11 @@ schemas, then run their actual requests with the restricted runtime login.
 - `templates/tax_estimate.html` displays the annual target, percentage, individual
   stream forecasts, incomplete inputs and scope. Change layout here.
 - `services/transactions/income_streams.py → stream_fields` validates the forecast
-  deduction mode and amount. `models.py` and migration 014 enforce the same
-  basic mode/amount contract in PostgreSQL.
-- `static/js/income-streams.js` shows the annual deduction input when needed and
-  restricts the PAYE option to employed streams. Validation also runs server-side.
+  gross income, active dates and absence. Actual credits are read from logged
+  payment records by `services/tax/records.py`. Migration 016 retires forecasts
+  of tax already deducted.
+- `static/js/income-streams.js` opens and closes the stream creation dialog.
+  Server validation preserves invalid entries and reopens the dialog.
 - `tests/test_tax_estimate.py` has plain income examples and real PostgreSQL/auth
   checks. `tests/tax_estimate_browser_checks.py` verifies Chromium/mobile layout.
 
@@ -321,3 +322,80 @@ JSON contains the bands; `validate_publication` checks the calculator's band
 values as well as the visible published table. Withholding forecasts do not
 change the actual amounts entered on bank payments. Before adding NI or a new
 jurisdiction/year, extend the reviewed rules and tests explicitly.
+
+## Test mode: where the separation happens
+
+`services/web/test_data.py` owns the browser selection and small sample fixtures.
+`activate_test_data` runs after dashboard/review authentication; a signed browser
+cookie alone cannot bypass login. `ensure_sample_data` uses a PostgreSQL lock to
+seed once even if two browsers enable it at the same time. Add sample examples
+here without reading live bank data.
+
+`services/database/session.py → DataSession.get_bind` routes the eight business
+models to `toms_demo` only for an authenticated browser test-mode request. Login,
+owner and browser-session models continue using `toms`. Raw SQL and queries
+mixing authentication with sample records are rejected in test mode. The demo
+engine is cached per request so all demo edits and the seed lock share one
+transaction. API and background/CLI contexts keep the normal binding.
+
+`services/database/demo_schema.py` is maintenance-only. After migrations, it
+creates the demo business tables from the same model definitions and grants DML
+to the restricted runtime role. When migrations change the models, the sample
+tables are rebuilt; real tables are never copied or dropped by this helper.
+This keeps the same form/validation behavior without maintaining duplicate models.
+
+The nav switch is a normal POST form with CSRF protection; it works without
+JavaScript. A switch invalidates previously opened forms and always returns to
+an unfiltered ledger. `test_data_notice.html` labels demo screens. The balance
+and sync routes return examples/simulated runs in test mode, with guards at the
+bank client and background-sync entry point as a second check.
+
+`tests/test_test_data.py` exercises two disposable PostgreSQL schemas with
+identical live/demo UUIDs, actual routed sessions, concurrent seeding and stale
+forms. `tests/demo_browser_checks.py` runs a temporary loopback Flask server and
+Chromium against those disposable schemas for complete browser workflows.
+
+## Logged tax, expenses and mileage
+
+Start with `services/tax/estimate.py`: this is the pure annual calculation. `services/tax/records.py` selects current payment credits and eligible linked expenses. `services/tax/mileage.py` handles annual groups, bands and reimbursements; `mileage_rules.py` validates both public HMRC sources against `data/tax_rules/uk-mileage-2026-27.json`. Remote pages never become executable code or rendered HTML.
+
+`routes/deductions.py` handles owner forms; `services/tax/deduction_forms.py` keeps validation readable and separate. `templates/deductions.html` holds the page. Stream creation uses a native dialog in `templates/income_streams.html`, controlled by `static/js/income-streams.js`. No frontend framework is needed. `models.py` and migration 016 define the two record tables; `DATA_TABLES` includes both so demo writes remain isolated.
+
+Use `tests/test_deductions.py` for calculation and authenticated form checks. The existing demo browser script exercises real Flask requests in disposable database schemas.
+
+## Shifts: where to start
+
+- `services/transactions/shifts.py` validates UK local times, calculates gross
+  shift pay and loads per-stream totals in one query. `annual_gross` switches
+  between the regular forecast and these loaded totals according to income mode.
+- `routes/shifts.py` implements owner-only create/edit/delete forms.
+  `templates/shifts.html` and `static/js/shifts.js` provide the page and pay-mode
+  selector. Individual-shift streams link here with **Manage shifts**; regular
+  forecasts use **Add overtime**.
+- `IncomeShift` in `models.py` and migration 017 define stored shifts. Composite
+  foreign keys on expenses and mileage prevent links to another stream's shift.
+- `routes/deductions.py → linked_shift_id` validates optional links. The shared
+  write lock coordinates deduction changes and shift deletion. Mileage link
+  editing changes only the association, not the journey or allowance.
+- `tests/test_shifts.py` covers money, overnight/DST times, stream isolation,
+  forecast selection, stale versions and deduction links. The shared rollback
+  fixture is `tests/deduction_support.py`; browser requests use disposable schemas
+  through `tests/demo_browser_checks.py`.
+
+## Overtime above regular pay
+
+`IncomeShift.is_overtime` distinguishes extra pay from ordinary work records.
+`routes/shifts.py` sets it when creating work for a regular-forecast stream; it
+is not a user-editable flag and editing the payment never changes its meaning.
+The same page shows Overtime or Shifts according to the stream's income pattern.
+A hidden income-pattern value rejects creation forms opened before a mode change.
+
+`attach_shift_totals()` loads both totals in one query. `annual_gross()` adds
+only overtime to regular pay after planned absence; Individual shifts uses all
+entered work instead. Bank receipts remain separate. Migration 018 preserves
+existing records as ordinary shifts. Tests in `test_shifts.py` and
+`demo_browser_checks.py` cover both patterns and their tax effects.
+
+`app.py` sets the browser Content Security Policy. Keep JavaScript in local
+`static/js/` files and styles in `static/css/`; inline scripts and handlers are
+blocked. Chromium wait predicates use arrow functions to work under this policy.
