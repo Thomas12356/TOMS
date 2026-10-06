@@ -10,12 +10,12 @@ from app import app
 from flask import render_template
 from playwright.sync_api import sync_playwright
 from services.transactions.income import TAX_TREATMENTS
-from services.transactions.income_streams import STREAM_KINDS, FORECAST_PERIODS, FORECAST_CURRENCIES, annual_gross, holiday_amount
+from services.transactions.income_streams import STREAM_KINDS, FORECAST_PERIODS, FORECAST_CURRENCIES, TAX_YEARS, active_days, annual_gross, holiday_amount
 from services.transactions.income_form import display_amount
 from routes.dashboard import format_amount
 from services.transactions.income_form import FIELDS
 
-stream = SimpleNamespace(id='11111111-1111-4111-8111-111111111111', name='My job', kind='employed', archived=False, expected_gross_minor=100050, expected_gross_period='monthly', expected_gross_currency='GBP', unpaid_holiday_weeks=0, unpaid_holiday_unit='weeks')
+stream = SimpleNamespace(id='11111111-1111-4111-8111-111111111111', name='My job', kind='employed', archived=False, expected_gross_minor=100050, expected_gross_period='monthly', expected_gross_currency='GBP', unpaid_holiday_weeks=0, unpaid_holiday_unit='weeks', forecast_tax_year='2026-27', forecast_starts_on=None, forecast_ends_on=None)
 
 with app.test_request_context('/dashboard/income'):
     html = render_template('income.html', transaction=SimpleNamespace(currency='GBP',
@@ -27,8 +27,8 @@ with app.test_request_context('/dashboard/income'):
 with app.test_request_context('/dashboard/income-streams'):
     stream_html = render_template('income_streams.html',
         streams=[stream], stream_kinds=STREAM_KINDS, counts={stream.id: 1},
-        create_values={'name': '', 'kind': '', 'expected_gross': '', 'expected_gross_period': 'yearly', 'expected_gross_currency': 'GBP', 'unpaid_holiday': '0', 'unpaid_holiday_unit': 'weeks'},
-        forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES,
+        create_values={'name': '', 'kind': '', 'expected_gross': '', 'expected_gross_period': 'yearly', 'expected_gross_currency': 'GBP', 'unpaid_holiday': '0', 'unpaid_holiday_unit': 'weeks', 'forecast_tax_year': '2026-27', 'forecast_starts_on': '', 'forecast_ends_on': ''},
+        forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES, tax_years=TAX_YEARS, active_days=active_days,
         format_amount=format_amount, display_amount=display_amount, annual_gross=annual_gross, holiday_amount=holiday_amount,
         editing_id=None, editing_values={}, error=None, selected_name=stream.name, selected_stream=stream.id, rows=[dict(source='Example employer with a very long source name',
         kind='Employment', date='06 Oct 2026', amount='GBP 25.00', needs_review=True, edit_url='/income')],
@@ -75,6 +75,8 @@ with sync_playwright() as playwright:
         page.locator('#stream-gross').fill('1234.56')
         page.locator('#stream-holiday').fill('2.5')
         page.locator('#stream-holiday-unit').select_option('days')
+        page.locator('#stream-starts').fill('2026-10-06')
+        page.locator('#stream-ends').fill('2027-03-31')
         for period in ('weekly', 'monthly', 'yearly'):
             page.locator('#stream-period').select_option(period)
         page.locator('#stream-currency').select_option('USD')
@@ -88,7 +90,7 @@ with sync_playwright() as playwright:
         assert page.get_by_role('link', name='Edit income details').is_visible()
         assert page.locator('#forecast-' + stream.id + '-gross').input_value() == '1000.50'
         assert page.locator('#forecast-' + stream.id + '-period').input_value() == 'monthly'
-        assert 'GBP 12,006.00 per year' in page.locator('main').inner_text()
+        assert 'GBP 12,006.00 for 2026-27' in page.locator('main').inner_text()
         with page.expect_request(lambda request: request.method == 'POST') as submitted:
             page.get_by_role('button', name='Create stream', exact=True).click()
         payload = parse_qs(submitted.value.post_data)
@@ -97,6 +99,9 @@ with sync_playwright() as playwright:
         assert payload['expected_gross_currency'] == ['USD']
         assert payload['unpaid_holiday'] == ['2.5']
         assert payload['unpaid_holiday_unit'] == ['days']
+        assert payload['forecast_tax_year'] == ['2026-27']
+        assert payload['forecast_starts_on'] == ['2026-10-06']
+        assert payload['forecast_ends_on'] == ['2027-03-31']
         page.close()
     browser.close()
 print('Income form and streams browser checks passed at mobile and desktop widths.')

@@ -1,6 +1,8 @@
 """Owner-created stream names and types; a stream never infers tax deductions."""
 import re
 from decimal import Decimal
+from datetime import date
+from types import SimpleNamespace
 
 from werkzeug.exceptions import BadRequest
 from services.validation import optional_text, uid
@@ -10,6 +12,7 @@ STREAM_KINDS = {'self_employed': 'Self employed', 'employed': 'Employed', 'cis':
 
 FORECAST_PERIODS = {'weekly': 'Weekly', 'monthly': 'Monthly', 'yearly': 'Yearly'}
 FORECAST_CURRENCIES = ('GBP', 'EUR', 'USD')
+TAX_YEARS = {'2026-27': (date(2026, 4, 6), date(2027, 4, 5))}
 
 
 def stream_id(value):
@@ -20,7 +23,7 @@ def stream_id(value):
 
 
 def stream_fields(form):
-    if set(form) - {'csrf_token', 'action', 'stream_id', 'name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit'} or any(len(form.getlist(key)) != 1 for key in form):
+    if set(form) - {'csrf_token', 'action', 'stream_id', 'name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on'} or any(len(form.getlist(key)) != 1 for key in form):
         raise BadRequest('Supply each form field once.')
     action = form.get('action', '')
     if action not in ('create', 'update', 'archive', 'restore'):
@@ -53,9 +56,40 @@ def stream_fields(form):
     if len(holiday) > 6 or not re.fullmatch(r'[0-9]+(?:\.[0-9]{1,2})?', holiday) or Decimal(holiday) > maximum:
         raise BadRequest(f'Enter unpaid holiday between 0 and {maximum} {unit}, with at most two decimal places.')
     weeks = Decimal(holiday) / 5 if unit == 'days' else Decimal(holiday)
-    return action, name, kind, dict(expected_gross_minor=gross, expected_gross_period=period,
-                                    expected_gross_currency=currency, unpaid_holiday_weeks=weeks,
-                                    unpaid_holiday_unit=unit)
+    year = form.get('forecast_tax_year')
+    if year not in TAX_YEARS:
+        raise BadRequest('Choose a supported tax year: 2026–27.')
+    starts = forecast_date(form.get('forecast_starts_on', ''))
+    ends = forecast_date(form.get('forecast_ends_on', ''))
+    if starts and ends and starts > ends:
+        raise BadRequest('The end date must be on or after the start date.')
+    forecast = dict(expected_gross_minor=gross, expected_gross_period=period,
+                    expected_gross_currency=currency, unpaid_holiday_weeks=weeks, unpaid_holiday_unit=unit,
+                    forecast_tax_year=year, forecast_starts_on=starts, forecast_ends_on=ends)
+    active, total = active_days(SimpleNamespace(**forecast))
+    if int(weeks * 10000) * total > active * 520000:
+        raise BadRequest('Unpaid absence cannot exceed the time this stream is active in the selected tax year.')
+    return action, name, kind, forecast
+
+
+def forecast_date(value):
+    value = value.strip()
+    if not value:
+        return None
+    if not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
+        raise BadRequest('Enter a valid start or end date.')
+    try:
+        return date.fromisoformat(value)
+    except ValueError:
+        raise BadRequest('Enter a valid start or end date.') from None
+
+
+def active_days(stream):
+    """Inclusive dates, clipped to the selected UK tax year."""
+    first, last = TAX_YEARS[getattr(stream, 'forecast_tax_year', '2026-27')]
+    start = max(first, getattr(stream, 'forecast_starts_on', None) or first)
+    end = min(last, getattr(stream, 'forecast_ends_on', None) or last)
+    return max(0, (end - start).days + 1), (last - first).days + 1
 
 
 def holiday_amount(stream):
@@ -66,10 +100,13 @@ def holiday_amount(stream):
 
 
 def annual_gross(stream):
-    """A full-year planning estimate, never actual income or a tax calculation."""
+    """Gross forecast for the active part of the tax year, minus planned absence."""
     if stream.expected_gross_minor is None:
         return None
     full_year = stream.expected_gross_minor * {'weekly': 52, 'monthly': 12, 'yearly': 1}[stream.expected_gross_period]
     unpaid_units = int(Decimal(getattr(stream, 'unpaid_holiday_weeks', 0)) * 10000)
-    # Prorate by paid weeks; round half up to the nearest minor unit using integers.
-    return (full_year * (520000 - unpaid_units) + 260000) // 520000
+    active, total = active_days(stream)
+    denominator = total * 520000
+    paid_fraction = max(0, active * 520000 - unpaid_units * total)
+    # Keep the existing 52-week/12-month annual rates, prorated by calendar days.
+    return (full_year * paid_fraction + denominator // 2) // denominator

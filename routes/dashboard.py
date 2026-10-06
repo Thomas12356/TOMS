@@ -12,7 +12,7 @@ from werkzeug.exceptions import BadRequest, NotFound, Conflict
 
 from models import Account, Transaction, TransactionIncome, IncomeStream
 from uuid import uuid4
-from services.transactions.income_streams import STREAM_KINDS, FORECAST_PERIODS, FORECAST_CURRENCIES, annual_gross, holiday_amount, stream_id, stream_fields
+from services.transactions.income_streams import STREAM_KINDS, FORECAST_PERIODS, FORECAST_CURRENCIES, TAX_YEARS, active_days, annual_gross, holiday_amount, stream_id, stream_fields
 from routes.helpers import query_values
 from services.database.connection import db
 from services.error_logging import log_failure
@@ -350,9 +350,9 @@ def income_streams():
     if selected_id and db.session.get(IncomeStream, selected_id) is None:
         raise NotFound('Income stream not found.')
     error = None
-    create_fields = ('name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit')
+    create_fields = ('name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on')
     create_values = dict.fromkeys(create_fields, '')
-    create_values.update(expected_gross_period='yearly', expected_gross_currency='GBP', unpaid_holiday='0', unpaid_holiday_unit='weeks')
+    create_values.update(expected_gross_period='yearly', expected_gross_currency='GBP', unpaid_holiday='0', unpaid_holiday_unit='weeks', forecast_tax_year='2026-27')
     editing_id, editing_values = None, {}
     if request.method == 'POST':
         submitted = {field: request.form.get(field, '') for field in create_fields}
@@ -405,6 +405,7 @@ def income_streams():
     return render_template('income_streams.html', streams=streams, selected_stream=selected_id,
                            counts=counts, stream_kinds=STREAM_KINDS, create_values=create_values, error=error,
                            forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES,
+                           tax_years=TAX_YEARS, active_days=active_days,
                            editing_id=editing_id, editing_values=editing_values,
                            display_amount=display_amount, format_amount=format_amount, annual_gross=annual_gross, holiday_amount=holiday_amount,
                            selected_name=names.get(selected_id, 'All income'), rows=rows, page=page,

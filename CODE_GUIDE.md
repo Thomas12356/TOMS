@@ -274,3 +274,18 @@ version is checked before saving. A stale form returns 409 and restores current
 saved values. This prevents amounts entered for an old bank currency from being
 saved in a newly changed currency. Concurrency coverage is in
 `tests/test_review_concurrency.py`.
+
+## Tax year and part-year dates
+
+Migration 013 adds `forecast_tax_year`, `forecast_starts_on` and
+`forecast_ends_on` to `IncomeStream`. Existing records use the supported 2026–27
+year and blank dates. Database checks reject unsupported years and reversed dates.
+
+In `services/transactions/income_streams.py`, `forecast_date` parses optional
+ISO dates and `active_days` clips their inclusive range to `TAX_YEARS`.
+`annual_gross` now means the forecast for that tax year: it prorates the normal
+annual rate by active days, subtracts the entered unpaid absence, and rounds
+once to a minor unit. Form validation rejects absence exceeding the active time.
+The shared macro includes the year/date fields in both create and edit forms;
+invalid edits retain entered values. Financial records and confirmations are
+not changed by forecast edits.
