@@ -33,7 +33,7 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 ''')
-subprocess.run(['systemctl', '--user', 'daemon-reload'], check=True)
-subprocess.run(['systemctl', '--user', 'enable', '--now', 'toms-sync.timer'], check=True)
-subprocess.run(['systemctl', '--user', 'is-active', '--quiet', 'toms-sync.timer'], check=True)
+subprocess.run(['/usr/bin/systemctl', '--user', 'daemon-reload'], check=True)
+subprocess.run(['/usr/bin/systemctl', '--user', 'enable', '--now', 'toms-sync.timer'], check=True)
+subprocess.run(['/usr/bin/systemctl', '--user', 'is-active', '--quiet', 'toms-sync.timer'], check=True)
 print('Installed TOMS sync timer. Check: systemctl --user list-timers toms-sync.timer')

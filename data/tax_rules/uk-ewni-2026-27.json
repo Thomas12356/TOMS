@@ -1,0 +1,27 @@
+{
+  "version": "uk-ewni-2026-27-v1",
+  "jurisdiction": "England, Wales and Northern Ireland",
+  "tax_year": "2026-27",
+  "starts_on": "2026-04-06",
+  "ends_on": "2027-04-05",
+  "currency": "GBP",
+  "reviewed_on": "2026-10-06",
+  "source_url": "https://www.gov.uk/income-tax-rates",
+  "personal_allowance_minor": 1257000,
+  "allowance_taper_starts_minor": 10000000,
+  "allowance_taper_reduction": "1 pound for every 2 pounds above the threshold",
+  "allowance_zero_at_minor": 12514000,
+  "published_bands": [
+    ["Personal Allowance", "Up to £12,570", "0%"],
+    ["Basic rate", "£12,571 to £50,270", "20%"],
+    ["Higher rate", "£50,271 to £125,140", "40%"],
+    ["Additional rate", "over £125,140", "45%"]
+  ],
+  "taxable_bands": [
+    {"upper_minor": 3770000, "rate_percent": 20},
+    {"upper_minor": 12514000, "rate_percent": 40},
+    {"upper_minor": null, "rate_percent": 45}
+  ],
+  "calculation_source_url": "https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past",
+  "scope": "Income tax on employment and self-employment earnings only. No National Insurance, savings, dividends, expenses, special reliefs or payments on account. Calculation is not yet implemented."
+}

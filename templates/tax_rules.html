@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tax rules · TOMS</title><link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}"></head>
+<body>
+<header class="site-header">
+    <a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+    {% with navigation_page='tax-rules', navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}
+</header>
+<main>
+    <div class="page-heading"><p class="eyebrow">TOMS / TAX</p><h1>Tax rules</h1></div>
+    <h2>{{ rules.jurisdiction }} · {{ rules.tax_year }}</h2>
+    <p class="secondary">6 April 2026 – 5 April 2027 · {{ rules.version }}</p>
+    <section class="payment-summary" aria-labelledby="rule-check-heading">
+        <h2 id="rule-check-heading">Official source check</h2>
+        <p role="status">{{ status.message if status else 'Checking GOV.UK in the background. Refresh this page shortly to see the result.' }}</p>
+        {% if status.checked_at %}<p class="secondary">Last attempted: {{ status.checked_at }}</p>{% endif %}
+        {% if status.verified_at %}<p class="secondary">Last matched: {{ status.verified_at }}</p>{% endif %}
+        <p class="secondary">Checks run automatically when you visit this page, at most once a day. Published changes are flagged for review; they never silently replace these rules.</p>
+        <form method="post"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Check GOV.UK now</button></form>
+    </section>
+    <section class="stream-records" aria-labelledby="allowance-heading">
+        <h2 id="allowance-heading">Personal allowance</h2>
+        <p>{{ format_amount(rules.personal_allowance_minor, rules.currency) }} standard allowance.</p>
+        <p>Reduced by £1 for each £2 of adjusted net income above {{ format_amount(rules.allowance_taper_starts_minor, rules.currency) }}. No allowance remains at {{ format_amount(rules.allowance_zero_at_minor, rules.currency) }}.</p>
+        <h2>Published bands</h2>
+        <p class="secondary">These ranges assume the standard allowance. The allowance reduction must be handled separately in a calculation.</p>
+        {% for band in rules.published_bands %}<article class="stream-payment"><div><h3>{{ band[0] }}</h3><p class="secondary">{{ band[1] }}</p></div><strong>{{ band[2] }}</strong></article>{% endfor %}
+        <p class="secondary">{{ rules.scope }}</p>
+        <p><a href="{{ rules.source_url }}" target="_blank" rel="noopener noreferrer">HMRC published rates</a> · <a href="{{ rules.calculation_source_url }}" target="_blank" rel="noopener noreferrer">Rates after allowances</a></p>
+        <p class="secondary">Rules reviewed: {{ rules.reviewed_on }}. Matching published figures checks the data; it does not validate a completed tax return.</p>
+    </section>
+</main>
+</body>
+</html>

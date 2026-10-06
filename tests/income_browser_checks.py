@@ -100,3 +100,28 @@ with sync_playwright() as playwright:
         page.close()
     browser.close()
 print('Income form and streams browser checks passed at mobile and desktop widths.')
+
+from services.tax.rules import reviewed_rules
+with app.test_request_context('/dashboard/tax-rules'):
+    tax_html = render_template('tax_rules.html', rules=reviewed_rules(),
+        status={'message': 'Published rules match the reviewed values.', 'checked_at': '2026-10-06T13:00:00+00:00', 'verified_at': '2026-10-06T13:00:00+00:00'},
+        format_amount=format_amount, current_user=SimpleNamespace(is_authenticated=True))
+with sync_playwright() as playwright:
+    browser = playwright.chromium.launch(headless=True)
+    for width in (320, 390, 768, 1280):
+        page = browser.new_page(viewport={'width': width, 'height': 850})
+        def respond_tax(route):
+            path = urlparse(route.request.url).path
+            if path.startswith('/static/'):
+                route.fulfill(path=str(ROOT / path.lstrip('/')))
+            else:
+                route.fulfill(body=tax_html, content_type='text/html')
+        page.route('http://toms.test/**', respond_tax)
+        page.goto('http://toms.test/dashboard/tax-rules')
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
+        assert page.get_by_role('heading', name='Tax rules', exact=True).is_visible()
+        assert page.get_by_role('button', name='Check GOV.UK now').is_visible()
+        assert page.get_by_role('link', name='HMRC published rates').get_attribute('href') == 'https://www.gov.uk/income-tax-rates'
+        page.close()
+    browser.close()
+print('Tax rules page browser checks passed at mobile and desktop widths.')

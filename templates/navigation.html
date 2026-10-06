@@ -4,6 +4,7 @@
 <nav id="main-navigation" class="main-navigation" aria-label="Main navigation">
     <a href="{{ url_for('dashboard.transactions_page') }}"{% if navigation_page == 'transactions' %} aria-current="page"{% endif %}>Transactions</a>
     <a href="{{ url_for('dashboard.income_streams') }}"{% if navigation_page == 'income-streams' %} aria-current="page"{% endif %}>Income streams</a>
+    <a href="{{ url_for('dashboard.tax_rules') }}"{% if navigation_page == 'tax-rules' %} aria-current="page"{% endif %}>Tax rules</a>
     {% if navigation_owner %}
     <a href="{{ url_for('login.change_password') }}"{% if navigation_page == 'settings' %} aria-current="page"{% endif %}>Password settings</a>
     <form class="logout-form" method="post" action="{{ url_for('login.sign_out') }}">

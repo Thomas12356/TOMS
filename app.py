@@ -157,6 +157,17 @@ def owner_setup_token():
     click.echo(token)
 
 
+@app.cli.command("refresh-tax-rules")
+def refresh_tax_rules():
+    """Check official UK rates, retaining reviewed rules if verification fails."""
+    from services.tax.rules import refresh_rules
+    try:
+        result = refresh_rules(app.instance_path, force=True)
+    except OSError:
+        raise click.ClickException("Unable to save the rule check in the instance directory.") from None
+    click.echo(result['status'] + ': ' + result['message'])
+
+
 @app.cli.command("sync-transactions")
 def scheduled_sync():
     """Import transactions without running a web server (used by the daily timer)."""
