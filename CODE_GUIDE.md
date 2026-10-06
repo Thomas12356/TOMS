@@ -28,7 +28,8 @@ services/
         rate_limit.py       Coordinates bank request limits
     transactions/           The income and categorisation work starts here
         classification.py   Manual transfer types and automatic defaults
-        income.py           Income choices and amount validation
+        income.py           Income choices, validation and shared saving
+        income_form.py      Converts browser amounts into exact minor units
         sync.py             Coordinates transaction imports
         store.py            Saves imports and their progress
     database/
@@ -49,14 +50,18 @@ just describe each package. For manual categorisation, begin in
 
 ## Follow one income edit
 
-Read these functions in order:
+For browser edits, read these functions in order:
 
-1. `routes/transactions.py` → `put_income`: receives the JSON edit.
-2. `services/transactions/income.py` → `income_body`: checks the fields and allowed values.
-3. `routes/transactions.py` → `saved_transaction`: loads the bank payment.
-4. `services/transactions/income.py` → `validate_reconciliation`: checks entered amounts
-   against the deposit.
-5. Back in `put_income`: updates `TransactionIncome`, commits, and returns HTML or JSON.
+1. `routes/dashboard.py` → `edit_income`: loads the payment and preserves ledger navigation.
+2. `templates/income.html`: renders the inputs and validation messages.
+3. `services/transactions/income_form.py` → `form_values`: converts decimal amounts into integer minor units.
+4. `services/transactions/income.py` → `income_body` and `save_income`: validate the details, reconcile against the deposit and update the record.
+5. Back in `edit_income`: commits and returns to the ledger.
+
+The JSON API starts at `routes/transactions.py` → `put_income` and uses the same
+validation and saving functions. Browser regression tests are in
+`tests/test_income_form.py`; optional Chromium layout checks are in
+`tests/income_browser_checks.py`.
 
 `Transaction` stores what the bank reported. `TransactionClassification` stores
 your choice of income, expense, transfer, refund, or other.
@@ -209,3 +214,63 @@ owner's confirmation. `services/transactions/review.py` fingerprints the reviewe
 details so stale popups cannot confirm changed records. The popup behaviour is
 in `static/js/transaction-review.js`, and its markup/styles share the dashboard.
 The importer and classification/income edits clear confirmation when details change.
+
+## Income streams page
+
+`routes/dashboard.py` → `income_streams` handles listing, creation, renaming and
+archiving. `services/transactions/income_streams.py` contains the three stream
+types and form validation. `templates/income_streams.html` renders the page.
+
+`IncomeStream` stores the owner's name and chosen type. `TransactionIncome`
+links a payment to it through `income_stream_id`. Migration
+`009_income_streams.sql` creates the table and optional link, preserving older
+records without creating streams. Browser edits require a chosen stream, while
+the existing API's historical income types remain compatible.
+
+The stream type and tax treatment are separate: no tax amount is inferred.
+Renaming preserves payment links. Archiving blocks new assignments while
+retaining existing records. Income saves return to the selected stream using
+constrained local navigation. Tests are in `tests/test_income_form.py`.
+
+Stream forecasts use `expected_gross_minor`, `expected_gross_period` and
+`expected_gross_currency` on `IncomeStream`. Migration 010 leaves all three
+unknown on existing records. `stream_fields` validates new or updated forecasts
+using the same exact decimal parser as income payments. `annual_gross` multiplies
+weekly forecasts by 52, monthly by 12 and yearly by 1; it never changes actual
+payment amounts. `templates/income_forecast_fields.html` shares the create/edit
+fields, and invalid edits retain the entered values.
+
+Unpaid holiday is stored as exact decimal weeks in `unpaid_holiday_weeks`.
+Migration 011 defaults it to zero and constrains it to 0–52. `stream_fields`
+accepts at most two decimal places. `annual_gross` reduces the base annual amount
+by `(52 - unpaid weeks) / 52`, then rounds half up to a minor unit using integer
+arithmetic. Actual income records are unaffected. The shared forecast-field
+macro adds the control to both create and manage forms.
+
+Holiday entry now uses `unpaid_holiday` and `unpaid_holiday_unit` in forms.
+Migration 012 remembers days/weeks and increases stored week precision to four
+decimal places. Days convert to weeks using five working days per week.
+`holiday_amount` converts back to the saved display unit; `annual_gross` keeps
+integer arithmetic with the increased precision. Existing records stay in weeks.
+
+## Tax-rule data and official checks
+
+Start at `data/tax_rules/uk-ewni-2026-27.json` for reviewed values.
+`services/tax/rules.py` reads this file, fetches only the fixed GOV.UK content URL,
+extracts table cells and allowance text without rendering remote HTML, and compares
+them with the reviewed dataset. Check metadata is written atomically in `instance/`.
+Failures and changed values retain the reviewed data.
+
+`routes/dashboard.py` → `tax_rules` renders `templates/tax_rules.html` and protects
+manual checks with browser sessions and CSRF. Background page checks run at most
+daily. `app.py` exposes `refresh-tax-rules`; the optional personal systemd timer
+is installed by `deployment/install_tax_rules_timer.py`. Tests in
+`tests/test_tax_rules.py` mock GOV.UK and never contact Starling. The financial
+calculation engine is a separate next step; no estimates use these values yet.
+
+Income editing also sends a hidden transaction `version`, produced by
+`services/transactions/review.py`. On POST the parent payment is locked and the
+version is checked before saving. A stale form returns 409 and restores current
+saved values. This prevents amounts entered for an old bank currency from being
+saved in a newly changed currency. Concurrency coverage is in
+`tests/test_review_concurrency.py`.

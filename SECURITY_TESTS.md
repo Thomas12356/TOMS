@@ -1,6 +1,6 @@
-# Security checks — 5 October 2026
+# Security checks — 6 October 2026
 
-The full suite passed: **195 tests**, with PostgreSQL checks enabled. This
+The full suite passed: **236 tests**, with PostgreSQL checks enabled. This
 includes **24 adversarial tests** in `tests/test_security.py`, plus the
 existing login, API protection, request-boundary and bank-client tests.
 Ten classification-form tests also cover saves, automatic reset, income
@@ -219,3 +219,109 @@ To run the additional browser checks with the existing temporary installation:
 ```bash
 LD_LIBRARY_PATH=/tmp/toms-browser-libs/root/usr/lib/x86_64-linux-gnu PYTHONPATH=/tmp/toms-browser-check .venv/bin/python tests/review_browser_checks.py
 ```
+
+## Income editing page — 6 October 2026
+
+The full PostgreSQL-enabled suite passes 202 tests. Seven new tests cover exact
+money conversion, invalid precision and oversized values, duplicate fields,
+authentication and CSRF, income eligibility, reconciliation failures, escaped
+text, currency changes, saved values, return navigation and confirmation reset.
+They use rollback-only synthetic transactions and block bank requests.
+
+`tests/income_browser_checks.py` verifies form controls, mobile overflow and
+return links in Chromium at widths 320, 390, 768 and 1280 pixels. These checks use
+synthetic data and intercepted requests; they do not verify deployment TLS.
+
+## Owner-created income streams
+
+Streams start empty and support Self employed, Employed and CIS. Regression tests
+cover creation, renaming, archiving/restoring, filtering, escaped names, missing
+CSRF, bearer rejection, invalid types/IDs, empty state and constrained return
+navigation. Archived streams cannot be newly assigned, but existing assignments
+remain editable. Stream choice never infers tax deducted. Migration 009 preserves
+existing income records without seeding streams.
+
+Chromium checks verify the create form, stream selector, management controls and
+mobile navigation at 320, 390 and 1280 pixels, plus income form layout at 768 pixels.
+Tests use synthetic data, rollback-only records and no bank requests.
+
+## Expected gross income forecasts
+
+The PostgreSQL-enabled suite passes 211 tests. Forecast regressions cover all
+three periods, exact amounts and annual estimates, currencies, zero income,
+missing/negative/oversized/invalid amounts, invalid periods, retained form inputs,
+updates that preserve actual payments, and archiving that retains the forecast.
+Migration 010 leaves existing forecasts unknown and enforces complete valid
+forecast fields in PostgreSQL. Chromium checks cover create-form submission,
+period selection, edit prefilling and yearly display on mobile and desktop.
+
+## Unpaid holiday forecasts
+
+The full PostgreSQL-enabled suite passes 214 tests. Three new tests cover weekly,
+monthly and yearly proration, partial weeks, exact rounding, zero and 52 weeks,
+creation/update persistence, unchanged actual income, invalid values and retained
+form inputs. Migration 011 preserves existing estimates with zero unpaid weeks.
+Chromium verifies entering and submitting partial holiday weeks alongside the
+forecast on mobile and desktop.
+
+## Holiday units
+
+The full suite passes 216 tests. Added checks cover day/week equivalence, saved
+unit preference, partial-day precision, maximum days, invalid units and rejected
+out-of-range input. Chromium verifies choosing Days and submitting that unit on
+mobile and desktop. Migration 012 preserves existing week values.
+
+## Current UK official rule checks
+
+The suite passes 223 tests with PostgreSQL enabled. New tests cover official
+content extraction, pinned tax-year dates, changed bands/allowances/year,
+withdrawn or malformed publications, cache reuse and corruption, network failure,
+unchanged reviewed files, fixed unauthenticated URLs, blocked redirects and
+response-size limits. Browser route tests cover login, bearer rejection and CSRF.
+Chromium checks verify the tax page and navigation at mobile and desktop widths.
+
+A live public GOV.UK check matched the reviewed England/Wales/Northern Ireland
+2026–27 figures. The daily 07:55 Europe/London timer was enabled and its service
+ran successfully. No banking information was sent. Only bands and standard
+allowance rules are checked automatically; no completed tax calculation is claimed.
+
+## Security review and regression tests — 6 October 2026
+
+The complete PostgreSQL-enabled suite passes **236 tests** (13 new regressions).
+The dashboard, review popup, income/stream forms and Tax rules Chromium scripts
+all pass at their configured mobile and desktop widths. Tests use synthetic,
+rollback-only transactions or disposable schemas, and block bank requests.
+
+Fixed during review:
+
+- Income forms now carry a version of the displayed payment and saved income.
+  Changed bank currency or another income edit causes HTTP 409 before saving.
+  Conflicts show current saved values; stale entered money is not carried into a
+  new currency. Two concurrent saves are checked against real PostgreSQL: one
+  succeeds and one is rejected as stale.
+- Tax verification caches are tied to the exact reviewed rules hash, validate
+  metadata and timestamps, and are read with a size bound. Changed local rule
+  values/dates/formulas cannot inherit a previous successful source check.
+- GOV.UK fetching has size limits, elapsed-time checks between chunks, separate
+  network timeouts and rejects compressed responses before decompression.
+  Redirects remain blocked and the client sends no bank credentials.
+- Publication validation rejects malformed shapes and ignores script, style
+  and template content. Failed atomic writes keep the prior cache and clean up
+  temporary files. Duplicate background checks are not queued within a worker.
+- Timer installers use `/usr/bin/systemctl`, avoiding executable lookup through
+  an untrusted PATH.
+
+Validation: Ruff's F checks pass. Bandit reports **zero application findings**.
+The timer installers have eight reviewed low-severity B404/B603 subprocess
+warnings: commands use fixed argument lists, an absolute executable, no shell
+and no remote inputs. The installed dependency audit checks **24 packages** and
+finds **no known advisories**. A fresh live public GOV.UK check still succeeds.
+These scans are snapshots, not proof that no vulnerabilities exist.
+
+Remaining deployment risk: the current application's PostgreSQL role is a
+**superuser** (verified directly during this review). A compromised application
+could therefore affect more than its own tables. Use a restricted runtime role
+and separate migration credentials. This review did not change database roles.
+Current configuration has Secure/HttpOnly/SameSite=Lax cookies, a sufficiently
+long signing key and debug disabled. Tailnet HTTPS configuration and the live
+owner login were not externally penetration-tested.

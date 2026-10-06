@@ -7,8 +7,8 @@ which records need attention, and how a tax estimate was calculated.
 
 **Current stage:** a working Flask JSON API with PostgreSQL storage and automated
 tests and an initial transaction dashboard at `/dashboard`. Manual categorisation
-is available through the API and dashboard; income editing forms and the annual tax
-calculator are planned and have not been implemented yet.
+and income details are available through the API and dashboard. The annual tax
+calculator is planned and has not been implemented yet.
 
 For a short map of the code and a walkthrough of an income edit, start with
 [Getting into the code](CODE_GUIDE.md).
@@ -972,3 +972,85 @@ pending/settled status, and edits to classification or income details require
 confirmation again. Identical syncs preserve it. Confirmation does not establish
 tax treatment. If details change while the popup is open, it refreshes them and
 requires another review before accepting confirmation.
+
+## Entering income details
+
+Classify an incoming transaction as **Income**, then select **Edit income details**
+in its ledger row. Choose its income stream and tax treatment, and enter the source,
+gross income and tax already deducted when known. GBP, EUR and USD amounts use
+ordinary decimals (for example `30.00`); other currencies explicitly use minor units.
+Leave unknown amounts blank. When known, gross minus tax plus any explained
+adjustment must match the bank deposit. Saving returns to the same account and
+ledger page and requires you to confirm the updated transaction again. If the
+payment or saved income changed while the form was open, the stale edit is
+rejected and the current values are shown for review.
+
+Bank corrections flag saved income details for review. A currency change asks you
+to re-enter amounts in the new currency rather than silently converting them.
+
+## Income streams
+
+Open **Income streams** in the navigation, or visit `/dashboard/income-streams`.
+There are no default streams. Create one with a name and one of three types:
+**Self employed**, **Employed** or **CIS**. Enter expected gross income before
+deductions, choose **Weekly**, **Monthly** or **Yearly**, and select GBP, EUR or USD.
+Then select the stream when editing an income payment. Tax treatment and any amounts already deducted are entered separately
+for each payment; choosing CIS does not fill them in automatically.
+
+Use **Manage** to update the name or income forecast, archive or restore a stream. Archiving preserves its
+payments and prevents new assignments; existing assignments remain editable.
+Create a new stream if its type changes. Older income records remain available
+under All income with **No stream assigned** until you choose a stream for them.
+
+Apply migration `009_income_streams.sql` with `.venv/bin/flask db-upgrade` when
+updating another installation. It creates no default streams.
+
+Weekly forecasts are multiplied by 52 and monthly forecasts by 12 to display a
+full-year planning estimate, then reduced proportionally for **Unpaid holiday per year**. Choose **Days** or **Weeks**; partial values are supported. Days are working
+days using a five-day week, with a maximum of 260 days or 52 weeks. For example,
+£500 weekly with four unpaid weeks estimates £24,000 for the year. Paid holiday
+does not reduce this figure. Enter zero if your income estimate already includes
+unpaid time off, to avoid subtracting it twice. These forecasts do not create
+payments or calculate tax and assume the same income rate throughout the year.
+Existing streams have no forecast until you enter one. Migration
+`010_income_stream_forecasts.sql` adds these fields; run `.venv/bin/flask db-upgrade`
+on other installations after updating.
+
+Migration `011_income_stream_unpaid_holiday.sql` adds unpaid holiday with a zero
+baseline, preserving existing estimates. Apply it with `.venv/bin/flask db-upgrade`
+on other installations. The holiday setting is editable under **Manage**.
+
+Migration `012_income_stream_holiday_units.sql` preserves existing entries as
+weeks and remembers the selected unit when editing. It retains enough precision
+for partial days without changing the forecast through rounding during storage.
+
+## UK tax rules and automatic official checks
+
+Open **Tax rules** in the navigation. The first reviewed dataset covers England,
+Wales and Northern Ireland for **2026–27 (6 April 2026 to 5 April 2027)**.
+`data/tax_rules/uk-ewni-2026-27.json` stores the published bands, personal allowance
+and taper, scope, source links and version. This is the data foundation; the annual
+income-tax calculator and reserve recommendations are not implemented yet.
+
+The app fetches GOV.UK's public content API with a separate unauthenticated client.
+It checks the year, published bands and allowance wording against reviewed rules.
+Matching values update verification metadata; different values, changed formatting
+or a new year are flagged for review. The data file is never replaced by the fetch.
+Timeouts retain reviewed rules and the last successful match. No bank credentials,
+income records or personal information are sent to GOV.UK.
+
+Checks run when visiting Tax rules, at most daily, or via **Check GOV.UK now**.
+For a daily background check even when the site is closed:
+
+```bash
+.venv/bin/python deployment/install_tax_rules_timer.py
+systemctl --user list-timers toms-tax-rules.timer
+```
+
+The personal Linux timer runs at 07:55 Europe/London with persistent catch-up.
+It is enabled on the current development machine. Run a check manually with
+`.venv/bin/flask refresh-tax-rules`. Cached check metadata is stored in
+`instance/tax-rule-check.json`; it contains no banking data.
+
+Official sources: [HMRC published rates](https://www.gov.uk/income-tax-rates) and
+[rates after allowances](https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past).
