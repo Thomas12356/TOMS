@@ -119,6 +119,10 @@ class IncomeStream(BaseModel):
         db.CheckConstraint("forecast_tax_year = '2026-27'", name="income_stream_forecast_year"),
         db.CheckConstraint("forecast_starts_on IS NULL OR forecast_ends_on IS NULL OR forecast_starts_on <= forecast_ends_on",
                            name="income_stream_forecast_dates"),
+        db.CheckConstraint("withholding_mode IN ('unknown', 'none', 'paye_estimate', 'manual')", name="income_stream_withholding_mode"),
+        db.CheckConstraint("withholding_mode <> 'paye_estimate' OR kind = 'employed'", name="income_stream_paye_employed"),
+        db.CheckConstraint("(withholding_mode = 'manual' AND expected_tax_deducted_minor IS NOT NULL AND expected_tax_deducted_minor >= 0) OR "
+                           "(withholding_mode <> 'manual' AND expected_tax_deducted_minor IS NULL)", name="income_stream_withholding_amount"),
         {"schema": "toms"},
     )
 
@@ -134,6 +138,8 @@ class IncomeStream(BaseModel):
     forecast_tax_year = db.Column(db.Text, nullable=False, server_default="2026-27")
     forecast_starts_on = db.Column(db.Date)
     forecast_ends_on = db.Column(db.Date)
+    withholding_mode = db.Column(db.Text, nullable=False, server_default="unknown")
+    expected_tax_deducted_minor = db.Column(db.BigInteger)
 
 
 class TransactionIncome(BaseModel):

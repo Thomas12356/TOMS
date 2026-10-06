@@ -23,5 +23,5 @@
     {"upper_minor": null, "rate_percent": 45}
   ],
   "calculation_source_url": "https://www.gov.uk/government/publications/rates-and-allowances-income-tax/income-tax-rates-and-allowances-current-and-past",
-  "scope": "Income tax on employment and self-employment earnings only. No National Insurance, savings, dividends, expenses, special reliefs or payments on account. Calculation is not yet implemented."
+  "scope": "Income tax on employment and self-employment earnings only. No National Insurance, savings, dividends, expenses, special reliefs or payments on account."
 }

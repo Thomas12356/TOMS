@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tax estimate · TOMS</title><link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}"></head>
+<body>
+<header class="site-header">
+    <a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+    {% with navigation_page='tax-estimate', navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}
+</header>
+<main class="tax-estimate">
+    <div class="page-heading"><p class="eyebrow">TOMS / TAX</p><h1>Tax estimate</h1></div>
+    <p>{{ rules.jurisdiction }} · {{ rules.tax_year }} · 6 April 2026 – 5 April 2027</p>
+    <p class="secondary">A whole-year income-tax forecast from your income streams. Gross income sets the tax bands; expected PAYE and CIS deductions reduce what you need to pay yourself.</p>
+    <p><a href="{{ url_for('dashboard.income_streams') }}">Manage income and deductions</a> · <a href="{{ url_for('dashboard.tax_rules') }}">Check tax rules</a></p>
+    {% if not status or status.status != 'verified' %}<p class="tax-note">Using reviewed rules from {{ rules.reviewed_on }}. {{ status.message if status else 'No current matching official-source check is available.' }} Check Tax rules for the latest verification.</p>{% else %}<p class="secondary">Official figures last matched: {{ status.verified_at }}.</p>{% endif %}
+    {% if estimate.blockers %}
+    <section class="tax-note" aria-labelledby="incomplete-heading"><h2 id="incomplete-heading">Finish your estimate</h2>
+        <p>The set-aside target is unavailable until these details are complete.</p>
+        <ul>{% for issue in estimate.blockers %}<li>{{ issue }}</li>{% endfor %}</ul>
+    </section>
+    {% endif %}
+    {% if estimate.calculation %}
+    <section class="tax-totals" aria-label="Annual tax forecast">
+        <div><span>Combined gross income</span><strong>{{ format_amount(estimate.calculation.gross_minor, 'GBP') }}</strong></div>
+        <div><span>Estimated income tax</span><strong>{{ format_amount(estimate.calculation.tax_minor, 'GBP') }}</strong></div>
+        <div><span>Expected automatic deductions</span><strong>{{ format_amount(estimate.withheld_minor, 'GBP') if estimate.withheld_minor is not none else 'Incomplete' }}</strong></div>
+        <div class="tax-reserve"><span>Income tax to set aside · whole year</span><strong>{{ format_amount(estimate.reserve_minor, 'GBP') if estimate.reserve_minor is not none else 'Incomplete' }}</strong></div>
+    </section>
+    {% if estimate.reserve_minor is not none %}
+    <section class="tax-plan" aria-labelledby="plan-heading"><h2 id="plan-heading">Your set-aside plan</h2>
+        {% if estimate.reserve_percent is not none %}
+        <p><strong>{{ estimate.reserve_percent }}%</strong> of your forecast self-employed / CIS receipts after automatic tax deductions would cover the estimated unpaid income tax.</p>
+        <p class="secondary">Calculated as {{ format_amount(estimate.reserve_minor, 'GBP') }} divided by {{ format_amount(estimate.self_managed_gross_minor, 'GBP') }}. This spreads the target across the whole year's forecast receipts; it is not a rate recalculated for the remaining months.</p>
+        {% else %}<p>No forecast self-employed / CIS receipts are available to spread this target over. {% if estimate.reserve_minor %}The {{ format_amount(estimate.reserve_minor, 'GBP') }} target is a shortfall in the entered employment deductions.{% else %}Expected deductions cover the forecast income tax.{% endif %}</p>{% endif %}
+        {% if estimate.reserve_percent is not none and estimate.reserve_percent > 100 %}<p>The target exceeds these receipts; check the forecasts and payroll deductions. This percentage includes any PAYE shortfall.</p>{% endif %}
+        {% if estimate.excess_withheld_minor %}<p>Expected deductions exceed estimated income tax by {{ format_amount(estimate.excess_withheld_minor, 'GBP') }}. This is a forecast excess, not a confirmed refund; CIS credits may also cover National Insurance.</p>{% endif %}
+        <p class="secondary">This is the annual amount to fund yourself after all expected automatic deductions. Money you have already saved or paid to HMRC is not subtracted. It includes any estimated PAYE shortfall.</p>
+    </section>
+    {% endif %}
+    <section aria-labelledby="calculation-heading"><h2 id="calculation-heading">How the tax is calculated</h2>
+        <p>One personal allowance of {{ format_amount(rounded_minor(estimate.calculation.allowance_minor), 'GBP') }} leaves {{ format_amount(rounded_minor(estimate.calculation.taxable_minor), 'GBP') }} taxable income.</p>
+        {% if estimate.calculation.gross_minor > rules.allowance_taper_starts_minor %}<p>The allowance falls by £1 for every £2 above £100,000. This can make the effective tax on extra income 60% before the allowance reaches zero; the estimate includes this reduction.</p>{% endif %}
+        <div class="tax-bands">{% for band in estimate.calculation.bands %}<div><span>{{ band.rate }}% band · {{ format_amount(rounded_minor(band.taxable_minor), 'GBP') }}</span><strong>{{ format_amount(rounded_minor(band.tax_minor), 'GBP') }} tax</strong></div>{% endfor %}</div>
+        {% if estimate.additional_tax_minor %}<p>Income outside employment adds {{ format_amount(estimate.additional_tax_minor, 'GBP') }} to the annual income tax compared with employment alone, before applying CIS credits.</p>{% endif %}
+        <p class="secondary">Amounts are rounded to pennies. Employment, self-employment and CIS income share the bands. Bank receipts are not added again to the gross forecasts.</p>
+    </section>
+    {% endif %}
+    <section aria-labelledby="streams-heading"><h2 id="streams-heading">Income and automatic deductions</h2>
+        {% for row in estimate.rows %}<article class="tax-stream">
+            <div><h3>{{ row.stream.name }}</h3><p class="secondary">{{ stream_kinds[row.stream.kind] }}{{ ' · Archived, still included for this tax year' if row.stream.archived else '' }}</p></div>
+            <dl><div><dt>Gross for {{ rules.tax_year }}</dt><dd>{{ format_amount(row.gross_minor, row.stream.expected_gross_currency) if row.gross_minor is not none else 'Not set' }}</dd></div>
+                <div><dt>Expected tax deducted</dt><dd>{{ format_amount(row.withheld_minor, row.stream.expected_gross_currency) if row.withheld_minor is not none else 'Not calculated' }}</dd></div></dl>
+            <p class="secondary">{{ withholding_modes[row.stream.withholding_mode] }}{% if row.stream.withholding_mode == 'paye_estimate' %} · Employment-only bands with one allowance across all jobs; actual tax codes may differ.{% endif %}</p>
+            <a href="{{ url_for('dashboard.income_streams', stream=row.stream.id) }}">Manage this stream</a>
+        </article>{% else %}<p>No income streams yet.</p>{% endfor %}
+        <p class="secondary">Archived streams remain included because ending a job does not remove its income from the tax year. Set its end date, and keep gross and deductions up to date.</p>
+    </section>
+    <section class="tax-note" aria-labelledby="scope-heading"><h2 id="scope-heading">What this estimate covers</h2>
+        <p>Income tax on employment and self-employment earnings, including CIS. Assumes the standard personal allowance before taper and treats gross business income as taxable earnings.</p>
+        <p>Excludes National Insurance, expenses and write-offs, trading allowance, pensions and other reliefs, savings, dividends, student loans, payments on account and tax already paid directly. The set-aside figure covers income tax only, not your entire Self Assessment bill.</p>
+        <p>PAYE estimates are planning assumptions, not payroll calculations. Enter expected deductions from payslips or HMRC for more accuracy. CIS deductions are advance credits and may differ from the final liability.</p>
+        <p><a href="{{ rules.source_url }}" target="_blank" rel="noopener noreferrer">HMRC rates</a> · <a href="https://www.gov.uk/income-tax/how-you-pay-income-tax" target="_blank" rel="noopener noreferrer">PAYE guidance</a> · <a href="https://www.gov.uk/what-you-must-do-as-a-cis-subcontractor/get-paid" target="_blank" rel="noopener noreferrer">CIS deductions</a></p>
+    </section>
+</main>
+</body>
+</html>

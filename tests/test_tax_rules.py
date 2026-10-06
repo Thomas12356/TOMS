@@ -82,6 +82,14 @@ class TaxRuleTests(unittest.TestCase):
             with self.subTest(changes=changes), self.assertRaises(ValueError):
                 rules.validate_publication(publication(), dict(rules.reviewed_rules(), **changes))
 
+    def test_calculation_bands_must_match_the_verified_display_table(self):
+        original = rules.reviewed_rules()
+        for index, changes in ((0, {'upper_minor': 4000000}), (1, {'rate_percent': 45}), (2, {'upper_minor': 20000000})):
+            edited = dict(original, taxable_bands=[dict(band) for band in original['taxable_bands']])
+            edited['taxable_bands'][index].update(changes)
+            with self.assertRaisesRegex(ValueError, 'calculation bands'):
+                rules.validate_publication(publication(), edited)
+
     def test_corrupt_cache_is_ignored(self):
         with TemporaryDirectory() as directory:
             Path(directory, 'tax-rule-check.json').write_text('not JSON')
