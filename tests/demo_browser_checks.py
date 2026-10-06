@@ -101,7 +101,7 @@ with sync_playwright() as playwright:
             assert 'Browser-created sample work' in page.locator('#your-streams-heading').locator('..').inner_text()
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.income_streams') == 1
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.transactions WHERE confirmed_at IS NOT NULL') == 0
-            stream_card = page.locator('.stream-manage').filter(has_text='Browser-created sample work')
+            stream_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading strong', has_text='Browser-created sample work'))
             assert stream_card.get_by_role('link', name='Manage shifts', exact=True).count() == 0
             overtime_button = stream_card.get_by_role('link', name='Add overtime', exact=True)
             box = overtime_button.bounding_box()
@@ -137,13 +137,13 @@ with sync_playwright() as playwright:
             assert 'GBP 71,000.00' in page.request.get(origin + '/dashboard/tax-estimate').text()
             with page.expect_navigation():
                 page.get_by_role('link', name='← Income stream', exact=True).click()
-            stream_card = page.locator('.stream-manage').filter(has_text='Browser-created sample work')
+            stream_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading strong', has_text='Browser-created sample work'))
             stream_card.locator('summary').click()
             stream_card.locator('[data-income-mode]').select_option('shifts')
             assert not stream_card.locator('[data-regular-forecast]').is_visible()
             with page.expect_navigation():
                 stream_card.get_by_role('button', name='Save changes', exact=True).click()
-            stream_card = page.locator('.stream-manage').filter(has_text='Browser-created sample work')
+            stream_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading strong', has_text='Browser-created sample work'))
             shifts_button = stream_card.get_by_role('link', name='Manage shifts', exact=True)
             assert shifts_button.is_visible()
             box = shifts_button.bounding_box()
@@ -203,6 +203,7 @@ with sync_playwright() as playwright:
             with page.expect_navigation():
                 page.locator('#deduction-type').select_option('mileage')
             assert page.locator('#expense-payment').count() == 0
+            assert page.locator('#mileage-group').count() == 0
             page.locator('#mileage-stream').select_option(shift_stream_id)
             page.locator('#mileage-shift').select_option(shift_identity)
             assert page.locator('#journey-date').input_value() == '2026-10-06'
@@ -219,7 +220,7 @@ with sync_playwright() as playwright:
             page.locator('#start-postcode').fill('SW1A 1AA')
             page.locator('#end-postcode').fill('SW1A 2AA')
             page.locator('form:has(#mileage-miles) input[name=eligible]').check()
-            for selector in ('#mileage-stream','#mileage-vehicle','#mileage-miles','#start-postcode','#mileage-group'):
+            for selector in ('#mileage-stream','#mileage-vehicle','#mileage-miles','#start-postcode'):
                 box=page.locator(selector).bounding_box()
                 assert box['x'] >= 0 and box['x']+box['width'] <= width, (width,selector,box)
             with page.expect_navigation():
@@ -228,6 +229,53 @@ with sync_playwright() as playwright:
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.expense_deductions') == 0
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.mileage_entries') == 0
+            with page.expect_navigation():
+                page.get_by_role('link', name='Manage income streams', exact=True).click()
+            page.get_by_role('link', name='Create a Stream', exact=True).click()
+            page.locator('#stream-name').fill('Browser-linked source')
+            page.locator('#stream-kind').select_option('self_employed')
+            relationship = page.locator('#stream-mileage-business')
+            assert relationship.locator('option[data-employed="true"]').first.is_disabled()
+            relationship.select_option(shift_stream_id)
+            box = relationship.bounding_box()
+            assert box['x'] >= 0 and box['x'] + box['width'] <= width
+            page.locator('#stream-gross').fill('30000')
+            with page.expect_navigation():
+                page.get_by_role('button', name='Create stream', exact=True).click()
+            partner_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading strong', has_text='Browser-linked source'))
+            assert 'Mileage: counted with Browser-created sample work' in partner_card.inner_text()
+            partner_card.locator('summary').click()
+            partner_id = partner_card.locator('[name=stream_id]').input_value()
+            assert partner_card.locator('[data-mileage-relationship]').input_value() == shift_stream_id
+            open_navigation()
+            with page.expect_navigation():
+                page.locator('#main-navigation').get_by_role('link', name='Deductions', exact=True).click()
+            with page.expect_navigation():
+                page.locator('#deduction-type').select_option('mileage')
+            page.locator('#mileage-stream').select_option(partner_id)
+            page.locator('#journey-date').fill('2026-04-11')
+            page.locator('#mileage-vehicle').fill('DEMO CAR')
+            page.locator('#mileage-miles').fill('10000')
+            page.locator('#mileage-purpose').fill('Partner journey')
+            page.locator('#start-postcode').fill('SW1A 1AA')
+            page.locator('#end-postcode').fill('SW1A 2AA')
+            page.locator('form:has(#mileage-miles) input[name=eligible]').check()
+            with page.expect_navigation():
+                page.get_by_role('button', name='Save mileage', exact=True).click()
+            assert 'calculated mileage relief GBP 5,470.00' in page.locator('main').inner_text()
+            with page.expect_navigation():
+                page.get_by_role('link', name='Manage income streams', exact=True).click()
+            partner_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading strong', has_text='Browser-linked source'))
+            partner_card.locator('summary').click()
+            partner_card.locator('[data-mileage-relationship]').select_option('')
+            with page.expect_navigation():
+                partner_card.get_by_role('button', name='Save changes', exact=True).click()
+            open_navigation()
+            with page.expect_navigation():
+                page.locator('#main-navigation').get_by_role('link', name='Deductions', exact=True).click()
+            assert 'calculated mileage relief GBP 5,500.00' in page.locator('main').inner_text()
+            with page.expect_navigation():
+                page.locator('.stream-payment').filter(has_text='Partner journey').get_by_role('button', name='Remove journey', exact=True).click()
             with page.expect_navigation():
                 page.get_by_role('link', name='Edit deduction', exact=True).click()
             with page.expect_navigation():
@@ -247,7 +295,7 @@ with sync_playwright() as playwright:
             assert not errors, errors
             fixture.bank.assert_not_called()
             page.close()
-            print(f'PASS: {width}px stream popup, overtime CRUD and forecasts, hourly/total shifts, linked expense/mileage CRUD, isolated edits, review, balances, simulated sync, tax and return to real mode')
+            print(f'PASS: {width}px stream relationships and shared mileage, popup, overtime CRUD and forecasts, hourly/total shifts, linked expense/mileage CRUD, isolated edits, review, balances, simulated sync, tax and return to real mode')
         finally:
             fixture.doCleanups()
     browser.close()

@@ -360,7 +360,8 @@ def income_streams():
     if selected_id and db.session.get(IncomeStream, selected_id) is None:
         raise NotFound('Income stream not found.')
     error = None
-    create_fields = ('name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'income_mode')
+    from services.transactions.mileage_relationships import mileage_partners, set_mileage_relationship
+    create_fields = ('name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'income_mode', 'mileage_with_stream')
     create_values = dict.fromkeys(create_fields, '')
     create_values.update(income_mode='forecast', expected_gross_period='yearly', expected_gross_currency='GBP', unpaid_holiday='0', unpaid_holiday_unit='weeks', forecast_tax_year='2026-27')
     editing_id, editing_values = None, {}
@@ -372,12 +373,14 @@ def income_streams():
             create_values = submitted
         try:
             action, name, kind, forecast = stream_fields(request.form)
+            # Coordinate relationship changes with mileage and shift writes.
+            db.session.execute(db.select(db.func.pg_advisory_xact_lock(6075157141257144400 + int(test_data_active()))))
             if action == 'create':
                 edited = IncomeStream(id=str(uuid4()), name=name, kind=kind, **forecast)
                 db.session.add(edited)
             else:
                 edited = db.session.scalar(db.select(IncomeStream).where(
-                    IncomeStream.id == stream_id(request.form.get('stream_id', ''))).with_for_update())
+                    IncomeStream.id == stream_id(request.form.get('stream_id', ''))).with_for_update().execution_options(populate_existing=True))
                 if edited is None:
                     raise BadRequest('Income stream not found.')
                 if action == 'update':
@@ -395,6 +398,8 @@ def income_streams():
                         setattr(edited, field, value)
                 else:
                     edited.archived = action == 'archive'
+            if action == 'create' or (action == 'update' and 'mileage_with_stream' in request.form):
+                set_mileage_relationship(edited, request.form.get('mileage_with_stream', ''))
             db.session.commit()
             return redirect(url_for('dashboard.income_streams', stream=selected_id, page=page_number), code=303)
         except BadRequest as invalid:
@@ -404,6 +409,7 @@ def income_streams():
                                     .group_by(TransactionIncome.income_stream_id)).all())
     streams = db.session.scalars(db.select(IncomeStream).order_by(IncomeStream.archived, IncomeStream.name, IncomeStream.id)).all()
     attach_shift_totals(streams)
+    partners = mileage_partners(streams)
     names = {stream.id: stream.name for stream in streams}
     query = db.select(Transaction).join(Transaction.income).options(
         load_only(Transaction.transaction_time, Transaction.counterparty_name, Transaction.amount_minor, Transaction.currency),
@@ -420,7 +426,7 @@ def income_streams():
                                   category_uid=payment.category_uid, feed_item_uid=payment.feed_item_uid,
                                   stream=selected_id or 'all', return_to='income-streams', page=page_number))
             for payment in page.items]
-    return render_template('income_streams.html', streams=streams, selected_stream=selected_id,
+    return render_template('income_streams.html', streams=streams, mileage_partners=partners, selected_stream=selected_id,
                            counts=counts, stream_kinds=STREAM_KINDS, create_values=create_values, error=error,
                            forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES,
                            tax_years=TAX_YEARS, active_days=active_days,

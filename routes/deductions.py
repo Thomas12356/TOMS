@@ -33,7 +33,7 @@ deductions.register_error_handler(SQLAlchemyError, database_error)
 
 EXPENSE_FIELDS = {'csrf_token', 'action', 'payment', 'version', 'stream_id', 'amount', 'purpose', 'category', 'vehicle_key', 'eligible', 'shift_id'}
 MILEAGE_FIELDS = {'csrf_token', 'action', 'entry_id', 'stream_id', 'journey_date', 'location', 'vehicle_type', 'vehicle_key',
-                  'miles', 'purpose', 'start_postcode', 'end_postcode', 'reimbursed', 'mileage_group', 'eligible', 'shift_id', 'version'}
+                  'miles', 'purpose', 'start_postcode', 'end_postcode', 'reimbursed', 'eligible', 'shift_id', 'version'}
 
 
 @deductions.route('', methods=['GET', 'POST'])
@@ -128,9 +128,6 @@ def page():
                         raise ValueError('Remove actual running-cost deductions for this vehicle before using simplified mileage.')
                     entry = MileageEntry(id=entry_id, income_stream_id=stream.id, **fields)
                     journeys = db.session.scalars(db.select(MileageEntry)).all()
-                    group = entry.mileage_group.strip().casefold()
-                    if any(j.income_stream_id == stream.id and j.mileage_group.strip().casefold() != group for j in journeys):
-                        raise ValueError('Use the same business / employer group on every journey for this stream.')
                     if any(j.vehicle_key == entry.vehicle_key and j.vehicle_type != entry.vehicle_type for j in journeys):
                         raise ValueError('This vehicle already has a different vehicle type in the mileage log.')
                     db.session.add(entry)

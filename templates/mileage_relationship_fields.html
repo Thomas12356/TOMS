@@ -1,0 +1,10 @@
+{% macro mileage_relationship(prefix, selected, streams, identity='') %}
+<label for="{{ prefix }}-mileage-business">Business / employer for this income</label>
+<select id="{{ prefix }}-mileage-business" name="mileage_with_stream" data-mileage-relationship>
+    <option value="">A separate business or employer</option>
+    {% for other in streams if other.id != identity %}
+    <option value="{{ other.id }}" data-employed="{{ 'true' if other.kind == 'employed' else 'false' }}" {{ 'selected' if selected == other.id else '' }}>Same {{ 'employer (or associated employer)' if other.kind == 'employed' else 'business' }} as {{ other.name }}{{ ' (archived)' if other.archived else '' }}</option>
+    {% endfor %}
+</select>
+<p class="secondary">If this is another income source for an existing business or employer, choose that stream. Their mileage will then be counted together automatically. Separate businesses or unrelated employers stay separate. Changing this setting recalculates existing journeys too.</p>
+{% endmacro %}

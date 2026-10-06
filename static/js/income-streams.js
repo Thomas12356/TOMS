@@ -26,3 +26,18 @@ document.querySelectorAll('[data-income-mode]').forEach((select) => {
     select.addEventListener('change', updateIncomeMode);
     updateIncomeMode();
 });
+
+// Employment and business mileage are separate schemes; mirror server checks.
+document.querySelectorAll('[data-mileage-relationship]').forEach((select) => {
+    const kind = select.form.querySelector('[name="kind"]');
+    const updateChoices = () => {
+        for (const option of select.options) {
+            option.disabled = Boolean(option.value && (kind.value === '' ||
+                (option.dataset.employed === 'true') !== (kind.value === 'employed')));
+            option.hidden = option.disabled;
+        }
+        if (select.selectedOptions[0]?.disabled) select.value = '';
+    };
+    kind.addEventListener('change', updateChoices);
+    updateChoices();
+});

@@ -1,4 +1,4 @@
-"""UK business mileage and employee mileage relief, calculated once per group/year."""
+"""UK business mileage and employee mileage relief, calculated once per stream/year."""
 from collections import defaultdict
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -11,7 +11,7 @@ VEHICLES = {'car_van': 'Car / van', 'motorcycle': 'Motorcycle', 'bicycle': 'Bicy
 def mileage_allowances(entries):
     """Share the 10,000-mile car/van band across vehicles in the same trade/job.
 
-    Related employments share a group. Reimbursements offset the annual approved
+    Each stream represents one business/job. Reimbursements offset the annual approved
     amount, not individual journeys, so overpayments cannot inflate relief.
     """
     rules = reviewed_rules()
@@ -22,9 +22,8 @@ def mileage_allowances(entries):
         employee = entry.income_stream.kind == 'employed'
         if entry.vehicle_type == 'bicycle' and not employee:
             raise ValueError('Self-employed simplified mileage does not cover bicycles.')
-        # A stream is one business/job unless the owner explicitly groups related streams.
-        group = entry.mileage_group.strip().casefold() or entry.income_stream_id
-        groups[(employee, group, entry.vehicle_type)].append(entry)
+        pool = getattr(entry.income_stream, 'mileage_pool_id', None) or entry.income_stream_id
+        groups[(employee, pool, entry.vehicle_type)].append(entry)
     for (employee, _, vehicle), journeys in groups.items():
         journeys.sort(key=lambda entry: (entry.journey_date, entry.id))
         used, approved = Decimal(0), defaultdict(Decimal)
