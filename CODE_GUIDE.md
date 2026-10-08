@@ -439,3 +439,8 @@ separates it to check recalculation.
   deductions cannot be counted twice.
 - `templates/tax_estimate.html` presents readiness and both savings targets.
   `templates/income.html` collects actual employee NI separately from income tax.
+
+Database backup maintenance lives in `services/database/backups.py`, which can
+run without importing Flask. `deployment/install_backup_timer.py` installs the
+optional daily backup/verification timer. See `DATA_STORAGE.md` for credentials,
+commands, storage boundaries and a recovery walkthrough.
