@@ -11,6 +11,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from models import BrowserSession, OwnerLogin, OwnerSetup
 from services.database.connection import db
+from services.web.activity import record_action
 from services.error_logging import log_failure
 from services.web.sessions import (
     LoggedInOwner, SESSION_LIFETIME, consume_login_attempt, csrf, token_hash,
@@ -65,6 +66,7 @@ def sign_in():
         db.session.execute(db.delete(BrowserSession).where(BrowserSession.expires_at <= now))
         db.session.add(BrowserSession(token_hash=token_hash(token), created_at=now,
                                      last_seen_at=now, expires_at=now + SESSION_LIFETIME))
+        record_action('login', verified_owner=True, sample=False)
         db.session.commit()
         session.clear()
         session.permanent = True
@@ -80,6 +82,7 @@ def sign_out():
         saved = db.session.get(BrowserSession, token_hash(current_user.get_id()))
         if saved is not None:
             db.session.delete(saved)
+            record_action('logout', sample=False)
             db.session.commit()
     logout_user()
     session.clear()
@@ -118,6 +121,7 @@ def setup_owner():
             else:
                 db.session.add(OwnerLogin(id=1, username=username,
                                           password_hash=generate_password_hash(password, method="scrypt")))
+                record_action('setup', verified_owner=True, sample=False)
                 db.session.delete(setup)
                 db.session.execute(db.delete(BrowserSession))
                 db.session.commit()
@@ -156,6 +160,7 @@ def change_password():
             except ValueError as invalid:
                 error = str(invalid)
             else:
+                record_action('owner.change', sample=False)
                 owner.password_hash = generate_password_hash(password, method="scrypt")
                 db.session.execute(db.delete(BrowserSession))
                 db.session.commit()

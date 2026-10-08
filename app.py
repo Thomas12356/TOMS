@@ -15,6 +15,7 @@ from routes.deductions import deductions
 from routes.shifts import shifts
 from routes.review import review
 from routes.login import login
+from routes.system import system
 from services.web.sessions import login_manager, csrf, SESSION_LIFETIME, lock_owner_setup, validate_owner_credentials
 from flask_wtf.csrf import CSRFError
 from werkzeug.security import generate_password_hash
@@ -49,6 +50,7 @@ app.config.update(
 login_manager.init_app(app, add_context_processor=False)
 csrf.init_app(app)
 app.register_blueprint(login)
+app.register_blueprint(system)
 app.register_blueprint(starling)
 app.register_blueprint(sync)
 app.register_blueprint(transactions)

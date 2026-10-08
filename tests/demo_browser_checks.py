@@ -312,10 +312,23 @@ with sync_playwright() as playwright:
             assert page.locator('.test-data-notice').count() == 0
             assert 'REAL-ISOLATION-SENTINEL' in page.locator('main').inner_text()
             assert 'Demo employer' not in page.locator('main').inner_text()
+            fixture.enterContext(patch('routes.system.backup_inventory', return_value=dict(rows=[], count=0, total_bytes=0, error=None)))
+            open_navigation()
+            with page.expect_navigation():
+                page.get_by_role('link', name='System', exact=True).click()
+            assert page.get_by_role('heading', name='System management', exact=True).is_visible()
+            assert page.get_by_role('heading', name='Database storage', exact=True).is_visible()
+            assert page.locator('.activity-record').count() > 0
+            page.locator('#activity-mode').select_option('test')
+            with page.expect_navigation():
+                page.get_by_role('button', name='Filter', exact=True).click()
+            assert page.locator('.activity-record').count() > 0
+            assert all('Test data' in text for text in page.locator('.activity-record').all_inner_texts())
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             assert not errors, errors
             fixture.bank.assert_not_called()
             page.close()
-            print(f'PASS: {width}px stream relationships and shared mileage, popup, overtime CRUD and forecasts, hourly/total shifts, linked expense/mileage CRUD, isolated edits, review, balances, simulated sync, tax and return to real mode')
+            print(f'PASS: {width}px stream relationships and shared mileage, popup, overtime CRUD and forecasts, hourly/total shifts, linked expense/mileage CRUD, isolated edits, review, balances, simulated sync, tax, return to real mode and System activity filtering')
         finally:
             fixture.doCleanups()
     browser.close()

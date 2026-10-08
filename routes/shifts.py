@@ -11,6 +11,7 @@ from models import ExpenseDeduction, IncomeShift, IncomeStream, MileageEntry
 from routes.dashboard import database_error, format_amount
 from routes.helpers import query_values
 from services.database.connection import db
+from services.web.activity import record_action
 from services.database.session import test_data_active
 from services.transactions.income_form import display_amount
 from services.transactions.shifts import FIELDS, LOCAL_TIME, shift_fields, shift_label, shift_version
@@ -79,6 +80,7 @@ def page(stream_id):
                 fields = shift_fields(request.form, stream)
                 for field, value in fields.items():
                     setattr(selected, field, value)
+            record_action('shift.' + action, identity)
             db.session.commit()
             return redirect(url_for('shifts.page', stream_id=stream.id), code=303)
     except (ValueError, BadRequest) as invalid:

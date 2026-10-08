@@ -444,3 +444,9 @@ Database backup maintenance lives in `services/database/backups.py`, which can
 run without importing Flask. `deployment/install_backup_timer.py` installs the
 optional daily backup/verification timer. See `DATA_STORAGE.md` for credentials,
 commands, storage boundaries and a recovery walkthrough.
+
+The System page is `routes/system.py` + `templates/system.html`.
+`services/system/overview.py` reads backup metadata and database sizes.
+`services/web/activity.py` adds fixed action codes to the caller's transaction;
+route handlers call it only after validation, immediately before saving. The
+append-only `UserAction` model lives in `models.py` and migration 022.

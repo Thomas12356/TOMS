@@ -16,6 +16,7 @@ from uuid import uuid4
 from services.transactions.income_streams import STREAM_KINDS, FORECAST_PERIODS, FORECAST_CURRENCIES, TAX_YEARS, active_days, annual_gross, holiday_amount, stream_id, stream_fields
 from routes.helpers import query_values
 from services.database.connection import db
+from services.web.activity import record_action
 from services.error_logging import log_failure
 from services.transactions.income import TAX_TREATMENTS, save_income
 from services.transactions.review import REVIEW_FIELDS, review_version
@@ -60,9 +61,14 @@ def trigger_sync():
     if options.get("force", "0") not in ("0", "1"):
         raise BadRequest("force must be 0 or 1.")
     if test_data_active():
+        if options.get('force') == '1':
+            record_action('sync.sample')
         record_sample_sync()
         return jsonify(started=True, test_data=True), 202
     started = start_dashboard_sync(current_app._get_current_object(), force=options.get("force") == "1")
+    if started and options.get('force') == '1':
+        record_action('sync')
+        db.session.commit()
     return jsonify(started=started), 202
 
 
@@ -259,6 +265,7 @@ def edit_classification(account_uid, category_uid, feed_item_uid):
             db.session.rollback()
             error = str(invalid)
         else:
+            record_action('classification.' + action, str(feed_item_uid))
             db.session.commit()
             return redirect(back_url, code=303)
 
@@ -334,6 +341,7 @@ def edit_income(account_uid, category_uid, feed_item_uid):
             if action != 'save':
                 raise BadRequest('Choose a valid action.')
             save_income(transaction, clean)
+            record_action('income.save', str(feed_item_uid))
             db.session.commit()
         except (BadRequest, Conflict) as invalid:
             db.session.rollback()
@@ -400,6 +408,7 @@ def income_streams():
                     edited.archived = action == 'archive'
             if action == 'create' or (action == 'update' and 'mileage_with_stream' in request.form):
                 set_mileage_relationship(edited, request.form.get('mileage_with_stream', ''))
+            record_action('stream.' + action, edited.id)
             db.session.commit()
             return redirect(url_for('dashboard.income_streams', stream=selected_id, page=page_number), code=303)
         except BadRequest as invalid:
@@ -454,6 +463,8 @@ def tax_rules():
             ni_rules.refresh_rules(current_app.instance_path, force=True)
         except OSError:
             raise BadRequest('Unable to save the rule check. Check the instance directory permissions.') from None
+        record_action('rules', sample=False)
+        db.session.commit()
         return redirect(url_for('dashboard.tax_rules'), code=303)
     status = cached_status(current_app.instance_path)
     start_rule_check(current_app.instance_path)
@@ -509,6 +520,8 @@ def switch_test_data():
         from flask import g
         g.use_test_data = True
         ensure_sample_data()
+    record_action('test-data.on' if enabled else 'test-data.off', sample=enabled)
+    db.session.commit()
     session['use_test_data'] = enabled
     # Reject edit/confirm forms opened before a dataset switch in another tab.
     session.pop('csrf_token', None)

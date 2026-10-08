@@ -339,3 +339,13 @@ class IncomeShift(BaseModel):
     gross_minor = db.Column(db.BigInteger, nullable=False)
     currency = db.Column(db.Text, nullable=False)
     notes = db.Column(db.Text, nullable=False, server_default='')
+
+
+class UserAction(BaseModel):
+    """Append-only owner activity, shared across real and sample modes."""
+    __tablename__ = 'user_actions'
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    occurred_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
+    action = db.Column(db.Text, nullable=False)
+    sample_data = db.Column(db.Boolean, nullable=False, server_default=db.false())
+    record_id = db.Column(db.Text, nullable=False, server_default='')

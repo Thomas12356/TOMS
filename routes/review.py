@@ -12,6 +12,7 @@ from models import Transaction, TransactionIncome
 from routes.dashboard import format_amount, requested_account, requested_page
 from routes.helpers import query_values
 from services.database.connection import db
+from services.web.activity import record_action
 from services.error_logging import log_failure
 from services.transactions.classification import CLASSIFICATION_TYPES, classification_details
 from services.transactions.income import INCOME_TYPES, TAX_TREATMENTS, income_details
@@ -104,5 +105,6 @@ def confirm_transaction(account_uid, category_uid, feed_item_uid):
         return jsonify(error='These details changed. Review the updated transaction before confirming.'), 409
     if transaction.confirmed_at is None:
         transaction.confirmed_at = datetime.now(timezone.utc)
+        record_action('confirm', str(feed_item_uid))
     db.session.commit()
     return jsonify(confirmed=True)

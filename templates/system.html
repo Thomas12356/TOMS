@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System management · TOMS</title><link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}"></head>
+<body>
+<header class="site-header">
+    <a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+    {% with navigation_page='system', navigation_owner=true %}{% include 'navigation.html' %}{% endwith %}
+</header>
+<main class="system-page">
+    <div class="page-heading"><p class="eyebrow">TOMS / SYSTEM</p><h1>System management</h1>
+    <p class="description">Storage, backups and activity for this installation. System information stays real when test data is enabled.</p></div>
+    {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+    {% if storage %}
+    <section aria-labelledby="storage-heading"><h2 id="storage-heading">Database storage</h2>
+        <div class="system-stats">
+            <article class="balance-card"><h3>Total database</h3><p class="balance-amount">{{ format_bytes(storage.total) }}</p><p class="secondary">Records, indexes and PostgreSQL overhead</p></article>
+            <article class="balance-card"><h3>Real records</h3><p class="balance-amount">{{ format_bytes(storage.real) }}</p><p class="secondary">Includes the user action log</p></article>
+            <article class="balance-card"><h3>Test records</h3><p class="balance-amount">{{ format_bytes(storage.sample) }}</p><p class="secondary">Isolated sample dataset</p></article>
+        </div>
+    </section>
+    {% endif %}
+    <section class="system-section" aria-labelledby="backups-heading">
+        <div class="panel-heading"><h2 id="backups-heading">Backups</h2><p>{{ backups.count }} bundles · {{ format_bytes(backups.total_bytes) }} on disk</p></div>
+        <p class="secondary">Local backups in <code>instance/backups</code>. Showing the latest 50. Restore-test results describe the last completed test; this page does not recheck archive contents.</p>
+        {% if backups.error %}<p class="message" role="alert">{{ backups.error }}</p>
+        {% elif not backups.rows %}<p class="empty-state">No backups yet. Follow DATA_STORAGE.md to create and test your first backup.</p>
+        {% else %}<div class="system-records">
+        {% for backup in backups.rows %}<article class="system-record backup-record">
+            <div><h3>{{ format_timestamp(backup.created) if backup.created else 'Unknown backup date' }}</h3><p class="system-id">{{ backup.name }}</p></div>
+            <div><span class="system-label">Size</span><strong>{{ format_bytes(backup.size) }}</strong></div>
+            <div><span class="system-label">Restore test</span><strong class="{{ 'system-ok' if backup.verified else 'secondary' }}">{{ backup.state }}</strong>
+            {% if backup.verified %}<p class="secondary">{{ format_timestamp(backup.verified) }}</p>{% endif %}</div>
+        </article>{% endfor %}</div>{% endif %}
+    </section>
+    <section class="system-section" aria-labelledby="activity-heading">
+        <div class="panel-heading"><h2 id="activity-heading">User action log</h2>
+            <form method="get" class="system-filter"><label for="activity-mode">Show</label><select id="activity-mode" name="mode"><option value="all"{% if mode == 'all' %} selected{% endif %}>All actions</option><option value="real"{% if mode == 'real' %} selected{% endif %}>Real actions</option><option value="test"{% if mode == 'test' %} selected{% endif %}>Test-data actions</option></select><button type="submit">Filter</button></form>
+        </div>
+        <p class="secondary">Successful browser actions recorded since this feature was enabled. Failed submissions, API calls and background jobs are excluded. Times are UTC.</p>
+        {% if actions and actions.items %}<div class="system-records">
+        {% for action in actions.items %}<article class="system-record activity-record">
+            <div><h3>{{ labels.get(action.action, 'Recorded action') }}</h3><p class="secondary">Owner · {{ 'Test data' if action.sample_data else 'Real system' }}</p>
+            {% if action.record_id %}<details><summary>Record ID</summary><p class="system-id">{{ action.record_id }}</p></details>{% endif %}</div>
+            <time datetime="{{ action.occurred_at.isoformat() }}">{{ format_timestamp(action.occurred_at, seconds=true) }}</time>
+        </article>{% endfor %}</div>
+        {% elif not error %}<p class="empty-state">No actions recorded{{ ' for this filter' if mode != 'all' else ' yet' }}.</p>{% endif %}
+        {% if actions and actions.pages > 1 %}<nav class="pagination" aria-label="Action log pages"><span>Page {{ actions.page }} of {{ actions.pages }}</span><div>{% if actions.has_prev %}<a href="{{ url_for('system.page', page=actions.prev_num, mode=mode) }}">← Newer</a>{% endif %}{% if actions.has_next %}<a href="{{ url_for('system.page', page=actions.next_num, mode=mode) }}">Older →</a>{% endif %}</div></nav>{% endif %}
+    </section>
+</main>
+</body></html>
