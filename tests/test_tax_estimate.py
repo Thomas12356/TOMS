@@ -53,8 +53,8 @@ class TaxCalculationTests(unittest.TestCase):
         result = estimate_streams([stream(4000000, 'employed', 'paye_estimate'), stream(2000000)], self.rules)
         self.assertEqual(result['calculation']['tax_minor'], 1143200)
         self.assertEqual(result['withheld_minor'], 0)
-        self.assertEqual(result['reserve_minor'], 594600)
-        self.assertEqual(result['reserve_percent'], Decimal('29.73'))
+        self.assertEqual(result['reserve_minor'], 639180)
+        self.assertEqual(result['reserve_percent'], Decimal('31.96'))
         result = estimate_streams([stream(10000000, 'employed', 'paye_estimate'), stream(1000000)], self.rules)
         self.assertEqual(result['reserve_minor'], 600000)
         self.assertEqual(result['reserve_percent'], Decimal('60.00'))
@@ -63,13 +63,13 @@ class TaxCalculationTests(unittest.TestCase):
         employee, business = stream(4000000, 'employed', 'paye_estimate'), stream(2000000, 'cis', 'manual', 400000)
         result = estimate_streams([employee, business], self.rules)
         self.assertEqual(result['withheld_minor'], 0)
-        self.assertEqual(result['uncovered_minor'], 1143200)
-        self.assertEqual(result['reserve_minor'], 594600)
+        self.assertEqual(result['uncovered_minor'], 1187780)
+        self.assertEqual(result['reserve_minor'], 639180)
         logged = estimate_streams([employee, business], self.rules, credits={employee.id: 100000, business.id: 200000})
         self.assertEqual(logged['withheld_minor'], 300000)
-        self.assertEqual(logged['uncovered_minor'], 843200)
-        self.assertEqual(logged['reserve_minor'], 394600)
-        self.assertEqual(logged['reserve_percent'], Decimal('21.92'))
+        self.assertEqual(logged['uncovered_minor'], 887780)
+        self.assertEqual(logged['reserve_minor'], 439180)
+        self.assertEqual(logged['reserve_percent'], Decimal('24.40'))
 
     def test_employment_only_has_no_manual_business_reserve(self):
         result = estimate_streams([stream(6000000, 'employed')], self.rules)
@@ -93,7 +93,7 @@ class TaxCalculationTests(unittest.TestCase):
         business = stream(3000000, 'cis')
         result = estimate_streams([business], self.rules, credits={business.id: 600000})
         self.assertEqual(result['reserve_minor'], 0)
-        self.assertEqual(result['excess_withheld_minor'], 251400)
+        self.assertEqual(result['excess_withheld_minor'], 146820)
 
     def test_missing_and_foreign_gross_block_partial_totals(self):
         for missing in (stream(None, expected_gross_period=None, expected_gross_currency=None), stream(100000, expected_gross_currency='EUR')):
@@ -110,7 +110,7 @@ class TaxCalculationTests(unittest.TestCase):
                       unpaid_holiday_weeks=Decimal(2))
         result = estimate_streams([part], self.rules)
         self.assertEqual(result['calculation']['gross_minor'], 2407123)
-        self.assertEqual(result['reserve_minor'], 230025)
+        self.assertEqual(result['reserve_minor'], 299032)
 
     def test_more_logged_business_credits_never_increase_reserve(self):
         business = stream(5000000, 'cis')
@@ -123,6 +123,7 @@ class TaxEstimatePageTests(PostgreSQLTestCase):
     def setUp(self):
         super().setUp()
         self.enterContext(patch.dict(app.config, SECRET_KEY='a' * 64, SESSION_COOKIE_SECURE=False))
+        self.rule_check = self.enterContext(patch('services.tax.rules.start_rule_check'))
         now, token = datetime.now(timezone.utc), 'b' * 64
         self.session.add(BrowserSession(token_hash=token_hash(token), created_at=now, last_seen_at=now,
                                         expires_at=now + timedelta(hours=8)))
@@ -138,7 +139,7 @@ class TaxEstimatePageTests(PostgreSQLTestCase):
         response = self.page([stream(4000000, 'employed', 'paye_estimate'), stream(2000000)])
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
-        for expected in ('GBP 60,000.00', 'GBP 11,432.00', 'GBP 0.00', 'GBP 5,946.00', '29.73%', 'whole year'):
+        for expected in ('GBP 60,000.00', 'GBP 11,432.00', 'GBP 0.00', 'GBP 6,391.80', '31.96%', 'whole year'):
             self.assertIn(expected, html)
         self.assertIn('aria-current="page">Tax estimate', html)
         self.assertIn('no-store', response.headers['Cache-Control'])
@@ -169,3 +170,18 @@ class TaxEstimatePageTests(PostgreSQLTestCase):
         with self.client.session_transaction() as cookie:
             cookie.clear()
         self.assertEqual(self.client.get('/dashboard/tax-estimate').status_code, 302)
+
+
+    def test_changed_ni_rules_withhold_savings_targets(self):
+        with patch('services.tax.ni_rules.cached_status', return_value={'status': 'needs_review'}):
+            response = self.page([stream(3000000)])
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertTrue('National Insurance rules changed and need review.' in html)
+        self.assertTrue('Your set-aside plan' not in html)
+        self.assertTrue('Needs review' in html)
+
+
+    def test_estimate_starts_nonblocking_official_rule_check(self):
+        self.assertEqual(self.page([stream(3000000)]).status_code, 200)
+        self.rule_check.assert_called_once_with(app.instance_path)

@@ -23,12 +23,13 @@ states = {
     'unknown': [stream(None, 'cis', 'unknown', name='<script>alert(1)</script>')],
     'foreign': [stream(3000000, expected_gross_currency='EUR')],
     'empty': [],
+    'received': [stream(3000000, 'cis')],
 }
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
     for state, streams in states.items():
         with app.test_request_context('/dashboard/tax-estimate'):
-            html = render_template('tax_estimate.html', estimate=estimate_streams(streams, rules, credits={streams[0].id: 600000} if state == 'cis' else {}), rules=rules,
+            html = render_template('tax_estimate.html', estimate=estimate_streams(streams, rules, credits={streams[0].id: 600000} if state == 'cis' else {streams[0].id: 100000} if state == 'received' else {}, received={streams[0].id: 1500000} if state == 'received' else {}), rules=rules,
                                    status=None, format_amount=format_amount, rounded_minor=rounded_minor,
                                    stream_kinds=STREAM_KINDS,
                                    current_user=SimpleNamespace(is_authenticated=True))
@@ -47,11 +48,14 @@ with sync_playwright() as playwright:
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (state, width)
             assert page.get_by_role('heading', name='Tax estimate', exact=True).is_visible()
             if state == 'complete':
-                assert page.locator('.tax-reserve').inner_text().endswith('GBP 5,946.00')
-                assert '29.73%' in page.locator('.tax-plan').inner_text()
+                assert page.locator('.tax-reserve').inner_text().endswith('GBP 6,391.80')
+                assert '31.96%' in page.get_by_role('region', name='Your set-aside plan', exact=True).inner_text()
                 assert page.locator('.tax-stream').count() == 2
             elif state == 'cis':
-                assert 'GBP 2,514.00' in page.locator('.tax-plan').inner_text()
+                assert 'GBP 1,468.20' in page.get_by_role('region', name='Your set-aside plan', exact=True).inner_text()
+            elif state == 'received':
+                assert page.locator('.received-reserve').inner_text() == 'GBP 1,265.90'
+                assert 'GBP 1,045.80' in page.locator('.tax-totals').inner_text()
             else:
                 assert page.get_by_role('heading', name='Finish your estimate').is_visible()
                 assert page.locator('.tax-plan').count() == 0
@@ -64,4 +68,4 @@ with sync_playwright() as playwright:
                 page.screenshot(path=f'/tmp/toms-tax-estimate-{width}.png', full_page=True)
             page.close()
     browser.close()
-print('Tax estimate: five states at five widths; layout, figures, navigation and JavaScript passed.')
+print('Tax estimate: six states at five widths; layout, figures, navigation and JavaScript passed.')

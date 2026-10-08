@@ -203,3 +203,17 @@ class TransactionReviewTests(SavedTransactionTestCase):
         count = self.session.scalar(db.select(db.func.count()).select_from(Transaction).where(
             Transaction.account_uid == self.account, Transaction.confirmed_at.is_not(None)))
         self.assertEqual(count, 0)
+
+
+    def test_actual_employee_ni_is_shown_before_confirming(self):
+        payment = self.session.get(Transaction, (self.account, self.category, self.incoming))
+        payment.source = 'FASTER_PAYMENTS_IN'
+        payment.transaction_time = datetime.now(timezone.utc)
+        payment.income = TransactionIncome(income_type='employment', tax_treatment='paye',
+            gross_minor=3500, tax_deducted_minor=700, ni_deducted_minor=300, recorded_currency='GBP')
+        self.session.commit()
+        item = self.pending()['transaction']
+        self.assertIn(['Employee NI deducted', 'GBP 3.00'], item['details'])
+        payment.income.ni_deducted_minor = 301
+        self.session.commit()
+        self.assertEqual(self.confirm(item).status_code, 409)

@@ -5,7 +5,7 @@ from decimal import Decimal
 from werkzeug.exceptions import BadRequest
 from services.transactions.income import income_body
 
-FIELDS = ('income_stream_id', 'income_type', 'tax_treatment', 'source_name', 'gross', 'tax_deducted', 'adjustment', 'adjustment_notes')
+FIELDS = ('income_stream_id', 'income_type', 'tax_treatment', 'source_name', 'gross', 'tax_deducted', 'ni_deducted', 'adjustment', 'adjustment_notes')
 
 
 def decimal_places(currency):
@@ -32,7 +32,7 @@ def parse_amount(value, currency, *, signed=False, blank=None):
         raise BadRequest('Enter amounts without commas, currency symbols or extra decimal places.')
     amount = int(Decimal(value) * (100 if places else 1))
     if amount < 0 and not signed:
-        raise BadRequest('Gross income and tax deducted cannot be negative.')
+        raise BadRequest('Gross income, income tax and NI deducted cannot be negative.')
     return amount
 
 
@@ -44,5 +44,6 @@ def form_values(form, currency, *, income_type=None):
         'source_name': form.get('source_name', ''), 'adjustment_notes': form.get('adjustment_notes', ''),
         'gross_minor': parse_amount(form.get('gross', ''), currency),
         'tax_deducted_minor': parse_amount(form.get('tax_deducted', ''), currency),
+        'ni_deducted_minor': parse_amount(form.get('ni_deducted', ''), currency),
         'adjustment_minor': parse_amount(form.get('adjustment', ''), currency, signed=True, blank=0),
     })

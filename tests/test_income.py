@@ -245,3 +245,18 @@ class PostgreSQLIncomeTests(SavedTransactionTestCase):
         self.assertEqual(self.call()["income"]["net_received_minor"], 3500)
         store.save_page(run, self.account, self.category, [item])
         self.assertTrue(self.call()["income"]["needs_review"])
+
+
+    def test_api_cannot_record_payroll_ni_against_linked_business_stream(self):
+        from models import IncomeStream
+        self.classify()
+        self.call('PUT', {'income_type': 'roofing'})
+        stream = IncomeStream(id=str(uuid4()), name='Business', kind='self_employed')
+        self.session.add(stream)
+        payment = self.session.get(Transaction, (self.account, self.category, self.incoming))
+        payment.income.income_stream_id = stream.id
+        self.session.commit()
+        self.call('PUT', dict(income_type='employment', tax_treatment='paye',
+            gross_minor=3000, tax_deducted_minor=200, ni_deducted_minor=300), expected=400)
+        self.assertEqual(self.call()['income']['income_type'], 'roofing')
+        self.assertIsNone(self.call()['income']['ni_deducted_minor'])

@@ -69,12 +69,13 @@ def ensure_sample_data():
     for item, stream, gross, tax, treatment in ((31, 21, 333333, 45717, 'paye'),
                                               (32, 22, 85000, 0, 'no_tax_deducted'),
                                               (33, 23, 100000, 20000, 'cis')):
-        # The payroll adjustment represents NI, excluded from income-tax credits.
+        # Employee NI is logged separately; it never supplies income-tax credits.
         amount = next(example[3] for example in examples if example[0] == item)
-        adjustment = amount - (gross - tax)
+        ni = gross - tax - amount if item == 31 else 0
+        adjustment = amount - (gross - tax - ni)
         db.session.add(TransactionIncome(account_uid=sample_id(1), category_uid=sample_id(11), feed_item_uid=sample_id(item),
                                          income_stream_id=sample_id(stream), income_type='employment' if item == 31 else 'other',
-                                         tax_treatment=treatment, source_name='Sample income', gross_minor=gross, tax_deducted_minor=tax,
+                                         tax_treatment=treatment, source_name='Sample income', gross_minor=gross, tax_deducted_minor=tax, ni_deducted_minor=ni if item == 31 else None,
                                          adjustment_minor=adjustment, adjustment_notes='Demo payroll deductions' if adjustment else None,
                                          recorded_currency='GBP'))
     record_sample_sync()

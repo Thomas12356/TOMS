@@ -76,7 +76,7 @@ def next_transaction():
                         ['Tax treatment', TAX_TREATMENTS[income['tax_treatment']]],
                         ['Income source', income['source_name'] or 'Not specified'],
                         ['Income currency', income['recorded_currency']]])
-        for field, label in (('gross_minor', 'Gross income'), ('tax_deducted_minor', 'Tax deducted'), ('adjustment_minor', 'Adjustment')):
+        for field, label in (('gross_minor', 'Gross income'), ('tax_deducted_minor', 'Tax deducted'), ('ni_deducted_minor', 'Employee NI deducted'), ('adjustment_minor', 'Adjustment')):
             details.append([label, format_amount(income[field], income['recorded_currency']) if income[field] is not None else 'Not specified'])
         details.extend([['Adjustment notes', income['adjustment_notes'] or 'None'],
                         ['Income needs review', 'Yes' if income['needs_review'] else 'No']])

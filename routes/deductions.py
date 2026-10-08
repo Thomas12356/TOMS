@@ -105,6 +105,8 @@ def page():
                 existing = db.session.get(MileageEntry, entry_id)
                 if action == 'delete_mileage':
                     if existing:
+                        if not hmac.compare_digest(values.get('version', '').encode(), mileage_version(existing).encode()):
+                            raise ValueError('This mileage entry changed. Reload before removing it.')
                         db.session.delete(existing)
                 elif action == 'link_mileage_shift':
                     if existing is None:

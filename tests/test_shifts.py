@@ -92,8 +92,8 @@ class ShiftCalculationTests(unittest.TestCase):
             unpaid_holiday_weeks=0, forecast_tax_year='2026-27')
         result = estimate_streams([employment, business], reviewed_rules(), credits={'work': 10000})
         self.assertEqual(result['gross_minor'], 8000000)
-        self.assertEqual(result['reserve_minor'], 790000)
-        self.assertEqual(str(result['reserve_percent']), '39.70')
+        self.assertEqual(result['reserve_minor'], 834580)
+        self.assertEqual(str(result['reserve_percent']), '41.94')
 
 
 class ShiftPageTests(DeductionOwnerCase):

@@ -24,9 +24,9 @@ TAX_TREATMENTS = {
 def income_body(body):
     """Validate an edit form's JSON and return the values to save on TransactionIncome."""
     allowed = {"income_type", "tax_treatment", "source_name", "gross_minor", "tax_deducted_minor",
-               "adjustment_minor", "adjustment_notes"}
+               "ni_deducted_minor", "adjustment_minor", "adjustment_notes"}
     if not isinstance(body, dict) or set(body) - allowed:
-        raise BadRequest("Use income_type, tax_treatment, source_name, gross_minor, tax_deducted_minor, adjustment_minor and adjustment_notes.")
+        raise BadRequest("Use income_type, tax_treatment, source_name, gross_minor, tax_deducted_minor, ni_deducted_minor, adjustment_minor and adjustment_notes.")
     kind, treatment = body.get("income_type"), body.get("tax_treatment", "unknown")
     if not isinstance(kind, str) or kind not in INCOME_TYPES:
         raise BadRequest("Invalid income_type. See /transactions/income-types.")
@@ -39,7 +39,7 @@ def income_body(body):
         raise BadRequest(str(error)) from None
     values = {"income_type": kind, "tax_treatment": treatment,
               "source_name": source}
-    for field in ("gross_minor", "tax_deducted_minor"):
+    for field in ("gross_minor", "tax_deducted_minor", "ni_deducted_minor"):
         value = body.get(field)
         if value is not None and (type(value) is not int or not 0 <= value <= 2**63 - 1):
             raise BadRequest(f"{field} must be a nonnegative integer in minor units or null.")
@@ -53,6 +53,11 @@ def income_body(body):
     gross, tax = values["gross_minor"], values["tax_deducted_minor"]
     if gross is not None and tax is not None and tax > gross:
         raise BadRequest("tax_deducted_minor cannot exceed gross_minor.")
+    ni = values['ni_deducted_minor'] or 0
+    if ni and kind != 'employment':
+        raise BadRequest('Payroll NI can only be recorded against employment income.')
+    if gross is not None and (tax or 0) + ni > gross:
+        raise BadRequest('Income tax and NI deductions cannot exceed gross income.')
     if treatment == "unknown" and tax is not None:
         raise BadRequest("Confirm tax_treatment before recording a tax deduction.")
     if treatment in ("no_tax_deducted", "non_taxable") and tax not in (None, 0):
@@ -61,7 +66,7 @@ def income_body(body):
 
 
 def validate_reconciliation(values, net_received):
-    """Check gross - tax + adjustment = deposit when all components are known.
+    """Check gross - tax - employee NI + adjustment = deposit when all components are known.
 
     This checks the entered amounts; it does not calculate tax liability.
     """
@@ -71,12 +76,12 @@ def validate_reconciliation(values, net_received):
     # These explicit treatments establish zero withholding even if no amount was entered.
     if values["tax_treatment"] in ("no_tax_deducted", "non_taxable"):
         tax = 0
-    before_tax = gross + values["adjustment_minor"]
+    before_tax = gross - (values.get("ni_deducted_minor") or 0) + values["adjustment_minor"]
     if tax is None:
         if before_tax < net_received:
-            raise BadRequest("gross_minor plus adjustment_minor cannot be less than the bank deposit.")
+            raise BadRequest("Gross income less employee NI plus adjustments cannot be less than the bank deposit.")
     elif before_tax - tax != net_received:
-        raise BadRequest("Amounts must reconcile: gross_minor - tax_deducted_minor + adjustment_minor = bank deposit. Explain any adjustment in adjustment_notes.")
+        raise BadRequest("Amounts must reconcile: gross_minor - tax_deducted_minor - ni_deducted_minor + adjustment_minor = bank deposit. Explain any adjustment in adjustment_notes.")
 
 
 def income_details(transaction):
@@ -86,6 +91,7 @@ def income_details(transaction):
     return {"income_stream_id": getattr(record, "income_stream_id", None), "income_type": record.income_type, "tax_treatment": record.tax_treatment,
             "source_name": record.source_name, "gross_minor": record.gross_minor,
             "tax_deducted_minor": record.tax_deducted_minor,
+            "ni_deducted_minor": getattr(record, "ni_deducted_minor", None),
             "adjustment_minor": record.adjustment_minor, "adjustment_notes": record.adjustment_notes,
             "net_received_minor": transaction.amount_minor, "currency": transaction.currency,
             "recorded_currency": record.recorded_currency, "needs_review": record.needs_review,
@@ -94,11 +100,19 @@ def income_details(transaction):
 
 def save_income(transaction, values):
     """Shared API/form save: reconcile the deposit and reopen owner confirmation."""
-    from models import TransactionIncome
+    from models import TransactionIncome, IncomeStream
     from services.transactions.classification import classification_details
 
     if transaction.direction != "IN" or classification_details(transaction)["type"] != "income":
         raise BadRequest("Income details require an incoming transaction classified as income.")
+    linked_id = values.get('income_stream_id') or (transaction.income.income_stream_id if transaction.income else None)
+    if values.get('ni_deducted_minor') and linked_id:
+        stream = transaction.income.income_stream if transaction.income and transaction.income.income_stream_id == linked_id else None
+        if stream is None:
+            from services.database.connection import db
+            stream = db.session.get(IncomeStream, linked_id)
+        if stream is None or stream.kind != 'employed':
+            raise BadRequest('Payroll NI requires an employed income stream.')
     validate_reconciliation(values, transaction.amount_minor)
     values = dict(values, recorded_currency=transaction.currency, needs_review=False)
     if transaction.income is None:

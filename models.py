@@ -157,6 +157,8 @@ class TransactionIncome(BaseModel):
         db.CheckConstraint("char_length(adjustment_notes) <= 2000", name="income_adjustment_notes_length"),
         db.CheckConstraint("gross_minor >= 0"),
         db.CheckConstraint("tax_deducted_minor >= 0"),
+        db.CheckConstraint("ni_deducted_minor >= 0"),
+        db.CheckConstraint("COALESCE(tax_deducted_minor, 0)::numeric + COALESCE(ni_deducted_minor, 0)::numeric <= gross_minor", name="income_total_deductions"),
         db.CheckConstraint("tax_deducted_minor <= gross_minor"),
         db.CheckConstraint("tax_treatment <> 'unknown' OR tax_deducted_minor IS NULL"),
         db.CheckConstraint("tax_treatment <> 'non_taxable' OR tax_deducted_minor IS NULL OR tax_deducted_minor = 0", name="income_non_taxable_zero_tax"),
@@ -174,6 +176,7 @@ class TransactionIncome(BaseModel):
     source_name = db.Column(db.Text)
     gross_minor = db.Column(db.BigInteger)
     tax_deducted_minor = db.Column(db.BigInteger)
+    ni_deducted_minor = db.Column(db.BigInteger)
     adjustment_minor = db.Column(db.BigInteger, nullable=False, server_default="0")
     adjustment_notes = db.Column(db.Text)
     recorded_currency = db.Column(db.Text, nullable=False)

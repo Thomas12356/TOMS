@@ -176,3 +176,24 @@ class TaxRuleTests(unittest.TestCase):
             200, headers={'Content-Encoding': 'gzip'}, stream=httpx.ByteStream(b'not a gzip stream'))))
         with patch.object(rules.httpx, 'Client', return_value=client), self.assertRaisesRegex(ValueError, 'Compressed'):
             rules.fetch_publication()
+
+
+    def test_known_changed_rules_remain_blocked_during_later_network_outage(self):
+        from services.tax import ni_rules, mileage_rules
+        from test_national_insurance import publication as ni_publication
+        from test_deductions import publication as mileage_publication
+        for module in (rules, ni_rules, mileage_rules):
+            with self.subTest(module=module.__name__), TemporaryDirectory() as directory:
+                with patch.object(module, 'fetch_publication', return_value={}):
+                    self.assertEqual(module.refresh_rules(directory, force=True)['status'], 'needs_review')
+                with patch.object(module, 'fetch_publication', side_effect=httpx.ReadTimeout('offline')):
+                    self.assertEqual(module.refresh_rules(directory, force=True)['status'], 'needs_review')
+                self.assertEqual(module.cached_status(directory)['status'], 'needs_review')
+                def approved(*args):
+                    if module is rules:
+                        return publication()
+                    if module is ni_rules:
+                        return ni_publication()
+                    return mileage_publication('tax-relief-for-employees' in args[0])
+                with patch.object(module, 'fetch_publication', side_effect=approved):
+                    self.assertEqual(module.refresh_rules(directory, force=True)['status'], 'verified')

@@ -32,6 +32,11 @@
         <p class="secondary">Rules reviewed: {{ rules.reviewed_on }}. Matching published figures checks the data; it does not validate a completed tax return.</p>
     </section>
 <section class="payment-summary"><h2>UK mileage · {{ mileage_rules.tax_year }}</h2><p>Cars / vans: {{ mileage_rules.car_van_first_pence }}p for the first {{ mileage_rules.threshold_miles }} miles; {{ mileage_rules.car_van_after_pence }}p thereafter. Motorcycles {{ mileage_rules.motorcycle_pence }}p; employee bicycles {{ mileage_rules.employee_bicycle_pence }}p.</p><p role="status">{{ mileage_status.message if mileage_status else 'Mileage verification pending.' }}</p><p class="secondary">Last attempted: {{ mileage_status.checked_at or 'Not yet checked' }}. Both employee and self-employed HMRC publications are checked daily. Unsupported years or locations need reviewed rules.</p><p><a href="{{ mileage_rules.business_source }}">Self-employed official source</a> · <a href="{{ mileage_rules.employee_source }}">Employee official source</a></p></section>
+{% if ni_rules %}<section class="payment-summary"><h2>National Insurance · {{ ni_rules.tax_year }}</h2>
+<p>Class 4: {{ ni_rules.main_percent }}% on business profits above {{ format_amount(ni_rules.lower_profits_minor, 'GBP') }} up to {{ format_amount(ni_rules.upper_profits_minor, 'GBP') }}; {{ ni_rules.upper_percent }}% above that.</p>
+<p role="status">{{ ni_status.message if ni_status else 'NI verification pending. Using reviewed figures.' }}</p>
+<p class="secondary">Reviewed {{ ni_rules.reviewed_on }}. Class 2 is not included as a compulsory payment. Voluntary Class 2 is {{ format_amount(ni_rules.voluntary_class2_weekly_minor, 'GBP') }} a week for eligible people.</p>
+<a href="{{ ni_rules.source_url }}">HMRC NI source</a></section>{% endif %}
 </main>
 </body>
 </html>

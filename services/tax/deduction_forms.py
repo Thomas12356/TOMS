@@ -2,7 +2,7 @@
 import hashlib
 import json
 import re
-from datetime import date
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 from decimal import Decimal
 
@@ -43,7 +43,7 @@ def expense_fields(form, payment):
     if not (payment.direction == 'OUT' and payment.status == 'SETTLED' and payment.currency == 'GBP'):
         raise ValueError('Only settled GBP expenses can be deducted.')
     day = payment.transaction_time.astimezone(ZoneInfo('Europe/London')).date()
-    if not date(2026, 4, 6) <= day <= min(date.today(), date(2027, 4, 5)):
+    if not date(2026, 4, 6) <= day <= min(datetime.now(ZoneInfo('Europe/London')).date(), date(2027, 4, 5)):
         raise ValueError('Choose an existing expense in the supported 2026–27 tax year.')
     amount = parse_amount(form.get('amount', ''), 'GBP')
     if amount is None or not 0 < amount <= payment.amount_minor:
@@ -64,7 +64,7 @@ def mileage_fields(form, stream):
         journey = date.fromisoformat(form.get('journey_date', ''))
     except ValueError:
         raise ValueError('Enter a valid journey date.') from None
-    if not date(2026, 4, 6) <= journey <= min(date.today(), date(2027, 4, 5)):
+    if not date(2026, 4, 6) <= journey <= min(datetime.now(ZoneInfo('Europe/London')).date(), date(2027, 4, 5)):
         raise ValueError('Log a completed journey in 2026–27 (6 April 2026 to 5 April 2027). Other years need reviewed rules.')
     if form.get('location') not in LOCATIONS or form.get('vehicle_type') not in VEHICLES:
         raise ValueError('Choose a supported UK location and vehicle type.')

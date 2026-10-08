@@ -1,0 +1,14 @@
+{
+  "version": "uk-ni-2026-27-v1",
+  "tax_year": "2026-27",
+  "starts_on": "2026-04-06",
+  "ends_on": "2027-04-05",
+  "reviewed_on": "2026-10-08",
+  "source_url": "https://www.gov.uk/self-employed-national-insurance-rates",
+  "lower_profits_minor": 1257000,
+  "upper_profits_minor": 5027000,
+  "main_percent": 6,
+  "upper_percent": 2,
+  "small_profits_minor": 710500,
+  "voluntary_class2_weekly_minor": 365
+}

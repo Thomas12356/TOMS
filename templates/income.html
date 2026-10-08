@@ -32,7 +32,7 @@
             <label for="income-stream">Income stream</label>
             <select id="income-stream" name="income_stream_id" required>
                 <option value="">Choose a stream</option>
-                {% for stream in streams %}<option value="{{ stream.id }}" {{ 'selected' if values.income_stream_id == stream.id else '' }}>{{ stream.name }} · {{ stream_kinds[stream.kind] }}{{ ' (archived)' if stream.archived else '' }}</option>{% endfor %}
+                {% for stream in streams %}<option data-employed="{{ 'true' if stream.kind == 'employed' else 'false' }}" value="{{ stream.id }}" {{ 'selected' if values.income_stream_id == stream.id else '' }}>{{ stream.name }} · {{ stream_kinds[stream.kind] }}{{ ' (archived)' if stream.archived else '' }}</option>{% endfor %}
             </select>
             <p class="secondary"><a href="{{ url_for('dashboard.income_streams') }}">Create or manage income streams</a>. Stream type does not confirm tax treatment or a deduction amount.</p>
             <label for="source-name">Income source <span class="secondary">Optional employer or client name</span></label>
@@ -46,9 +46,14 @@
             <input id="gross" name="gross" value="{{ values.gross }}" inputmode="{{ 'decimal' if decimal_places else 'numeric' }}" maxlength="30" placeholder="{{ '0.00' if decimal_places else '0' }}">
             <label for="tax-deducted">Tax already deducted ({{ unit }}) <span class="secondary">Optional; zero means none</span></label>
             <input id="tax-deducted" name="tax_deducted" value="{{ values.tax_deducted }}" inputmode="{{ 'decimal' if decimal_places else 'numeric' }}" maxlength="30" placeholder="{{ '0.00' if decimal_places else '0' }}">
+            <div class="payroll-ni-fields" data-payroll-ni>
+            <label for="ni-deducted">Employee National Insurance deducted ({{ unit }}) <span class="secondary">Employment payslips only · optional</span></label>
+            <input id="ni-deducted" name="ni_deducted" value="{{ values.ni_deducted }}" inputmode="decimal" maxlength="30" placeholder="0.00">
+            <p class="secondary">Enter actual employee NI, excluding employer contributions. If NI was previously included in an adjustment, remove that portion from the adjustment to avoid counting it twice.</p>
+            </div>
             <fieldset class="income-adjustments">
                 <legend>Adjustments <span class="secondary">Only when needed</span></legend>
-                <p class="secondary">Gross income − tax deducted + adjustment should match the bank deposit. For example, a fee reduces the deposit and needs a negative adjustment.</p>
+                <p class="secondary">Gross income − income tax − employee NI + adjustment should match the bank deposit. For example, a fee reduces the deposit and needs a negative adjustment.</p>
                 <label for="adjustment">Adjustment ({{ unit }})</label>
                 <input id="adjustment" name="adjustment" value="{{ values.adjustment }}" maxlength="30" placeholder="{{ '0.00' if decimal_places else '0' }}">
                 <label for="adjustment-notes">Explain the adjustment</label>
@@ -58,5 +63,6 @@
             <a href="{{ back_url }}">Cancel</a>
         </form>
     </main>
+<script src="{{ url_for('static', filename='js/income.js') }}" defer></script>
 </body>
 </html>
