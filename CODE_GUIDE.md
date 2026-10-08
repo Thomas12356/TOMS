@@ -424,3 +424,18 @@ thresholds, reimbursement offsets, creation, independent jobs, moving and
 archiving members, incompatible/forged IDs and form authentication. The demo
 browser script creates a related stream, checks the threshold and then
 separates it to check recalculation.
+
+### Tax readiness and National Insurance
+
+- `services/tax/readiness.py` builds the short list of records needing attention.
+- `services/tax/records.py` selects actual tax credits, payroll NI, deductions and
+  confirmed gross receipts. It keeps incomplete receipt details separate from
+  blockers that invalidate an annual savings target.
+- `services/tax/national_insurance.py` calculates standard Class 4 once on combined
+  business profits. Reviewed figures live in `data/tax_rules/uk-ni-2026-27.json`;
+  `services/tax/ni_rules.py` checks them against the official source.
+- `services/tax/estimate.py` combines forecasts with those records. The received
+  target allocates the business charge before applying actual credits, so CIS
+  deductions cannot be counted twice.
+- `templates/tax_estimate.html` presents readiness and both savings targets.
+  `templates/income.html` collects actual employee NI separately from income tax.

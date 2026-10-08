@@ -568,3 +568,64 @@ estimate states, transaction review and dashboard layouts. Ruff and Bandit pass;
 the installed-dependency audit reports no known vulnerabilities in 20 packages.
 These checks cover the application; they do not verify deployment firewall or
 tailnet access policies.
+
+## Tax readiness and National Insurance (2026-10-08)
+
+The PostgreSQL suite now passes **352 tests**, including 19 new cases covering
+standard Class 4 thresholds and penny rounding, aggregation across business
+streams, payroll NI reconciliation, rejected malformed/excessive NI, actual CIS
+credits applied once, received-income readiness, pending/future payment exclusion,
+non-taxable receipts, stale expense blocking and records outside the selected
+year. Missing income confirmation blocks the received target without treating
+ordinary unconfirmed spending as a calculation blocker.
+
+The owner-only estimate hides savings targets when NI publication checks report
+changed rules. NI source tests include changes from 6% to 16% and 2% to 12%, so
+substring matches cannot falsely approve altered rates. A live GOV.UK check
+matched the reviewed 2026–27 NI figures. New sample-mode tests confirm payroll NI
+writes and stale forms remain isolated from real records.
+
+Chromium checks pass for six tax-estimate states at five widths, the full live
+sample workflow at 320/390/1280px, and income/rules page layouts. The workflow
+checks readiness expansion, cumulative-target labels, sample payroll NI and
+revised annual targets. Ruff and Bandit pass; the application environment audit
+reports no known vulnerabilities in 25 installed distributions. Migration 021
+applied successfully and a second upgrade was a no-op.
+
+Calculation scope remains explicit: standard Class 4 estimates; actual Class 1
+records rather than future payroll estimates; no automatic Class 2 charge.
+Mixed Class 1/4 annual maximum adjustments, age exemptions and special NI cases
+are not calculated. Deployment firewall and tailnet policies were not audited.
+
+## Checkpoint review (2026-10-08)
+
+The final checkpoint suite passes **359 backend tests**. Review fixes cover:
+
+- Employee NI is displayed in the transaction confirmation popup and participates
+  in its stale-version check. API changes cannot assign payroll NI to an existing
+  self-employed/CIS stream by changing only the historical income type.
+- Claims whose bank transaction dates move out of the tax year remain visible as
+  stale deductions. They block a complete target instead of disappearing silently.
+- Mileage deletion requires the version currently displayed, protecting later
+  changes to its details or shift link. Completed-journey validation uses the
+  Europe/London date, including near midnight during British Summer Time.
+- A known changed official publication stays blocked through later network outages
+  for income tax, NI and mileage. Successful matching verification clears it.
+  Visiting Tax estimate also starts the existing nonblocking daily checks.
+- Payroll NI fields follow employment selection, retain typed values on switching
+  back, and remain subject to server validation. Sync-status failures show the
+  correct real/sample footer label and leave the controls usable.
+
+All six Chromium suites pass: dashboard, income/rules, transaction review, tax
+estimate, live sample workflows, and the new real owner login/password/logout
+workflow. The latter checks wrong credentials, password mismatch and correction,
+revocation of another session, old-password rejection and logout at 320, 390 and
+1280px, entirely within disposable database schemas. Sample workflow checks include
+employment-only NI fields and sample/real isolation. Security scans and dependency
+checks pass; 25 installed application distributions have no known vulnerabilities.
+Live official checks match all three reviewed rule sets. The Git integrity check
+also passes after preserving and quarantining two empty tool checkpoint pointers.
+
+These tests validate the implemented planning scope and application behavior;
+NI exemptions/annual maximum adjustments and deployment access policies remain
+outside the implemented calculation and this local review respectively.

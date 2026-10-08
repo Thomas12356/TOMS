@@ -5,32 +5,26 @@ manually categorising incoming money, and keeping income records ready for
 an annual tax calculation. The goal is to make it clear where income came from,
 which records need attention, and how a tax estimate was calculated.
 
-**Current stage:** a working Flask JSON API with PostgreSQL storage and automated
-tests and an initial transaction dashboard at `/dashboard`. Manual categorisation
-and income details are available through the API and dashboard. The annual tax
-calculator is planned and has not been implemented yet.
+**Current stage:** a Flask dashboard and JSON API with PostgreSQL storage,
+transaction review, income streams, shifts/overtime, expenses, mileage and
+annual income-tax/Class 4 NI planning.
 
 For a short map of the code and a walkthrough of an income edit, start with
 [Getting into the code](CODE_GUIDE.md).
 
 ## Project scope and MVP
 
-The MVP should let you import transactions, review incoming payments, enter
-income details, and see an income-tax estimate for a supported jurisdiction and
-tax year. It will focus on income, with no claimed business expenses or complex
-reliefs in the initial calculation. That assumption should be visible alongside
-the result.
+The first supported income-tax calculation covers England, Wales and Northern
+Ireland for 2026–27. It combines employment, self-employed and CIS forecasts,
+subtracts eligible logged expenses/mileage, and credits only actual recorded
+income-tax deductions. Standard Class 4 National Insurance is included for
+combined business profits; actual payroll Class 1 is recorded separately.
 
-The first supported jurisdiction and tax years still need to be chosen. The
-existing income fields include UK-oriented concepts such as CIS and PAYE, but
-there are currently no country-specific tax rules or calculations. The eventual
-tax profile must capture any region or other inputs required by the supported
-rules. Multi-country support is a later extension.
-
-The proposed initial tax feature calculates income tax within its documented
-scope. National Insurance, other social contributions, tax-return submission,
-and payments to tax authorities would be separate future features. Recorded
-withholding will be shown separately from calculated liability.
+The estimate explains incomplete records and separates annual forecasts from
+a savings target against confirmed income received so far. It does not submit
+tax returns, make payments, calculate student loans or handle every tax/NI
+exception. Mixed Class 1/4 annual maximum adjustments and age exemptions require
+individual review. Other jurisdictions and tax years remain future work.
 
 ## What works today
 
@@ -71,9 +65,9 @@ does not automatically establish its tax treatment.
    shift suggests its local date and a purpose based on its stream and notes.
    Check these against the actual journey; your manual changes are preserved.
 6. Open Tax estimate to see the calculation and the suggested business income-tax
-   reserve. Resolve missing or changed records before relying on that target.
-   This is an income-tax estimate, not a complete tax bill: National Insurance,
-   student loans and tax-return submission are not included.
+   and Class 4 NI reserve. Resolve missing or changed records before relying on that target.
+   This is a planning estimate. Student loans, payments on account and tax-return
+   submission are not included.
 
 Regular forecasts add only explicitly logged overtime after the normal-pay
 absence adjustment. Older ordinary shift records remain excluded. Switching to
@@ -1309,3 +1303,38 @@ db-upgrade` and restart Flask when updating another installation. Sample tables
 are rebuilt by migrations; real journeys are preserved.
 
 Employment rules: [HMRC associated employments](https://www.gov.uk/hmrc-internal-manuals/employment-income-manual/eim31280).
+
+## Tax readiness, savings targets and National Insurance
+
+Open **Tax estimate** for the selected 2026–27 England/Wales/Northern Ireland
+forecast. **Needs attention** lists unconfirmed transactions and incomplete
+income records, with links to correct them. Unconfirmed ordinary spending does
+not block the forecast. Complete and confirm income payments to enable the
+received-income savings target; pending and future payments are excluded.
+
+The page separates whole-year income tax, standard self-employed Class 4 NI,
+actual logged tax credits, the annual business savings target and the cumulative
+target against income received so far. The received target allocates the annual
+business tax/NI charge in proportion to confirmed gross business receipts, then
+subtracts logged business tax deductions once. It does not track money you have
+already saved or paid directly to HMRC. A missing forecast, stale deduction or
+changed official rules prevents presenting a complete savings target.
+
+**Income details** now has an optional employee NI field. Enter the actual
+payslip amount; employer NI is excluded. If an old adjustment includes NI, remove
+that portion of the adjustment when entering it separately. Existing adjustments
+are preserved because the app cannot safely infer their contents. Payroll NI is
+never deducted from income tax or treated as a direct Class 4 credit.
+
+Class 4 uses combined self-employed/CIS profits after eligible deductions, with
+one £12,570 threshold and 6%/2% bands for 2026–27. Employment does not consume that
+threshold. These are standard estimates before mixed Class 1/4 annual maximum
+adjustments; exemptions and special occupations are outside the calculation.
+Class 2 is not added as a compulsory cash charge. Voluntary Class 2 and future
+payroll NI are not estimated. The NI source is checked automatically alongside
+the other rules; changed publications require review.
+
+Run `.venv/bin/flask db-upgrade` and restart Flask when updating another
+installation. Migration 021 adds the optional logged NI amount; it does not
+reinterpret existing payroll records. As with other migrations, sample tables
+are rebuilt; real records are preserved.
