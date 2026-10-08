@@ -1338,3 +1338,11 @@ Run `.venv/bin/flask db-upgrade` and restart Flask when updating another
 installation. Migration 021 adds the optional logged NI amount; it does not
 reinterpret existing payroll records. As with other migrations, sample tables
 are rebuilt; real records are preserved.
+
+### Database backups and recovery
+
+See [DATA_STORAGE.md](DATA_STORAGE.md) for where data lives, protected backup
+bundles, disposable restore verification, daily scheduling, retention and recovery.
+Start with `.venv/bin/python -m services.database.backups backup`; configure the
+separate restore-test login before adding `--verify`. Backup operations run
+outside the web app and do not contact the bank.

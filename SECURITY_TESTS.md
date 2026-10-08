@@ -629,3 +629,25 @@ also passes after preserving and quarantining two empty tool checkpoint pointers
 These tests validate the implemented planning scope and application behavior;
 NI exemptions/annual maximum adjustments and deployment access policies remain
 outside the implemented calculation and this local review respectively.
+
+## Database backup and restore verification — 2026-10-08
+
+- Full PostgreSQL-backed regression suite: 372 tests, successful (four optional
+  backup integration tests skipped in that invocation).
+- All 13 backup tests separately passed against an isolated PostgreSQL 18 server,
+  including all four integration tests: actual archive/restore, concurrent source
+  changes during an exported snapshot, nonempty-target protection and cleanup
+  after manifest mismatch. Safety tests cover corrupted archives, missing
+  maintenance credentials, source/system database refusal, failed backup cleanup,
+  private directory permissions, safe process errors and verified-only retention.
+- A real application backup was restored into the isolated server. Every table's
+  count and row hash matched; all SQLAlchemy-mapped application tables could be
+  read. Temporary databases were removed. The source database was not restored
+  over or modified by backup verification. No bank requests were made.
+- Ruff F checks and Bandit checks passed for the new maintenance code. PostgreSQL
+  tools and systemctl use argument lists without a shell; those intended process
+  calls have narrowly documented Bandit suppressions.
+- The optional daily timer is provided but not enabled: dedicated restore-test
+  credentials require administrator provisioning. Off-device storage, encryption,
+  monitoring/alerts and configuration recovery remain deployment responsibilities.
+  See DATA_STORAGE.md for the boundaries and recovery instructions.
