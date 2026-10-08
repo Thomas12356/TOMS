@@ -11,6 +11,7 @@ from werkzeug.exceptions import BadRequest
 
 from models import ExpenseDeduction, IncomeStream, IncomeShift, MileageEntry, Transaction
 from services.database.connection import db
+from services.web.activity import record_action
 from services.database.session import test_data_active
 from services.web.sessions import require_dashboard_login
 from services.web.test_data import activate_test_data
@@ -133,6 +134,7 @@ def page():
                     if any(j.vehicle_key == entry.vehicle_key and j.vehicle_type != entry.vehicle_type for j in journeys):
                         raise ValueError('This vehicle already has a different vehicle type in the mileage log.')
                     db.session.add(entry)
+            record_action('deduction.' + action, values.get('entry_id', '') if 'mileage' in action else selected.feed_item_uid)
             db.session.commit()
             return redirect(url_for('deductions.page'), code=303)
     except (ValueError, BadRequest) as invalid:

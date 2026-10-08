@@ -8,6 +8,7 @@
     <a href="{{ url_for('dashboard.tax_estimate') }}"{% if navigation_page == 'tax-estimate' %} aria-current="page"{% endif %}>Tax estimate</a>
     <a href="{{ url_for('dashboard.tax_rules') }}"{% if navigation_page == 'tax-rules' %} aria-current="page"{% endif %}>Tax rules</a>
     {% if navigation_owner %}
+    <a href="{{ url_for('system.page') }}"{% if navigation_page == 'system' %} aria-current="page"{% endif %}>System</a>
     <form class="test-data-form" method="post" action="{{ url_for('dashboard.switch_test_data') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" role="switch" aria-checked="{{ 'true' if using_test_data else 'false' }}" name="enabled" value="{{ '0' if using_test_data else '1' }}" title="Switch between real records and isolated sample data.">

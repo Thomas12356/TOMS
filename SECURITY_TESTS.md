@@ -651,3 +651,26 @@ outside the implemented calculation and this local review respectively.
   credentials require administrator provisioning. Off-device storage, encryption,
   monitoring/alerts and configuration recovery remain deployment responsibilities.
   See DATA_STORAGE.md for the boundaries and recovery instructions.
+
+## System management and owner activity — 2026-10-08
+
+- Owner-only read-only `/dashboard/system` rejects anonymous/API access before
+  reading backup metadata or database statistics. Sensitive responses retain
+  no-store and existing CSP/security headers. No maintenance credentials or bank
+  calls are used by the page.
+- Backup inventory tests cover missing directories, malformed metadata, symlinks,
+  mismatched verification markers and incomplete archives. The web page reads
+  metadata only and explicitly does not claim fresh archive integrity checking.
+- Action logging uses fixed action codes and record IDs, not submitted form
+  values. Successful edits and their events share a transaction in real and
+  sample mode. Regression checks cover rollback, failed validation, duplicate
+  confirmations, UTC display and both engine/connection schema mappings. Disposable-schema
+  tests leave no activity events in the live installation.
+- Migration 022 grants the runtime role SELECT/INSERT only on user_actions;
+  real PostgreSQL tests reject UPDATE, DELETE and TRUNCATE.
+- Full backend suite: 386 tests successful, four optional backup integration tests
+  skipped (those were separately exercised during backup implementation).
+- Chromium System-page checks pass at 320, 390, 640, 768 and 1280 pixels for
+  populated, empty and error states, escaped record IDs, filters and mobile nav.
+  Existing dashboard, real login/password and sample-mode end-to-end browser
+  suites also pass. Ruff F and Bandit checks pass.

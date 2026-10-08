@@ -363,3 +363,24 @@ class TestDataTests(unittest.TestCase):
         self.assertEqual(self.client.post(path, data=values).status_code, 400)
         self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.transaction_income'), 0)
         self.bank.assert_not_called()
+
+    def test_activity_stays_in_isolated_real_log_and_marks_sample_changes(self):
+        from models import UserAction
+        from sqlalchemy import inspect
+        from services.web.activity import record_action
+        self.assertEqual(self.toggle(True).status_code, 303)
+        with app.test_request_context('/dashboard/income-streams', method='POST'):
+            g.use_test_data = True
+            record_action('shift.create', sample_id(41), verified_owner=True)
+            db.session.commit()
+        events = db.session.scalars(db.select(UserAction)).all()
+        self.assertTrue(any(row.action == 'test-data.on' and row.sample_data for row in events))
+        self.assertTrue(any(row.action == 'shift.create' and row.sample_data for row in events))
+        with self.runtime.connect() as connection:
+            self.assertFalse(inspect(connection).has_table('user_actions', schema=self.demo_schema))
+        before = len(events)
+        with app.test_request_context('/dashboard/income-streams', method='POST'):
+            g.use_test_data = True
+            record_action('shift.delete', sample_id(41), verified_owner=True)
+            db.session.rollback()
+        self.assertEqual(len(db.session.scalars(db.select(UserAction)).all()), before)

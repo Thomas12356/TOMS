@@ -1346,3 +1346,11 @@ bundles, disposable restore verification, daily scheduling, retention and recove
 Start with `.venv/bin/python -m services.database.backups backup`; configure the
 separate restore-test login before adding `--verify`. Backup operations run
 outside the web app and do not contact the bank.
+
+### System management
+
+The owner-only **System** navigation page (`/dashboard/system`) shows database
+storage, local backup/restore-test metadata and a paginated user action log.
+It stays real in test mode and labels sample actions separately. Migration 022
+adds the activity table; run `flask db-upgrade` before restarting an existing
+installation. See [DATA_STORAGE.md](DATA_STORAGE.md) for storage and audit scope.

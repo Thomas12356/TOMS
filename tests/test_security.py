@@ -310,6 +310,8 @@ class ConcurrentLoginSecurityTests(ApiTestCase):
         OwnerLogin.__table__.create(admin_bound)
         BrowserSession.__table__.create(admin_bound)
         OwnerSetup.__table__.create(admin_bound)
+        from models import UserAction
+        UserAction.__table__.create(admin_bound)
         with self.admin_engine.begin() as connection:
             connection.execute(text(f"GRANT USAGE ON SCHEMA {self.schema} TO toms_app"))
             connection.execute(text(f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {self.schema} TO toms_app"))

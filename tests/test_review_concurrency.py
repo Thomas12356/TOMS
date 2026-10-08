@@ -157,3 +157,17 @@ class ReviewConcurrencyTests(ApiTestCase):
         with self.bound.connect() as connection:
             self.assertEqual(connection.scalar(db.select(db.func.count()).select_from(TransactionIncome)), 1)
             self.assertEqual(connection.scalar(db.select(TransactionIncome.gross_minor)), 1000)
+
+    def test_activity_uses_connection_schema_and_duplicate_confirmations_log_once(self):
+        from models import UserAction
+        from services.web.activity import record_action
+        with app.test_request_context('/dashboard', method='POST'):
+            record_action('confirm', self.item, verified_owner=True)
+            self.sessions.commit()
+        with self.bound.connect() as connection:
+            self.assertEqual(connection.scalar(db.select(db.func.count()).select_from(UserAction).where(UserAction.record_id == self.item)), 1)
+        # Reconfirming an already confirmed transaction must not add another event.
+        self.assertEqual(self.submit(0), 200)
+        self.assertEqual(self.submit(1), 200)
+        with self.bound.connect() as connection:
+            self.assertEqual(connection.scalar(db.select(db.func.count()).select_from(UserAction).where(UserAction.record_id == self.item)), 2)

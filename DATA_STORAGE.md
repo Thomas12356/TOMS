@@ -222,3 +222,45 @@ login. Set `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` for that tes
 server, then run with `RUN_BACKUP_POSTGRES_TESTS=1`. The tests create their own
 randomly named source and restore databases and remove them afterward. Never
 use a production administrator login for this test suite.
+
+## System management page and activity data
+
+Open **System** in the navigation (`/dashboard/system`) after signing in as the
+owner. This page always describes the real installation, even when test data is
+selected. It is read-only and does not read maintenance credentials or call the
+bank. API keys cannot access it.
+
+- Database storage is PostgreSQL's current database size, with separate real and
+  sample schema totals including table indexes/TOAST. Database-level overhead
+  means the schema figures need not add up to the total. Cluster-wide WAL,
+  filesystem free space and backups are not part of this database-size figure.
+- The backups list reads metadata from `instance/backups` and shows the newest
+  50 bundles, their disk sizes and recorded restore-test results. Custom backup
+  locations and off-device copies are not listed. Loading the page does not hash
+  large archives or rerun restore tests; use the verify command for a fresh check.
+- The user action log starts when migration `022_user_actions.sql` is installed.
+  It records successful owner browser actions, including sign-in/out, password
+  changes, classifications, income details, streams, shifts/overtime, deductions,
+  confirmations, test-mode switches, manual sync requests and rule checks.
+  Background jobs, API calls, failed submissions and simple page views are not
+  included. Bank-sync completion remains in sync history, separate from a user
+  requesting sync. Dates use UTC.
+- Activity is stored in `toms.user_actions`, included in subsequent database
+  backups. Sample actions are clearly flagged and use the same transaction as
+  the sample edit; they remain in the real action log when samples are rebuilt.
+  The log contains action codes and record IDs, not submitted form contents,
+  password hashes, session tokens or raw bank payloads. It is retained without
+  automatic pruning. The runtime role can select/insert but cannot update/delete
+  these events. A database administrator can still change them; this is an
+  activity history, not a tamper-proof audit service.
+
+When recovering an archive that includes the activity table, restore its
+append-only permissions **after** any broad table grants:
+
+```sql
+REVOKE UPDATE, DELETE, TRUNCATE ON TABLE toms.user_actions FROM toms_app;
+```
+
+Apply `flask db-upgrade` and restart the app when deploying this feature to
+another installation. As with existing migrations, upgrading rebuilds the
+sample business dataset; real records and the action log are preserved.
