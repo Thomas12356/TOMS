@@ -177,7 +177,7 @@
         </div>
     </dialog>
     <footer class="sync-footer" aria-label="Transaction sync status">
-        <span id="last-synced">Last synced: checking…</span>
+        <span id="last-synced">Last {{ 'simulated sync' if using_test_data else 'synced' }}: checking…</span>
         <span id="sync-message" role="status"></span>
     </footer>
     {% endif %}
