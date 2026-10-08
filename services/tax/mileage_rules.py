@@ -71,12 +71,13 @@ def refresh_rules(instance_path, *, force=False):
         if previous and not force and timedelta(0) <= datetime.now(timezone.utc) - datetime.fromisoformat(previous['checked_at']) < timedelta(days=1):
             return previous
         rules = reviewed_rules()
-        result = dict(rules_sha256=rule_hash(rules), checked_at=datetime.now(timezone.utc).isoformat(), status='unavailable')
+        result = dict(rules_sha256=rule_hash(rules), checked_at=datetime.now(timezone.utc).isoformat(), status='needs_review' if previous.get('status') == 'needs_review' else 'unavailable')
         try:
             hashes = [validate_publication(fetch_publication('https://www.gov.uk/api/content' + path), rules, bool(index))
                       for index, (path, _) in enumerate(SOURCES)]
         except httpx.HTTPError:
-            result['message'] = 'HMRC is unavailable; reviewed mileage rules are retained.'
+            result['message'] = ('HMRC is unavailable. A previously detected rule change still needs review.'
+                                 if result['status'] == 'needs_review' else 'HMRC is unavailable; reviewed mileage rules are retained.')
         except (ValueError, TypeError, AttributeError, KeyError):
             result.update(status='needs_review', message='Published mileage rules changed or could not be validated. Review required.')
         else:

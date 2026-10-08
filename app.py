@@ -194,6 +194,9 @@ def refresh_tax_rules():
     from services.tax.mileage_rules import refresh_rules as refresh_mileage
     mileage = refresh_mileage(app.instance_path, force=True)
     click.echo(mileage['status'] + ': ' + mileage['message'])
+    from services.tax.ni_rules import refresh_rules as refresh_ni
+    ni = refresh_ni(app.instance_path, force=True)
+    click.echo(ni['status'] + ': ' + ni['message'])
 
 
 @app.cli.command("sync-transactions")

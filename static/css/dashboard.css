@@ -1260,3 +1260,15 @@ td.amount {
 .shift-create [data-shift-hourly] label, .shift-create [data-shift-total] label { display: block; margin-bottom: 8px; }
 .stream-payment form:has([name="shift_id"]) { flex: 1 1 220px; min-width: 0; max-width: 100%; }
 .stream-payment form:has([name="shift_id"]) select { display: block; width: 100%; min-width: 0; margin: 8px 0; padding: 8px; color: var(--text); background: var(--surface); border: 1px solid var(--border); font: inherit; }
+
+/* Tax readiness keeps corrective actions close to the figures they affect. */
+.tax-readiness { padding: 18px 20px; border: 1px solid var(--border); background: var(--surface); }
+.tax-readiness h2 { margin-top: 0; }
+.tax-readiness details { padding: 12px 0; border-top: 1px solid var(--border); }
+.tax-readiness summary { cursor: pointer; overflow-wrap: anywhere; }
+.tax-readiness summary strong { margin-left: 8px; font-family: var(--mono); }
+.tax-readiness li { margin: 8px 0; overflow-wrap: anywhere; }
+.received-reserve { font: 600 24px var(--mono); overflow-wrap: anywhere; }
+
+.payroll-ni-fields { display: grid; gap: 8px; }
+.payroll-ni-fields[hidden] { display: none; }

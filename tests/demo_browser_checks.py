@@ -68,6 +68,20 @@ with sync_playwright() as playwright:
             assert 'REAL-ISOLATION-SENTINEL' not in page.locator('main').inner_text()
             page.wait_for_function("() => document.querySelector('#last-synced').textContent.startsWith('Last simulated sync:')")
             assert 'GBP 7,550.75' in page.locator('#account-balances').inner_text()
+            payroll_path = f'/dashboard/transactions/{sample_id(1)}/{sample_id(11)}/{sample_id(31)}/income'
+            page.goto(origin + payroll_path)
+            assert page.locator('#ni-deducted').is_visible()
+            assert page.locator('#ni-deducted').input_value() == '76.16'
+            page.locator('#income-stream').select_option(sample_id(22))
+            assert page.locator('#ni-deducted').is_hidden()
+            assert page.locator('#ni-deducted').is_disabled()
+            page.locator('#income-stream').select_option(sample_id(21))
+            assert page.locator('#ni-deducted').is_visible()
+            assert page.locator('#ni-deducted').input_value() == '76.16'
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
+            page.goto(origin + '/dashboard')
+            close_review()
+
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
             with page.expect_navigation():
                 page.locator('#sync-now').click()
@@ -82,7 +96,13 @@ with sync_playwright() as playwright:
             with page.expect_navigation():
                 page.get_by_role('link', name='Tax estimate', exact=True).click()
             assert 'GBP 70,000.00' in page.locator('.tax-totals').inner_text()
-            assert 'GBP 9,746.00' in page.locator('.tax-reserve').inner_text()
+            assert 'GBP 10,791.80' in page.locator('.tax-reserve').inner_text()
+            assert page.get_by_role('heading', name='Needs attention', exact=True).is_visible()
+            assert page.locator('.received-reserve').inner_text() == 'Needs review'
+            assert 'GBP 76.16' in page.locator('#ni-heading').locator('..').inner_text()
+            page.locator('.tax-readiness summary').first.click()
+            assert page.locator('.tax-readiness').get_by_role('link', name='Review records').first.is_visible()
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
             open_navigation()
             with page.expect_navigation():
                 page.get_by_role('link', name='Income streams', exact=True).click()

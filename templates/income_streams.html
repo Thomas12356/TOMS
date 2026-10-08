@@ -49,7 +49,7 @@
                 {% endif %}
             </div>
             {% if stream.income_mode == 'shifts' %}
-            <p class="secondary">Individual shifts · {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} entered gross for {{ stream.forecast_tax_year }}. No future shifts assumed.</p>
+            <p class="secondary">Individual shifts · {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} entered gross for {{ stream.forecast_tax_year }}. Includes entered planned shifts; remaining weeks are not extrapolated.</p>
             {% elif stream.expected_gross_minor is not none %}
             <p class="secondary">Expected gross: {{ format_amount(stream.expected_gross_minor, stream.expected_gross_currency) }} {{ stream.expected_gross_period }} · {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} for {{ stream.forecast_tax_year }} after {{ holiday_amount(stream) }} {{ stream.unpaid_holiday_unit }} unpaid holiday / absence</p>
             {% else %}<p class="secondary">Expected gross income not set.</p>{% endif %}

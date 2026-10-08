@@ -178,12 +178,13 @@ def refresh_rules(instance_path, *, force=False):
             except (KeyError, TypeError, ValueError):
                 pass
         result = dict(version=rules['version'], rules_sha256=rule_hash(rules), checked_at=datetime.now(timezone.utc).isoformat(),
-                      verified_at=previous.get('verified_at'), status='unavailable')
+                      verified_at=previous.get('verified_at'), status='needs_review' if previous.get('status') == 'needs_review' else 'unavailable')
         try:
             payload = fetch_publication()
             result['content_sha256'] = validate_publication(payload, rules)
         except (httpx.HTTPError, json.JSONDecodeError):
-            result['message'] = 'GOV.UK is unavailable. The reviewed rules are retained.'
+            result['message'] = ('GOV.UK is unavailable. A previously detected rule change still needs review.'
+                                 if result['status'] == 'needs_review' else 'GOV.UK is unavailable. The reviewed rules are retained.')
         except (ValueError, TypeError, AttributeError):
             result.update(status='needs_review', message='The official publication changed or could not be validated. The reviewed rules are retained.')
         else:
@@ -211,6 +212,8 @@ def start_rule_check(instance_path):
             refresh_rules(instance_path)
             from services.tax.mileage_rules import refresh_rules as refresh_mileage
             refresh_mileage(instance_path)
+            from services.tax.ni_rules import refresh_rules as refresh_ni
+            refresh_ni(instance_path)
         except OSError:
             pass  # A read-only cache never prevents viewing the reviewed rules.
         finally:

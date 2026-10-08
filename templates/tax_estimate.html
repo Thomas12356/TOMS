@@ -11,33 +11,56 @@
         {% include 'test_data_notice.html' %}
     <div class="page-heading"><p class="eyebrow">TOMS / TAX</p><h1>Tax estimate</h1></div>
     <p>{{ rules.jurisdiction }} · {{ rules.tax_year }} · 6 April 2026 – 5 April 2027</p>
-    <p class="secondary">A whole-year income-tax forecast from your income streams. Combined earnings set the bands. Only PAYE / CIS tax actually logged on payments is credited; eligible logged expenses and mileage reduce taxable earnings.</p>
+    <p class="secondary">A whole-year income tax and self-employed National Insurance forecast from your income streams. Combined earnings set the bands. Only PAYE / CIS tax actually logged on payments is credited; eligible logged expenses and mileage reduce taxable earnings.</p>
     <p><a href="{{ url_for('dashboard.income_streams') }}">Manage income and deductions</a> · <a href="{{ url_for('dashboard.tax_rules') }}">Check tax rules</a></p>
     {% if not status or status.status != 'verified' %}<p class="tax-note">Using reviewed rules from {{ rules.reviewed_on }}. {{ status.message if status else 'No current matching official-source check is available.' }} Check Tax rules for the latest verification.</p>{% else %}<p class="secondary">Official figures last matched: {{ status.verified_at }}.</p>{% endif %}
+    <section class="tax-readiness" aria-labelledby="readiness-heading">
+        <h2 id="readiness-heading">Needs attention</h2>
+        <p>{{ 'Annual target incomplete' if estimate.blockers else 'Annual forecast available' }} · {{ 'Received-income target needs review' if estimate.received_issues or estimate.blockers else 'Received-income target available' }}</p>
+        {% for group in estimate.attention %}
+        <details><summary>{{ group.title }} <strong>{{ group.count }}</strong></summary>
+            <p><a href="{{ group.url }}">{{ 'Open first record' if group['items'] else 'Review records' }}</a></p>
+            {% if group['items'] %}<ul>{% for item in group['items'] %}<li><a href="{{ item.url }}">{{ item.label }}</a></li>{% endfor %}</ul>
+            {% if group.count > group['items']|length %}<p class="secondary">Showing the first {{ group['items']|length }} records.</p>{% endif %}{% endif %}
+        </details>
+        {% else %}<p class="secondary">No transaction details flagged. Check that all income sources and forecasts are included.</p>{% endfor %}
+        {% if estimate.received_issues %}<ul>{% for issue in estimate.received_issues %}<li>{{ issue }}</li>{% endfor %}</ul>{% endif %}
+        <p class="secondary">Unconfirmed spending does not block the forecast. Incomplete income details prevent the received-income target; pending payments are excluded.</p>
+    </section>
     {% if estimate.blockers %}
     <section class="tax-note" aria-labelledby="incomplete-heading"><h2 id="incomplete-heading">Finish your estimate</h2>
         <p>The set-aside target is unavailable until these details are complete.</p>
         <ul>{% for issue in estimate.blockers %}<li>{{ issue }}</li>{% endfor %}</ul>
+        <p><a href="{{ url_for('dashboard.income_streams') }}">Complete income forecasts</a> · <a href="{{ url_for('deductions.page') }}">Review deductions</a> · <a href="{{ url_for('dashboard.tax_rules') }}">Review rules</a></p>
     </section>
     {% endif %}
     {% if estimate.calculation %}
     <section class="tax-totals" aria-label="Annual tax forecast">
         <div><span>Combined gross income</span><strong>{{ format_amount(estimate.gross_minor, 'GBP') }}</strong></div>
         <div><span>Estimated income tax</span><strong>{{ format_amount(estimate.calculation.tax_minor, 'GBP') }}</strong></div>
+        <div><span>Estimated self-employed NI · Class 4</span><strong>{{ format_amount(estimate.ni_minor, 'GBP') }}</strong></div>
+        <div><span>Income tax + Class 4 NI</span><strong>{{ format_amount(estimate.total_liability_minor, 'GBP') }}</strong></div>
         <div><span>Logged tax already withheld</span><strong>{{ format_amount(estimate.withheld_minor, 'GBP') if estimate.withheld_minor is not none else 'Incomplete' }}</strong></div>
-        <div class="tax-reserve"><span>Manual business set-aside · whole year</span><strong>{{ format_amount(estimate.reserve_minor, 'GBP') if estimate.reserve_minor is not none else 'Incomplete' }}</strong></div>
+        <div class="tax-reserve"><span>Business tax + NI set-aside · whole year</span><strong>{{ format_amount(estimate.reserve_minor, 'GBP') if estimate.reserve_minor is not none else 'Incomplete' }}</strong></div>
     </section>
     {% if estimate.reserve_minor is not none %}
     <section class="tax-plan" aria-labelledby="plan-heading"><h2 id="plan-heading">Your set-aside plan</h2>
         {% if estimate.reserve_percent is not none %}
-        <p><strong>{{ estimate.reserve_percent }}%</strong> of your forecast self-employed / CIS receipts after logged tax deductions would cover the extra income tax from your self-employed / CIS work.</p>
+        <p><strong>{{ estimate.reserve_percent }}%</strong> of your forecast self-employed / CIS receipts after logged tax deductions would cover the extra income tax and standard Class 4 NI from your self-employed / CIS work.</p>
         <p class="secondary">Calculated as {{ format_amount(estimate.reserve_minor, 'GBP') }} divided by {{ format_amount(estimate.self_managed_gross_minor, 'GBP') }}. This spreads the target across the whole year's forecast receipts; it is not a rate recalculated for the remaining months.</p>
         {% else %}<p>No self-employed / CIS receipts to spread a target across.</p>{% endif %}
-        <p class="secondary">Employment-only income tax is the baseline. This target covers the extra tax from business income, minus logged business tax credits. Future PAYE / CIS deductions, money saved and direct HMRC payments are not assumed.</p>
-        <p><strong>Forecast tax not yet covered: {{ format_amount(estimate.uncovered_minor, 'GBP') }}</strong>. This includes future payroll tax that has not yet been logged; it is not all a manual savings target.</p>
-        {% if estimate.excess_withheld_minor %}<p>Logged credits exceed estimated income tax by {{ format_amount(estimate.excess_withheld_minor, 'GBP') }}. This is not a confirmed refund.</p>{% endif %}
+        <p class="secondary">Employment-only income tax is the baseline. This target covers the extra income tax and Class 4 NI from business income, minus logged business tax credits. Future PAYE / CIS deductions, money saved and direct HMRC payments are not assumed.</p>
+        <p><strong>Forecast income tax + Class 4 NI not yet covered: {{ format_amount(estimate.uncovered_minor, 'GBP') }}</strong>. This includes future payroll tax that has not yet been logged; it is not all a manual savings target.</p>
+        {% if estimate.excess_withheld_minor %}<p>Logged credits exceed estimated income tax and Class 4 NI by {{ format_amount(estimate.excess_withheld_minor, 'GBP') }}. This is not a confirmed refund.</p>{% endif %}
     </section>
     {% endif %}
+    <section class="tax-plan" aria-labelledby="received-heading">
+        <h2 id="received-heading">Set aside against income received so far</h2>
+        <p class="received-reserve"><strong>{{ format_amount(estimate.received_reserve_minor, 'GBP') if estimate.received_reserve_minor is not none else 'Needs review' }}</strong></p>
+        <p>Based on {{ format_amount(estimate.received_gross_minor or 0, 'GBP') }} confirmed gross self-employed / CIS income received in this tax year.</p>
+        <p class="secondary">The annual business income-tax and NI charge is allocated in proportion to gross business income received, then actual business tax deductions are subtracted once. Employment forecasts still determine the income-tax bands. This is a cumulative savings target, not a bill or an additional payment each time you visit.</p>
+        <p class="secondary">Money you have already saved and payments made directly to HMRC are not tracked. Future payroll deductions are not assumed. Update forecasts as your work changes.</p>
+    </section>
     <section aria-labelledby="calculation-heading"><h2 id="calculation-heading">How the tax is calculated</h2>
         <p>One personal allowance of {{ format_amount(rounded_minor(estimate.calculation.allowance_minor), 'GBP') }} leaves {{ format_amount(rounded_minor(estimate.calculation.taxable_minor), 'GBP') }} taxable income.</p>
         {% if estimate.calculation.gross_minor > rules.allowance_taper_starts_minor %}<p>The allowance falls by £1 for every £2 above £100,000. This can make the effective tax on extra income 60% before the allowance reaches zero; the estimate includes this reduction.</p>{% endif %}
@@ -46,6 +69,14 @@
         <p class="secondary">Amounts are rounded to pennies. Employment, self-employment and CIS income share the bands. Bank receipts are not added again to the gross forecasts.</p>
     </section>
     {% endif %}
+    <section class="tax-note" aria-labelledby="ni-heading">
+        <h2 id="ni-heading">National Insurance</h2>
+        <p>Standard Class 4: {{ estimate.ni_rules.main_percent }}% of combined self-employed / CIS profits above {{ format_amount(estimate.ni_rules.lower_profits_minor, 'GBP') }} up to {{ format_amount(estimate.ni_rules.upper_profits_minor, 'GBP') }}, then {{ estimate.ni_rules.upper_percent }}%. The thresholds apply once across your business streams. Employment earnings do not use up the Class 4 threshold.</p>
+        <p>Logged employee NI: <strong>{{ format_amount(estimate.ni_paid_minor, 'GBP') }}</strong>. This is payroll Class 1 already taken from pay. It is shown separately and is not an income-tax credit.</p>
+        {% if estimate.mixed_ni %}<p><strong>Mixed employment and self-employment:</strong> this uses standard Class 4 before any annual maximum adjustment. HMRC may reduce the amount after considering Class 1 contributions. The target may therefore overestimate your NI.</p>{% endif %}
+        <p class="secondary">Assumes Class 4 applies for the whole year. Age exemptions, special occupations and individual NI adjustments are not calculated. Class 2 is not added as a compulsory charge; voluntary contributions are excluded. Payroll Class 1 is recorded from payslips, not forecast from annual pay.</p>
+        <a href="{{ estimate.ni_rules.source_url }}" target="_blank" rel="noopener noreferrer">HMRC National Insurance rules</a>
+    </section>
     <section aria-labelledby="streams-heading"><h2 id="streams-heading">Income, logged credits and expenses</h2>
         {% for row in estimate.rows %}<article class="tax-stream">
             <div><h3>{{ row.stream.name }}</h3><p class="secondary">{{ stream_kinds[row.stream.kind] }}{{ ' · Archived, still included for this tax year' if row.stream.archived else '' }}</p></div>
@@ -59,7 +90,7 @@
     </section>
     <section class="tax-note" aria-labelledby="scope-heading"><h2 id="scope-heading">What this estimate covers</h2>
         <p>Income tax on employment and self-employment earnings, including CIS. Assumes the standard personal allowance before taper and subtracts eligible logged expenses and mileage from forecast earnings.</p>
-        <p>Excludes National Insurance, loss relief, capital allowances, trading allowance, pensions and other reliefs, savings, dividends, student loans, payments on account and tax already paid directly. The set-aside figure covers income tax only, not your entire Self Assessment bill.</p>
+        <p>Excludes loss relief, capital allowances, trading allowance, pensions and other reliefs, savings, dividends, student loans, payments on account and tax already paid directly. The set-aside figure covers business income tax and standard Class 4 NI; it is not your complete Self Assessment bill.</p>
         <p>Log actual income-tax deductions from payslips or contractor statements on each payment. Future PAYE and CIS deductions are never guessed. CIS deductions are advance credits and may differ from the final liability.</p>
         <p><a href="{{ rules.source_url }}" target="_blank" rel="noopener noreferrer">HMRC rates</a> · <a href="https://www.gov.uk/income-tax/how-you-pay-income-tax" target="_blank" rel="noopener noreferrer">PAYE guidance</a> · <a href="https://www.gov.uk/what-you-must-do-as-a-cis-subcontractor/get-paid" target="_blank" rel="noopener noreferrer">CIS deductions</a></p>
     </section>

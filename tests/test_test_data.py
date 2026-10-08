@@ -63,6 +63,7 @@ class TestDataTests(unittest.TestCase):
         self.addCleanup(app.after_request_funcs[None].remove, close_request_session)
         self.bank = self.enterContext(patch('services.banking.client.http_client.send', side_effect=AssertionError('Test mode must never contact the bank')))
         self.start_sync = self.enterContext(patch('routes.dashboard.start_dashboard_sync'))
+        self.enterContext(patch('services.tax.rules.start_rule_check'))
         now = datetime.now(timezone.utc)
         self.token = 'f' * 64
         db.session.add(OwnerLogin(id=1, username='demo-test-owner', password_hash=generate_password_hash('test-pass-123')))
@@ -263,11 +264,11 @@ class TestDataTests(unittest.TestCase):
         self.toggle(True)
         with self.admin.connect() as connection:
             rows = connection.execute(text(f"""SELECT t.amount_minor, i.gross_minor,
-                i.tax_deducted_minor, i.adjustment_minor FROM {self.demo_schema}.transaction_income i
+                i.tax_deducted_minor, i.ni_deducted_minor, i.adjustment_minor FROM {self.demo_schema}.transaction_income i
                 JOIN {self.demo_schema}.transactions t USING (account_uid, category_uid, feed_item_uid)""")).all()
             self.assertEqual(len(rows), 3)
-            for net, gross, tax, adjustment in rows:
-                self.assertEqual(net, gross - tax + adjustment)
+            for net, gross, tax, ni, adjustment in rows:
+                self.assertEqual(net, gross - tax - (ni or 0) + adjustment)
             self.assertEqual(connection.scalar(text(f'SELECT count(*) FROM {self.demo_schema}.income_shifts WHERE is_overtime')), 1)
         self.assertTrue('GBP 70,000.00' in self.client.get('/dashboard/tax-estimate').get_data(as_text=True))
         path = f'/dashboard/income-streams/{sample_id(21)}/shifts'
@@ -334,4 +335,31 @@ class TestDataTests(unittest.TestCase):
         db.session.remove()
         self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.mileage_entries'), 0)
         self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.expense_deductions'), 0)
+        self.bank.assert_not_called()
+
+    def test_tax_readiness_and_logged_payroll_ni_are_visible_in_demo_only(self):
+        self.toggle(True)
+        response = self.client.get('/dashboard/tax-estimate')
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        for expected in ('Needs attention', 'Transactions awaiting your confirmation',
+                         'Received-income target needs review', 'GBP 76.16', 'Class 4'):
+            self.assertTrue(expected in html, expected)
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.transaction_income'), 0)
+        self.bank.assert_not_called()
+
+    def test_actual_payroll_ni_edit_reconciles_and_cannot_cross_datasets(self):
+        self.toggle(True)
+        path = f'/dashboard/transactions/{sample_id(1)}/{sample_id(11)}/{sample_id(31)}/income'
+        html = self.client.get(path).get_data(as_text=True)
+        values = dict(action='save', income_stream_id=sample_id(21), tax_treatment='paye', gross='3333.33',
+            tax_deducted='457.17', ni_deducted='76.16', adjustment='0', adjustment_notes='',
+            csrf_token=re.search(r'name="csrf_token" value="([^"]+)"', html)[1],
+            version=re.search(r'name="version" value="([^"]+)"', html)[1])
+        self.assertEqual(self.client.post(path, data=values).status_code, 303)
+        with self.admin.connect() as connection:
+            self.assertEqual(connection.scalar(text(f'SELECT ni_deducted_minor FROM {self.demo_schema}.transaction_income WHERE income_type = :kind'), {'kind': 'employment'}), 7616)
+        self.toggle(False)
+        self.assertEqual(self.client.post(path, data=values).status_code, 400)
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.transaction_income'), 0)
         self.bank.assert_not_called()

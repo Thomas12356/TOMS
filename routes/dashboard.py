@@ -312,7 +312,7 @@ def edit_income(account_uid, category_uid, feed_item_uid):
         values.update(income_stream_id=record.income_stream_id or '', income_type=record.income_type, tax_treatment=record.tax_treatment,
                       source_name=record.source_name or '', adjustment_notes=record.adjustment_notes or '')
         if not currency_changed:
-            for field, column in (('gross', 'gross_minor'), ('tax_deducted', 'tax_deducted_minor'), ('adjustment', 'adjustment_minor')):
+            for field, column in (('gross', 'gross_minor'), ('tax_deducted', 'tax_deducted_minor'), ('ni_deducted', 'ni_deducted_minor'), ('adjustment', 'adjustment_minor')):
                 values[field] = display_amount(getattr(record, column), transaction.currency)
     error, error_status = None, 400
     original_values = dict(values)
@@ -440,7 +440,7 @@ def income_streams():
 def tax_rules():
     """Show reviewed rules and their official-source verification status."""
     from services.tax.rules import cached_status, reviewed_rules, refresh_rules, start_rule_check
-    from services.tax import mileage_rules
+    from services.tax import mileage_rules, ni_rules
 
     if request.authorization is not None or not current_user.is_authenticated:
         return redirect(url_for('login.sign_in'))
@@ -451,6 +451,7 @@ def tax_rules():
         try:
             refresh_rules(current_app.instance_path, force=True)
             mileage_rules.refresh_rules(current_app.instance_path, force=True)
+            ni_rules.refresh_rules(current_app.instance_path, force=True)
         except OSError:
             raise BadRequest('Unable to save the rule check. Check the instance directory permissions.') from None
         return redirect(url_for('dashboard.tax_rules'), code=303)
@@ -458,6 +459,7 @@ def tax_rules():
     start_rule_check(current_app.instance_path)
     return render_template('tax_rules.html', rules=reviewed_rules(), status=status,
                            mileage_rules=mileage_rules.reviewed_rules(), mileage_status=mileage_rules.cached_status(current_app.instance_path),
+                           ni_rules=ni_rules.reviewed_rules(), ni_status=ni_rules.cached_status(current_app.instance_path),
                            format_amount=format_amount, current_user=current_user)
 
 
@@ -465,7 +467,7 @@ def tax_rules():
 def tax_estimate():
     """Annual planning across all streams; never add bank receipts to forecasts."""
     from services.tax.estimate import estimate_streams, rounded_minor
-    from services.tax.rules import reviewed_rules, cached_status
+    from services.tax.rules import reviewed_rules, cached_status, start_rule_check
 
     if request.authorization is not None or not current_user.is_authenticated:
         return redirect(url_for('login.sign_in'))
@@ -474,11 +476,20 @@ def tax_estimate():
         raise BadRequest('The estimate currently supports England, Wales and Northern Ireland, 2026–27 only.')
     streams = db.session.scalars(db.select(IncomeStream).where(
         IncomeStream.forecast_tax_year == '2026-27').order_by(IncomeStream.name, IncomeStream.id)).all()
+    start_rule_check(current_app.instance_path)
     rules = reviewed_rules()
     status = cached_status(current_app.instance_path)
     from services.tax.records import tax_records
     attach_shift_totals(streams)
-    estimate = estimate_streams(streams, rules, **tax_records(rules))
+    from services.tax import ni_rules
+    records = tax_records(rules)
+    records.setdefault('issues', [])
+    if status.get('status') == 'needs_review':
+        records['issues'].append('Income-tax rules changed and need review.')
+    ni_status = ni_rules.cached_status(current_app.instance_path)
+    if ni_status.get('status') == 'needs_review':
+        records['issues'].append('National Insurance rules changed and need review.')
+    estimate = estimate_streams(streams, rules, **records)
     return render_template('tax_estimate.html', estimate=estimate, rules=rules, status=status,
                            format_amount=format_amount, rounded_minor=rounded_minor, stream_kinds=STREAM_KINDS,
                            current_user=current_user)

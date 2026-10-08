@@ -15,6 +15,7 @@ from models import IncomeStream, MileageEntry, TransactionIncome
 from services.tax.mileage import mileage_allowances
 from services.tax.mileage_rules import reviewed_rules, validate_publication, refresh_rules, cached_status
 from services.tax.records import tax_records
+from services.tax.deduction_forms import mileage_version, mileage_fields
 from services.tax.rules import reviewed_rules as income_rules
 from deduction_support import DeductionOwnerCase
 
@@ -95,6 +96,18 @@ class MileageTests(unittest.TestCase):
         self.assertEqual(reviewed_rules()['car_van_first_pence'],55)
 
 
+    def test_completed_journey_uses_london_date_near_midnight(self):
+        from zoneinfo import ZoneInfo
+        form = dict(journey_date='2026-06-02', location='england', vehicle_type='car_van',
+                    vehicle_key='TEST', miles='10', reimbursed='0', eligible='1',
+                    purpose='Customer visit', start_postcode='A', end_postcode='B')
+        local = datetime(2026, 6, 1, 23, 30, tzinfo=timezone.utc).astimezone(ZoneInfo('Europe/London'))
+        with patch('services.tax.deduction_forms.datetime') as clock:
+            clock.now.return_value = local
+            self.assertEqual(mileage_fields(form, SimpleNamespace(kind='self_employed'))['journey_date'], date(2026, 6, 2))
+            self.assertEqual(clock.now.call_args.args[0], ZoneInfo('Europe/London'))
+
+
 class DeductionFormsTests(DeductionOwnerCase):
     def test_partial_expense_edit_and_remove(self):
         self.assertEqual(self.expense().status_code,303)
@@ -140,7 +153,7 @@ class DeductionFormsTests(DeductionOwnerCase):
         self.assertEqual(self.mileage(entry_id=identity).status_code,400)
         html=self.html()
         token=re.search(r'name="csrf_token" value="([^"]+)"',html)[1]
-        self.assertEqual(self.client.post('/dashboard/deductions',data=dict(action='delete_mileage',entry_id=identity,csrf_token=token)).status_code,303)
+        self.assertEqual(self.client.post('/dashboard/deductions',data=dict(action='delete_mileage',entry_id=identity,version=mileage_version(self.session.get(MileageEntry,identity)),csrf_token=token)).status_code,303)
         self.assertIsNone(self.session.get(MileageEntry,identity))
 
     def test_ineligible_mileage_fails_and_retains_form(self):
@@ -225,7 +238,7 @@ class DeductionFormsTests(DeductionOwnerCase):
                                (datetime(2027,4,5,23,0,tzinfo=timezone.utc),False)):
             payment.transaction_time=stamp
             self.session.commit()
-            self.assertEqual(bool(tax_records(income_rules())['credits']),included)
+            self.assertEqual(bool(tax_records(income_rules(), as_of=datetime(2027, 4, 6, tzinfo=timezone.utc))['credits']),included)
 
     def test_obsolete_group_field_is_rejected(self):
         self.assertEqual(self.mileage(mileage_group='Business').status_code,400)
@@ -253,3 +266,29 @@ class DeductionFormsTests(DeductionOwnerCase):
             result=tax_records(income_rules())
         self.assertEqual(result['deductions'],{})
         self.assertTrue(result['issues'])
+
+
+    def test_bank_date_correction_outside_year_keeps_claim_in_review(self):
+        self.assertEqual(self.expense().status_code, 303)
+        for changed in (datetime(2026, 4, 5, tzinfo=timezone.utc), datetime(2027, 4, 6, tzinfo=timezone.utc)):
+            self.payment().transaction_time = changed
+            self.session.commit()
+            records = tax_records(income_rules())
+            self.assertEqual(records['deductions'], {})
+            self.assertTrue(any('linked expense changed' in issue for issue in records['issues']))
+
+    def test_stale_mileage_delete_does_not_remove_changed_journey(self):
+        identity = str(uuid4())
+        self.assertEqual(self.mileage(entry_id=identity).status_code, 303)
+        entry = self.session.get(MileageEntry, identity)
+        old_version = mileage_version(entry)
+        entry.purpose = 'Corrected journey purpose'
+        self.session.commit()
+        token = re.search(r'name="csrf_token" value="([^"]+)"', self.html())[1]
+        for version in ('', old_version, 'é' * 64):
+            response = self.client.post('/dashboard/deductions', data=dict(action='delete_mileage',
+                entry_id=identity, version=version, csrf_token=token))
+            self.assertEqual(response.status_code, 400)
+            self.assertIsNotNone(self.session.get(MileageEntry, identity))
+        self.assertEqual(self.client.post('/dashboard/deductions', data=dict(action='delete_mileage',
+            entry_id=identity, version=mileage_version(entry), csrf_token=token)).status_code, 303)
