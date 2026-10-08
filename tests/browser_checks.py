@@ -55,6 +55,9 @@ with sync_playwright() as playwright:
                 state['review_remaining'] -= 1
                 route.fulfill(json={'confirmed': True})
             elif path == '/dashboard/sync-status':
+                if state.get('status_failed'):
+                    route.fulfill(status=503, json={'error': 'Unavailable'})
+                    return
                 now = datetime.now(timezone.utc)
                 last = now - timedelta(minutes=2) if state['stale'] and not state['synced'] else now
                 route.fulfill(json={'run': {'status': 'completed', 'started_at': now.isoformat(),
@@ -68,7 +71,7 @@ with sync_playwright() as playwright:
             elif path == '/dashboard/balances':
                 route.fulfill(json={'balances': [], 'totals': [{'name': 'Total balance · All accounts', 'amount': 'GBP 123.45', 'error': None}]})
             elif path == '/dashboard':
-                route.fulfill(content_type='text/html', body=html)
+                route.fulfill(content_type='text/html', body=html.replace('data-test-data="false"', 'data-test-data="true"').replace('Last synced: checking…', 'Last simulated sync: checking…') if state.get('demo') else html)
             else:
                 route.abort()
         page.route('**/*', respond)
@@ -133,6 +136,13 @@ with sync_playwright() as playwright:
                     page.wait_for_function("() => !document.querySelector('#transaction-review').open")
             assert page.locator('.is-confirmed').count() == 3
             print('PASS: dismissible mobile popup, individual confirmation and persistent labels')
+        for demo, label in ((False, 'Last synced'), (True, 'Last simulated sync')):
+            state.update(status_failed=True, demo=demo, posts=[])
+            page.reload()
+            page.wait_for_function('(label) => document.querySelector("#last-synced").textContent === `${label}: unavailable`', arg=label)
+            assert page.locator('[data-sync-now]').first.is_enabled()
+            assert not state['posts'], 'A failed status check must not start a sync'
+        assert not errors, errors
         print(f'PASS: {width}px layout, navigation, totals, tooltip, footer and sync flow')
         context.close()
     browser.close()

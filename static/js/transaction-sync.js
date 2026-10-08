@@ -55,7 +55,7 @@
             }
             message.textContent = 'Sync is taking longer than expected. Reload to check progress.';
         } catch (error) {
-            if (timestamp.textContent === 'Last synced: checking…') timestamp.textContent = 'Last synced: unavailable';
+            if (timestamp.textContent === `${syncLabel}: checking…`) timestamp.textContent = `${syncLabel}: unavailable`;
             message.textContent = error.message;
         } finally {
             busy = false;
