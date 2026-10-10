@@ -81,11 +81,9 @@ scheduled bank sync remain separate. Demo records are rebuilt on migrations.
 
 ## Next milestones
 
-1. A guided checklist for streams, payment review, actual withholding and tax
-   estimate blockers, so the next action is clear without reading this guide.
-2. A tax-year export containing the calculation, income records, work records,
+1. A tax-year export containing the calculation, income records, work records,
    deductions and mileage evidence for checking and backup.
-3. Reconcile gross work records against bank payments to highlight missing pay
+2. Reconcile gross work records against bank payments to highlight missing pay
    without adding the same earnings twice.
 
 ## Open the dashboard
@@ -1411,6 +1409,30 @@ The invoice list distinguishes **Not recorded as sent** from **Sending recorded*
 Migration `025_invoice_delivery.sql` adds the document details and sending
 history. Run `.venv/bin/flask db-upgrade` and restart the application on another
 installation. Sample documents and sending history remain isolated in test mode.
+
+## Guided checklist
+
+Open **Checklist** in the navigation or follow **Open your guided checklist**
+from Tax estimate. Five steps show what needs attention: income forecasts,
+income details and actual withholding, payment confirmation, changed tax
+deductions, and remaining estimate warnings. The first outstanding step is
+highlighted, with explanations and links to individual records and full pages.
+
+The checklist uses the same planning checks as Tax estimate. It updates from
+saved records when opened; there are no manual completion checkboxes. Resolving
+a record through the existing forms clears its action on your next visit.
+One record can appear in multiple steps, so counts describe actions rather than
+unique payments. Each step counts every relevant record and displays the first
+20. No bank calls or automatic sync are started by the checklist.
+
+The supported tax-year checks exclude pending, future and out-of-year payments;
+internal transfers do not require income details. Confirmed non-taxable receipts
+do not require stream assignment or withholding. Unknown withholding remains
+unknown, and unconfirmed spending does not block tax targets. Changed claims are
+still flagged when their bank payment moves outside the saved claim year.
+Sample mode has an independent checklist. Clear checks do not establish that all
+income sources, planned shifts or evidence have been entered, or that a tax
+return is ready to submit.
 
 ## Income stream controls, notices and earmarks
 

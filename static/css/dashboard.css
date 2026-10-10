@@ -1378,3 +1378,14 @@ td.amount {
 .invoice-business { min-width: 0; margin: 16px 0; padding: 16px; border: 1px solid var(--border); display: grid; gap: 10px; }
 .invoice-business textarea { width: 100%; min-width: 0; }
 .invoice-section details summary { cursor: pointer; min-height: 44px; padding: 12px 0; }
+
+.checklist-page { max-width: 1000px; }
+.checklist-summary { padding: 20px; border: 1px solid var(--border); margin: 24px 0; }
+.checklist-steps { list-style: none; padding: 0; counter-reset: checklist; }
+.checklist-step { counter-increment: checklist; padding: 24px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; scroll-margin-top: 20px; }
+.checklist-step h2::before { content: counter(checklist) '. '; }
+.checklist-status { font-weight: 600; }
+.checklist-records { padding-left: 24px; }
+.checklist-records li { padding: 8px 0; }
+.checklist-records li p { margin-top: 6px; }
+.checklist-page a { overflow-wrap: anywhere; }

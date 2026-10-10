@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checklist · TOMS</title><link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}"></head>
+<body><header class="site-header"><a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+{% with navigation_page='checklist', navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}</header>
+<main class="checklist-page">{% include 'test_data_notice.html' %}
+<div class="page-heading"><p class="eyebrow">TOMS / NEXT STEPS</p><h1>Your checklist</h1></div>
+{% if error %}<p class="message" role="alert">{{ error }}</p><p><a href="{{ url_for('checklist.page') }}">Try again</a></p>
+{% elif checklist %}
+<p class="secondary">England, Wales and Northern Ireland · {{ checklist.tax_year }}. This checklist updates from your saved records when you open it. Pending and future payments are excluded.</p>
+<section class="checklist-summary" aria-labelledby="checklist-summary-heading"><h2 id="checklist-summary-heading">{{ checklist.clear_steps }} of {{ checklist.steps|length }} checks clear</h2>
+<p>Annual forecast: <strong>{{ 'Available' if checklist.annual_ready else 'Needs attention' }}</strong> · Received-income target: <strong>{{ 'Available' if checklist.received_ready else 'Needs attention' }}</strong></p>
+{% if checklist.next_step %}<p>Next: <a href="#check-{{ checklist.next_step.key }}">{{ checklist.next_step.title }}</a></p>
+{% else %}<p>No issues found in your saved records. Check that every income source and all relevant work and deductions are included.</p>{% endif %}
+<p class="secondary">One payment may need more than one action. Clear checks describe saved records, not a completed tax return.</p></section>
+<ol class="checklist-steps">{% for step in checklist.steps %}<li id="check-{{ step.key }}" class="checklist-step">
+<h2>{{ step.title }}</h2><p class="checklist-status {{ 'system-ok' if not step.count else '' }}">{{ (step.count|string) ~ ' needing attention' if step.count else 'No issues found' }}</p>
+<p class="secondary">{{ step.description }}</p>
+{% if step['items'] %}<ul class="checklist-records">{% for item in step['items'] %}<li><a href="{{ item.url }}">{{ item.label }}</a><p>{{ item.reason }}</p></li>{% endfor %}</ul>
+{% if step.count > step['items']|length %}<p class="secondary">Showing the first {{ step['items']|length }} of {{ step.count }}. Use the link below for the full records and return here after resolving them.</p>{% endif %}{% endif %}
+<p><a href="{{ step.url }}">{{ step.action }}</a></p></li>{% endfor %}</ol>
+{% endif %}</main></body></html>

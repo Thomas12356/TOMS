@@ -720,3 +720,26 @@ LD_LIBRARY_PATH=/tmp/toms-checkpoint-libs/root/usr/lib/x86_64-linux-gnu PYTHONPA
 
 PDF generation uses the browser's print dialog; no automatic email or delivery
 receipt integration is present. Sending records document owner-entered delivery.
+
+## Guided checklist — 2026-10-10
+
+- Owner-only `/dashboard/checklist` derives five ordered actions from the shared
+  planning estimate and saved records. Opening it does not start Starling calls,
+  automatic sync or official rule checks. API credentials cannot access it.
+- Full PostgreSQL suite: 441 tests ran successfully (437 passed; four optional
+  disposable-server backup checks skipped). New checks cover actual withholding,
+  missing/changed income, unknown tax treatment, non-taxable receipts, pending and
+  future exclusions, transfers, unconfirmed spending, changed claims moved out of
+  year, bounded lists, privacy, owner access and errors without false completion.
+- Chromium checklist workflow passed at 320, 390, 768 and 1280px: follow a
+  forecast link, complete it, enter actual CIS withholding, confirm payments and
+  return to see all five steps clear. Escaped bank text, no overflow/JavaScript
+  errors, and sample edits leaving real records untouched were verified. The
+  mobile screenshot was inspected.
+- Dashboard and tax-estimate regression checks passed at five widths; the
+  income-workspace regression passed at four widths. Ruff F, Bandit and whitespace
+  checks passed. No schema migration is required.
+
+Counts describe actions; one receipt may appear in multiple steps. The first 20
+items per step are displayed, while counts include every relevant record. Clear
+checks do not guarantee all income sources, work or supporting evidence exist.

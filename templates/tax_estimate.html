@@ -12,7 +12,7 @@
     <div class="page-heading"><p class="eyebrow">TOMS / TAX</p><h1>Tax estimate</h1></div>
     <p>{{ rules.jurisdiction }} · {{ rules.tax_year }} · 6 April 2026 – 5 April 2027</p>
     <p class="secondary">A whole-year income tax and self-employed National Insurance forecast from your income streams. Combined earnings set the bands. Only PAYE / CIS tax actually logged on payments is credited; eligible logged expenses and mileage reduce taxable earnings.</p>
-    <p><a href="{{ url_for('dashboard.income_streams') }}">Manage income and deductions</a> · <a href="{{ url_for('dashboard.tax_rules') }}">Check tax rules</a></p>
+    <p><a href="{{ url_for('checklist.page') }}">Open your guided checklist</a> · <a href="{{ url_for('dashboard.income_streams') }}">Manage income and deductions</a> · <a href="{{ url_for('dashboard.tax_rules') }}">Check tax rules</a></p>
     {% if not status or status.status != 'verified' %}<p class="tax-note">Using reviewed rules from {{ rules.reviewed_on }}. {{ status.message if status else 'No current matching official-source check is available.' }} Check Tax rules for the latest verification.</p>{% else %}<p class="secondary">Official figures last matched: {{ status.verified_at }}.</p>{% endif %}
     <section class="tax-readiness" aria-labelledby="readiness-heading">
         <h2 id="readiness-heading">Needs attention</h2>

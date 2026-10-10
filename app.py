@@ -18,6 +18,7 @@ from routes.login import login
 from routes.system import system
 from routes.invoices import invoices
 from routes.reserves import reserves
+from routes.checklist import checklist
 from services.web.sessions import login_manager, csrf, SESSION_LIFETIME, lock_owner_setup, validate_owner_credentials
 from flask_wtf.csrf import CSRFError
 from werkzeug.security import generate_password_hash
@@ -55,6 +56,7 @@ app.register_blueprint(login)
 app.register_blueprint(system)
 app.register_blueprint(invoices)
 app.register_blueprint(reserves)
+app.register_blueprint(checklist)
 app.register_blueprint(starling)
 app.register_blueprint(sync)
 app.register_blueprint(transactions)

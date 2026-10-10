@@ -511,3 +511,17 @@ records manual sends. `routes/invoices.py` owns the read-only print route and
 CSRF-protected sending form. `InvoiceDelivery`, migration 025 and `DATA_TABLES`
 keep durable sending history isolated in sample mode. Sending does not change
 settlement; the existing invoice revision/lock prevents stale or repeated writes.
+
+## Guided checklist
+
+`routes/checklist.py` is an owner-only read page. It calls `current_plan` with
+`refresh_rules=False`, so opening the checklist does not start rule checks or
+bank operations. `services/tax/checklist.py` derives bounded action lists from
+the shared estimate, income completeness checks and current expense claims.
+`templates/checklist.html` presents the first next action and five ordered steps.
+Do not add separate tax rates, guessed withholding or stored completion flags.
+
+`tests/test_checklist.py` checks readiness, links, exclusions, bounded lists,
+privacy, errors and access. `tests/checklist_browser_checks.py` follows the real
+sample forms through forecast completion, withholding and confirmation at four
+widths, checking that progress updates without touching real records.

@@ -12,8 +12,9 @@ from services.tax.rules import cached_status, reviewed_rules
 from services.transactions.shifts import attach_shift_totals
 
 
-def current_plan():
-    tax_rule_service.start_rule_check(current_app.instance_path)
+def current_plan(*, refresh_rules=True):
+    if refresh_rules:
+        tax_rule_service.start_rule_check(current_app.instance_path)
     rules = reviewed_rules()
     streams = db.session.scalars(db.select(IncomeStream).where(
         IncomeStream.forecast_tax_year == rules['tax_year']).order_by(IncomeStream.name, IncomeStream.id)).all()
