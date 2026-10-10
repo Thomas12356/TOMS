@@ -743,3 +743,44 @@ receipt integration is present. Sending records document owner-entered delivery.
 Counts describe actions; one receipt may appear in multiple steps. The first 20
 items per step are displayed, while counts include every relevant record. Clear
 checks do not guarantee all income sources, work or supporting evidence exist.
+
+## New-feature bug and functionality audit — 2026-10-10
+
+Reviewed and exercised invoices, print/PDF documents, sending history, expense
+treatment, income dialogs/notices, earmarks and the guided checklist together.
+Four reproducible functionality issues were fixed:
+
+- Non-taxable income notices incorrectly requested stream assignment. Confirmed
+  receipts now show no business reserve; unconfirmed receipts request review and
+  confirmation without requiring a stream or displaying a guessed zero.
+- Successful notice polling did not clear earlier fetch errors. Recovery now
+  clears the error and rebuilds the displayed batch, retaining keyboard focus.
+- An acknowledgement followed by a failed refresh stranded its disabled button.
+  The acknowledged state is explained and the action becomes usable again;
+  subsequent recovery replaces the stale batch.
+- Chromium repeated the invoice grand total on successive table pages. Print
+  styling now places the total once after the work rows.
+
+The added backend/browser regressions failed before these fixes. Final full
+PostgreSQL verification ran 443 tests: 439 passed, four optional disposable-server
+backup integration checks skipped. A new concurrent sending test verifies one
+submission saves and the stale competitor receives 409, leaving one history row.
+
+All 12 browser scripts passed: checklist, invoices, income workspace, demo,
+income forms/rules, review, tax estimate, System, login, dashboard, notice failure
+recovery, and large invoice documents. Affected invoice/workspace workflows were
+rerun after fixes. The large-document check verifies all 100 work items appear
+once across 11 PDF pages, with long fields, one total and no print controls at
+320, 390 and 1280px. Notice recovery/retry checks pass at 320 and 1280px.
+
+Ruff F, Bandit, whitespace and configured-secret scans passed; all 25 applied
+migration checksums match the repository. No live Starling calls were made;
+bank responses were mocked and disposable/rollback-only data was used.
+
+The optional large-document test needs `pypdf` alongside Playwright in the
+temporary browser tools directory:
+
+```bash
+.venv/bin/pip install --target /tmp/toms-checkpoint-tools pypdf
+LD_LIBRARY_PATH=/tmp/toms-checkpoint-libs/root/usr/lib/x86_64-linux-gnu PYTHONPATH=/tmp/toms-checkpoint-tools .venv/bin/python tests/invoice_document_browser_checks.py
+```

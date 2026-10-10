@@ -268,3 +268,20 @@ class IncomeWorkspaceTests(DeductionOwnerCase):
         self.session.commit()
         html = self.client.get('/dashboard/income-streams?view=deductions&stream='+other.id).get_data(as_text=True)
         self.assertNotIn('Business tools', html)
+
+    def test_confirmed_non_taxable_notice_does_not_demand_stream_assignment(self):
+        self.receipt.income.tax_treatment = 'non_taxable'
+        self.receipt.income.income_stream_id = None
+        self.receipt.income.gross_minor = None
+        self.session.commit()
+        row = self.notice_rows()[0]
+        self.assertEqual((row['tax_minor'], row['ni_minor']), (0, 0))
+        self.assertNotIn('Assign', row['message'])
+        self.assertIn('non-taxable', row['message'])
+        self.assertNotIn('needs review', row['message'])
+        self.receipt.confirmed_at = None
+        self.session.commit()
+        row = self.notice_rows()[0]
+        self.assertNotIn('Assign', row['message'])
+        self.assertIn('confirm', row['message'])
+        self.assertIsNone(row['tax_minor'])

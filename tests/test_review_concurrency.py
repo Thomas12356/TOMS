@@ -262,3 +262,28 @@ class ReviewConcurrencyTests(ApiTestCase):
             self.assertEqual(sorted(pool.map(save, (0, 1))), [303, 409])
         with self.bound.connect() as connection:
             self.assertEqual(connection.scalar(db.select(db.func.count()).select_from(AccountReserve)), 1)
+
+    def test_competing_sending_records_reject_the_stale_submission(self):
+        from services.invoices import workflow as work
+        from models import InvoiceDelivery
+        stream, shifts = self.invoice_setup(1)
+        invoice = work.save_draft(str(uuid4()), stream, self.invoice_fields(), shifts)
+        self.sessions.commit()
+        invoice = work.get_invoice(invoice.id, str(invoice.revision))
+        work.issue(invoice)
+        self.sessions.commit()
+        identity, revision = invoice.id, str(invoice.revision)
+        barrier = Barrier(2)
+        def send(index):
+            client, csrf, _ = self.clients[index]
+            try:
+                barrier.wait(timeout=10)
+                return client.post('/dashboard/invoices/' + identity, data=dict(
+                    csrf_token=csrf, action='sent', version=revision, sent_at='2026-04-12T12:00',
+                    method='email', recipient='client@example.invalid')).status_code
+            finally:
+                self.sessions.remove()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(sorted(pool.map(send, (0, 1))), [303, 409])
+        with self.bound.connect() as connection:
+            self.assertEqual(connection.scalar(db.select(db.func.count()).select_from(InvoiceDelivery)), 1)

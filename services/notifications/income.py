@@ -63,7 +63,10 @@ def notices(estimate, format_amount):
         current_version = notice_version(payment)
         if reads.get(key) == current_version:
             continue
-        if income is None or income.income_stream_id is None:
+        if income and income.tax_treatment == 'non_taxable':
+            message = ('Confirmed non-taxable receipt. No business tax / NI reserve for this payment.' if complete
+                       else 'Tax / NI set-aside needs review. Review and confirm this receipt’s non-taxable income details.')
+        elif income is None or income.income_stream_id is None:
             message = 'Tax / NI set-aside needs review. Assign this incoming payment to a stream and confirm its income details.'
         elif amounts is None:
             message = 'Tax / NI set-aside needs review. Confirm income details and resolve tax estimate warnings.'

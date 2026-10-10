@@ -8,6 +8,7 @@
     const opener = document.getElementById('show-income-notices');
     let loading = null;
     let stopped = false;
+    let refreshFailed = false;
     function textElement(tag, text, className) {
         const element = document.createElement(tag);
         element.textContent = text;
@@ -15,31 +16,41 @@
         return element;
     }
     async function refresh(forceRender = false) {
-        if (stopped || document.hidden) return;
+        if (stopped || document.hidden) return false;
         if (loading) {
-            await loading;
+            const refreshed = await loading;
             if (forceRender) return refresh(true);
-            return;
+            return refreshed;
         }
         loading = loadNotices(forceRender);
-        try { await loading; } finally { loading = null; }
+        try { return await loading; } finally { loading = null; }
     }
     async function loadNotices(forceRender) {
         try {
             const response = await fetch(bar.dataset.url, {credentials: 'same-origin', cache: 'no-store'});
-            if (response.redirected || response.status === 401) { stopped = true; bar.hidden = true; return; }
+            if (response.redirected || response.status === 401) { stopped = true; bar.hidden = true; return false; }
             if (!response.ok) throw new Error('Income notices could not be refreshed. Reload to try again.');
             const data = await response.json();
+            const recovered = refreshFailed;
+            refreshFailed = false;
+            if (recovered) error.hidden = true;
             bar.hidden = data.count === 0;
             const first = data.notices[0];
             document.getElementById('income-alert-summary').textContent = first ? `${data.count} income notice${data.count === 1 ? '' : 's'} · ${first.source} received ${first.amount}. ${first.message}` : '';
             // Keep active controls stable while somebody is reading the popup.
-            if (forceRender || !dialog.open || !list.children.length) render(data);
+            if (forceRender || recovered || !dialog.open || !list.children.length) {
+                const restoreFocus = dialog.open && list.contains(document.activeElement);
+                render(data);
+                if (restoreFocus) (list.querySelector('button') || document.getElementById('close-income-notices')).focus();
+            }
+            return true;
         } catch (failure) {
+            refreshFailed = true;
             error.textContent = failure.message;
             error.hidden = false;
             bar.hidden = false;
             document.getElementById('income-alert-summary').textContent = 'Income notices are unavailable. Reload to try again.';
+            return false;
         }
     }
     function render(data) {
@@ -64,7 +75,7 @@
                     const response = await fetch(dialog.dataset.readUrl, {method: 'POST', credentials: 'same-origin', body});
                     if (!response.ok || response.redirected) throw new Error('The payment or login changed. Reload before marking it as read.');
                     // Reload the batch without reopening the dialog or losing its focus.
-                    await refresh(true);
+                    if (!await refresh(true)) throw new Error('Marked as read, but notices could not refresh. Try again or reload.');
                     (list.querySelector('button') || document.getElementById('close-income-notices')).focus();
                 } catch (failure) {
                     error.textContent = failure.message;

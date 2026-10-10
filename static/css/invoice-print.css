@@ -34,4 +34,5 @@ thead { display: table-header-group; } tfoot { font-weight: 700; }
     .parties { grid-template-columns: 1fr 1fr; }
     tr, .payment-details, .parties { break-inside: avoid; }
     .money { width: 40mm; }
+    tfoot { display: table-row-group; }
 }
