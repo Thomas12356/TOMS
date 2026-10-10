@@ -840,3 +840,28 @@ No database migration is required.
 RUN_POSTGRES_TESTS=1 .venv/bin/python -m unittest discover -s tests -q
 LD_LIBRARY_PATH=/tmp/toms-checkpoint-libs/root/usr/lib/x86_64-linux-gnu PYTHONPATH=/tmp/toms-checkpoint-tools RUN_POSTGRES_TESTS=1 .venv/bin/python tests/reconciliation_browser_checks.py
 ```
+
+## Complete system and feature verification — 2026-10-10
+
+Retested the final invoice, checklist, export and reconciliation implementation
+before publication. The full PostgreSQL-backed suite ran 474 tests: 470 passed
+and four optional backup integration cases were skipped in that invocation.
+All 13 backup tests then passed separately, including those four integration
+cases, on a disposable local PostgreSQL 16 server with matching client tools.
+The temporary test runner selected those clients instead of the application's
+pinned PostgreSQL 18 clients; application code and client configuration were
+unchanged. The temporary server was stopped after verification.
+
+All 14 browser scripts passed: dashboard, checklist, demo, income forms/rules,
+income notice recovery, income workspace, large invoice PDFs, invoices, login,
+reconciliation, transaction review, System, tax estimate and tax-year export.
+Coverage includes mobile/desktop layouts, source filters, explicit allocation,
+partial/CIS payments, stale revisions and recovery, sample isolation, ZIP
+contents, authentication/session flows and all 100 invoice lines exactly once
+across multiple PDF pages.
+
+Ruff F, Bandit, whitespace checks and Git object integrity passed. All 25 applied
+migration checksums match the repository. The outgoing six feature/fix commits
+were scanned across 258 unique blobs for configured application/bank/database
+secrets and excluded private files; no matches were found. Bank calls were mocked
+throughout. No application bugs were found in this final verification run.
