@@ -94,6 +94,8 @@ def ensure_sample_data():
     db.session.add(Invoice(id=sample_id(51), income_stream_id=sample_id(21), stream_name='Demo employment',
         state='draft', revision=1, client_name='Demo employer', client_address='Example client address',
         reference='Sample overtime invoice — test data only', issue_date=today(),
+        business_name='Example business', business_address='Example business address',
+        business_contact='example@example.invalid', payment_instructions='Sample only — do not make a payment.',
         due_date=today() + timedelta(days=30), currency='GBP', total_minor=20000))
     db.session.flush()
     db.session.add(InvoiceItem(id=sample_id(61), invoice_id=sample_id(51), shift_id=shift.id, active=True,

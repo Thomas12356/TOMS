@@ -31,6 +31,9 @@ class DatabasePermissionTests(unittest.TestCase):
                 'ALTER TABLE toms.accounts ADD COLUMN forbidden_probe integer',
                 'ALTER TABLE toms_demo.accounts ADD COLUMN forbidden_probe integer',
                 'TRUNCATE toms.accounts CASCADE',
+                'UPDATE toms.invoice_deliveries SET notes=notes WHERE false',
+                'DELETE FROM toms.invoice_deliveries WHERE false',
+                'TRUNCATE toms.invoice_deliveries',
                 'SET ROLE toms_migrator',
                 'SET ROLE postgres',
             ):

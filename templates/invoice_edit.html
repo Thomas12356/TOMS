@@ -15,6 +15,13 @@
 <label for="invoice-reference">Client / work reference · optional</label><input id="invoice-reference" name="reference" maxlength="200" value="{{ values.reference }}">
 <label for="invoice-date">Invoice date</label><input id="invoice-date" name="issue_date" type="date" value="{{ values.issue_date }}" required>
 <label for="invoice-due">Due date</label><input id="invoice-due" name="due_date" type="date" value="{{ values.due_date }}" required>
+<fieldset class="invoice-business"><legend>Your business and payment details</legend>
+<p class="secondary">Add these before issuing. They stay fixed on this invoice after issue.</p>
+<label for="invoice-business-name">Business / seller name</label><input id="invoice-business-name" name="business_name" maxlength="200" value="{{ values.business_name }}">
+<label for="invoice-business-address">Business address</label><textarea id="invoice-business-address" name="business_address" maxlength="2000">{{ values.business_address }}</textarea>
+<label for="invoice-business-contact">Contact details · optional</label><textarea id="invoice-business-contact" name="business_contact" maxlength="500">{{ values.business_contact }}</textarea>
+<label for="invoice-payment-instructions">Payment instructions</label><textarea id="invoice-payment-instructions" name="payment_instructions" maxlength="2000" placeholder="Payment destination and reference to use">{{ values.payment_instructions }}</textarea>
+</fieldset>
 <button type="submit">{{ 'Save draft' if invoice else 'Create draft' }}</button></div></form>
 {% else %}<p class="empty-state">No completed, available shifts in this stream.</p><p><a href="{{ url_for('shifts.page', stream_id=stream.id, add=1) }}">Record a shift or overtime</a>{% if invoice %} · <a href="{{ url_for('invoices.detail', identity=invoice.id) }}">Return to draft</a>{% endif %}</p>{% endif %}
 {% elif not streams %}<p>Create an income stream and record completed shifts first.</p><p><a href="{{ url_for('dashboard.income_streams') }}">Income streams</a></p>{% endif %}

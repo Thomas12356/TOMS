@@ -497,3 +497,17 @@ Models and migration 024 define the new stored state; `DATA_TABLES` includes it
 for sample isolation. `tests/test_income_workspace.py` and
 `tests/income_workspace_browser_checks.py` exercise the feature. No frontend
 framework or additional background scheduler is needed.
+
+## Invoice documents and sending records
+
+`templates/invoice_print.html`, `static/css/invoice-print.css` and the small
+`static/js/invoice-print.js` provide a separate client document and browser
+printing/Save as PDF. Use saved invoice/item fields only, so later edits to
+streams and shifts cannot rewrite issued documents. Internal receipt allocations
+and sending notes are deliberately absent from that template.
+
+`services/invoices/workflow.py` validates business fields before issue and
+records manual sends. `routes/invoices.py` owns the read-only print route and
+CSRF-protected sending form. `InvoiceDelivery`, migration 025 and `DATA_TABLES`
+keep durable sending history isolated in sample mode. Sending does not change
+settlement; the existing invoice revision/lock prevents stale or repeated writes.

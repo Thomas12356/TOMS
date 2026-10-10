@@ -1374,3 +1374,7 @@ td.amount {
 .stream-actions .secondary-button:hover, .stream-list-dialog button.secondary-button:hover { border-color: var(--accent); }
 .stream-actions .secondary-button:focus-visible { outline: 3px solid var(--highlight); outline-offset: 3px; }
 .review-dialog .dialog-close { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--text); text-decoration: none; }
+
+.invoice-business { min-width: 0; margin: 16px 0; padding: 16px; border: 1px solid var(--border); display: grid; gap: 10px; }
+.invoice-business textarea { width: 100%; min-width: 0; }
+.invoice-section details summary { cursor: pointer; min-height: 44px; padding: 12px 0; }

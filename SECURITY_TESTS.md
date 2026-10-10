@@ -698,3 +698,25 @@ For example, rerun the new owner workflow with:
 ```bash
 LD_LIBRARY_PATH=/tmp/toms-checkpoint-libs/root/usr/lib/x86_64-linux-gnu PYTHONPATH=/tmp/toms-checkpoint-tools RUN_POSTGRES_TESTS=1 .venv/bin/python tests/income_workspace_browser_checks.py
 ```
+
+## Client invoice documents and sending history — 2026-10-10
+
+- Full PostgreSQL suite: 431 tests ran successfully (427 passed, four optional
+  disposable-server backup checks skipped). Added coverage for required business
+  details before issue, draft/cancelled document markers, escaped text, owner-only
+  print access, private data exclusion, durable sending/resends, stale duplicate
+  revisions, CSRF, invalid/future sending times and ambiguous local clock times.
+- Real sending history grants allow runtime SELECT/INSERT and reject UPDATE,
+  DELETE and TRUNCATE. Legacy issued invoices retain empty seller fields without
+  backfilling or changing the original document.
+- Invoice Chromium workflows passed at 320, 390, 768 and 1280px, including
+  entering business details, recording a send, preserving unpaid settlement,
+  print layout and actual PDF generation with print controls hidden. Internal
+  sending notes and destinations remain absent from the client document. Sample
+  sending records leave real tables untouched. A print screenshot was inspected.
+- Income-workspace, complete demo and System browser regressions passed. Ruff F,
+  Bandit and whitespace checks passed; all 25 applied migrations matched their
+  repository checksums. Migration 025 was applied locally.
+
+PDF generation uses the browser's print dialog; no automatic email or delivery
+receipt integration is present. Sending records document owner-entered delivery.

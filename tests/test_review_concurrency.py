@@ -193,7 +193,8 @@ class ReviewConcurrencyTests(ApiTestCase):
         return stream,shifts
 
     def invoice_fields(self):
-        return dict(client_name='Test customer',client_address='',reference='',issue_date='2026-04-12',due_date='2026-04-20')
+        return dict(client_name='Test customer',client_address='',reference='',issue_date='2026-04-12',due_date='2026-04-20',
+            business_name='Test business',business_address='Example address',payment_instructions='Bank transfer')
 
     def test_simultaneous_invoice_drafts_cannot_reserve_the_same_shift(self):
         from services.invoices import workflow as work

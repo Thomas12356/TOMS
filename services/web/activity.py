@@ -31,6 +31,7 @@ ACTIONS = {
     'rules': 'Checked official tax rules',
     'invoice.create': 'Created invoice draft', 'invoice.update': 'Updated invoice draft',
     'invoice.issue': 'Issued invoice', 'invoice.cancel': 'Cancelled invoice',
+    'invoice.sent': 'Recorded invoice sending',
     'invoice.allocate': 'Allocated invoice payment', 'invoice.remove_payment': 'Removed invoice payment allocation',
     'sync': 'Requested bank sync', 'sync.sample': 'Simulated bank sync',
 }

@@ -359,6 +359,8 @@ class Invoice(BaseModel):
         db.CheckConstraint('revision > 0 AND total_minor > 0'),
         db.CheckConstraint('char_length(trim(client_name)) BETWEEN 1 AND 200'),
         db.CheckConstraint('char_length(client_address) <= 2000 AND char_length(reference) <= 200'),
+        db.CheckConstraint('char_length(business_name) <= 200 AND char_length(business_address) <= 2000'),
+        db.CheckConstraint('char_length(business_contact) <= 500 AND char_length(payment_instructions) <= 2000'),
         db.CheckConstraint("state <> 'draft' OR (number IS NULL AND issued_at IS NULL)"),
         db.CheckConstraint("state <> 'issued' OR (number IS NOT NULL AND issued_at IS NOT NULL)"),
         db.CheckConstraint("state <> 'cancelled' OR cancelled_at IS NOT NULL"),
@@ -375,6 +377,10 @@ class Invoice(BaseModel):
     client_name = db.Column(db.Text, nullable=False)
     client_address = db.Column(db.Text, nullable=False, server_default='')
     reference = db.Column(db.Text, nullable=False, server_default='')
+    business_name = db.Column(db.Text, nullable=False, server_default='')
+    business_address = db.Column(db.Text, nullable=False, server_default='')
+    business_contact = db.Column(db.Text, nullable=False, server_default='')
+    payment_instructions = db.Column(db.Text, nullable=False, server_default='')
     issue_date = db.Column(db.Date, nullable=False)
     due_date = db.Column(db.Date, nullable=False)
     currency = db.Column(db.Text, nullable=False)
@@ -384,6 +390,25 @@ class Invoice(BaseModel):
     cancelled_at = db.Column(db.DateTime(timezone=True))
     items = db.relationship('InvoiceItem', back_populates='invoice', lazy='selectin')
     payments = db.relationship('InvoicePayment', back_populates='invoice', lazy='selectin')
+    deliveries = db.relationship('InvoiceDelivery', lazy='selectin')
+
+
+class InvoiceDelivery(BaseModel):
+    """Owner-recorded sending history; records do not send messages."""
+    __tablename__ = 'invoice_deliveries'
+    __table_args__ = (
+        db.CheckConstraint("method IN ('email', 'post', 'hand', 'other')"),
+        db.CheckConstraint('char_length(trim(recipient)) BETWEEN 1 AND 500'),
+        db.CheckConstraint('char_length(notes) <= 1000'),
+        {'schema': 'toms'},
+    )
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    invoice_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.invoices.id'), nullable=False)
+    sent_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    method = db.Column(db.Text, nullable=False)
+    recipient = db.Column(db.Text, nullable=False)
+    notes = db.Column(db.Text, nullable=False, server_default='')
+    recorded_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
 
 
 class InvoiceItem(BaseModel):

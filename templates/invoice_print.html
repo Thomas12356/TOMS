@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ invoice.number or 'Draft invoice' }} · {{ invoice.business_name or 'Invoice' }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/invoice-print.css') }}">
+<script src="{{ url_for('static', filename='js/invoice-print.js') }}" defer></script></head>
+<body>
+<nav class="print-controls" aria-label="Invoice document controls">
+<a href="{{ url_for('invoices.detail', identity=invoice.id) }}">Return to invoice</a>
+<button type="button" id="print-invoice">Print / save as PDF</button>
+<p>Choose “Save as PDF” in your browser’s print dialog. Turn off browser headers and footers for a clean document.</p>
+</nav>
+<main class="invoice-document">
+{% if sample %}<p class="document-warning">TEST DATA — SAMPLE ONLY</p>{% endif %}
+{% if preview %}<p class="document-warning">DRAFT — NOT ISSUED</p>{% elif invoice.state == 'cancelled' %}<p class="document-warning">CANCELLED</p>{% endif %}
+<header><h1>Invoice</h1><p class="invoice-number">{{ invoice.number or 'Draft' }}</p></header>
+<section class="parties">
+<div><h2>From</h2><strong>{{ invoice.business_name or 'Business details not recorded' }}</strong><p class="multiline">{{ invoice.business_address }}</p>{% if invoice.business_contact %}<p class="multiline">{{ invoice.business_contact }}</p>{% endif %}</div>
+<div><h2>Bill to</h2><strong>{{ invoice.client_name }}</strong><p class="multiline">{{ invoice.client_address }}</p></div>
+</section>
+<dl class="document-dates"><div><dt>Invoice date</dt><dd>{{ invoice.issue_date.strftime('%d %b %Y') }}</dd></div><div><dt>Payment due</dt><dd>{{ invoice.due_date.strftime('%d %b %Y') }}</dd></div>{% if invoice.reference %}<div><dt>Reference</dt><dd>{{ invoice.reference }}</dd></div>{% endif %}</dl>
+<table><thead><tr><th scope="col">Work / description</th><th scope="col" class="money">Amount</th></tr></thead>
+<tbody>{% for item in invoice.items|sort(attribute='id') %}<tr><td>{{ item.description }}{% if item.shift_snapshot.hourly_rate_minor %}<p class="work-detail">{{ format_amount(item.shift_snapshot.hourly_rate_minor, invoice.currency) }} / hour · {{ item.shift_snapshot.unpaid_break_minutes }} unpaid break minutes</p>{% endif %}</td><td class="money">{{ format_amount(item.amount_minor, invoice.currency) }}</td></tr>{% endfor %}</tbody>
+<tfoot><tr><th scope="row">Total · {{ invoice.currency }}</th><td class="money">{{ format_amount(invoice.total_minor, invoice.currency) }}</td></tr></tfoot></table>
+<section class="payment-details"><h2>Payment instructions</h2><p class="multiline">{{ invoice.payment_instructions or 'Payment instructions not recorded.' }}</p><p>Please quote {{ invoice.number or 'the invoice reference' }} when paying.</p></section>
+</main></body></html>

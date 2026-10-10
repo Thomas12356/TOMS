@@ -48,6 +48,30 @@ with sync_playwright() as playwright:
             click(page.get_by_role('button',name='Issue invoice',exact=True))
             assert page.get_by_role('heading',name='TEST-INV-000001').is_visible()
             assert 'Unpaid' in page.locator('.invoice-totals').inner_text()
+            assert 'Not recorded as sent.' in page.locator('main').inner_text()
+            page.get_by_text('Record sending / resend', exact=True).click()
+            page.locator('#invoice-recipient').fill('client@example.invalid')
+            page.locator('#invoice-send-notes').fill('<script>Resend note</script>')
+            click(page.get_by_role('button', name='Record as sent', exact=True))
+            assert 'client@example.invalid' in page.locator('main').inner_text()
+            assert '<script>Resend note</script>' in page.locator('main').inner_text()
+            assert 'Unpaid' in page.locator('.invoice-totals').inner_text()
+            detail_url = page.url
+            click(page.get_by_role('link', name='Print / save invoice as PDF', exact=True))
+            assert page.locator('h1').inner_text() == 'Invoice'
+            assert 'TEST DATA — SAMPLE ONLY' in page.locator('main').inner_text()
+            assert 'Example business' in page.locator('main').inner_text()
+            assert 'client@example.invalid' not in page.locator('main').inner_text()
+            assert page.locator('script:not([src])').count() == 0
+            page.emulate_media(media='print')
+            assert page.locator('.print-controls').is_hidden()
+            pdf = page.pdf(path=f'/tmp/toms-invoice-print-{width}.pdf', prefer_css_page_size=True)
+            assert pdf.startswith(b'%PDF')
+            if width == 1280:
+                page.screenshot(path='/tmp/toms-invoice-print.png', full_page=True)
+            page.emulate_media(media='screen')
+            page.goto(detail_url)
+            assert_layout()
             assert 'No available matching payments' in page.locator('main').inner_text()
             with fixture.admin.begin() as connection:
                 connection.execute(text(f'UPDATE {fixture.demo_schema}.transactions SET confirmed_at=now() WHERE feed_item_uid=:id'),dict(id=sample_id(31)))
@@ -73,6 +97,9 @@ with sync_playwright() as playwright:
             page.goto(origin+'/dashboard/invoices/new?stream='+sample_id(21))
             page.locator('[name=shift_id]').check()
             page.locator('#invoice-client').fill('<script>Example client</script>')
+            page.locator('#invoice-business-name').fill('Sample business')
+            page.locator('#invoice-business-address').fill('Sample address')
+            page.locator('#invoice-payment-instructions').fill('Sample bank transfer')
             click(page.get_by_role('button',name='Create draft',exact=True))
             assert '<script>Example client</script>' in page.locator('main').inner_text()
             assert page.locator('script:not([src])').count()==0
@@ -95,6 +122,9 @@ with sync_playwright() as playwright:
             for box in page.locator('[name=shift_id]').all(): box.check()
             page.locator('#invoice-client').fill('CIS client with a longer readable name')
             page.locator('#invoice-address').fill('Example business address\nExample town')
+            page.locator('#invoice-business-name').fill('Sample CIS business')
+            page.locator('#invoice-business-address').fill('Sample address')
+            page.locator('#invoice-payment-instructions').fill('Sample bank transfer')
             click(page.get_by_role('button',name='Create draft',exact=True))
             click(page.get_by_role('button',name='Issue invoice',exact=True))
             with fixture.admin.begin() as connection:
@@ -112,6 +142,7 @@ with sync_playwright() as playwright:
             if width in (390,1280): page.screenshot(path=f'/tmp/toms-invoice-{width}.png',full_page=True)
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.invoices')==0
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.invoice_payments')==0
+            assert fixture.live_value('SELECT count(*) FROM SCHEMA.invoice_deliveries')==0
             fixture.bank.assert_not_called()
             assert not errors,errors
             page.close()

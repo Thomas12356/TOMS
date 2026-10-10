@@ -6,15 +6,18 @@ from uuid import uuid4
 from sqlalchemy.orm import load_only, selectinload
 from werkzeug.exceptions import Conflict, NotFound
 
-from models import IncomeShift, IncomeStream, Invoice, InvoiceItem, InvoicePayment, InvoiceSequence, Transaction, TransactionIncome
+from models import IncomeShift, IncomeStream, Invoice, InvoiceItem, InvoicePayment, InvoiceSequence, InvoiceDelivery, Transaction, TransactionIncome
 from services.database.connection import db
 from services.database.session import test_data_active
 from services.transactions.classification import classification_details
 from services.transactions.review import REVIEW_FIELDS, record_snapshot as snapshot, record_version as version, payment_version
-from services.transactions.shifts import LOCAL_TIME, shift_label
+from services.transactions.shifts import LOCAL_TIME, shift_label, local_time
 from services.validation import optional_text, uid
 
 MAX_MINOR = 2**63 - 1
+BUSINESS_FIELDS = {'business_name': 200, 'business_address': 2000,
+                   'business_contact': 500, 'payment_instructions': 2000}
+DELIVERY_METHODS = {'email': 'Email', 'post': 'Post', 'hand': 'Hand delivered', 'other': 'Other'}
 
 
 def shift_source_version(shift):
@@ -67,6 +70,8 @@ def draft_fields(form):
     values = dict(client_name=name,
         client_address=optional_text(form.get('client_address'), field='client address', maximum=2000) or '',
         reference=optional_text(form.get('reference'), field='invoice reference', maximum=200) or '')
+    values.update({field: optional_text(form.get(field), field=field.replace('_', ' '), maximum=limit) or ''
+                   for field, limit in BUSINESS_FIELDS.items()})
     for field in ('issue_date', 'due_date'):
         value = form.get(field, '')
         if not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}', value):
@@ -135,6 +140,8 @@ def save_draft(identity, stream_id, form, shift_ids, revision=None):
 def issue(invoice):
     if invoice.state != 'draft':
         raise ValueError('Only a draft can be issued.')
+    if not all(getattr(invoice, field).strip() for field in ('business_name', 'business_address', 'payment_instructions')):
+        raise ValueError('Edit the draft and add your business name, address and payment instructions before issuing.')
     stream = db.session.get(IncomeStream, invoice.income_stream_id)
     if stream.archived:
         raise ValueError('Restore this income stream before issuing its draft.')
@@ -156,6 +163,30 @@ def issue(invoice):
     invoice.number = ('TEST-INV-' if test_data_active() else 'INV-') + f'{counter.last_number:06d}'
     invoice.state, invoice.issued_at = 'issued', datetime.now(timezone.utc)
     invoice.revision += 1
+
+
+def record_delivery(invoice, form):
+    """Record an actual send separately from issue and payment settlement."""
+    if invoice.state != 'issued':
+        raise ValueError('Only an issued invoice can be recorded as sent.')
+    method = form.get('method', '')
+    if method not in DELIVERY_METHODS:
+        raise ValueError('Choose how you sent the invoice.')
+    try:
+        sent_at = local_time(form.get('sent_at', ''))
+    except (ValueError, OverflowError):
+        raise ValueError('Enter an unambiguous, valid sending date and time in Europe/London.') from None
+    if sent_at > datetime.now(timezone.utc) or sent_at.astimezone(LOCAL_TIME).date() < invoice.issue_date:
+        raise ValueError('The sending date must be on or after the invoice date and cannot be in the future.')
+    recipient = optional_text(form.get('recipient'), field='recipient', maximum=500)
+    if not recipient:
+        raise ValueError('Enter the recipient or delivery destination.')
+    notes = optional_text(form.get('notes'), field='sending notes', maximum=1000) or ''
+    row = InvoiceDelivery(id=str(uuid4()), invoice_id=invoice.id, sent_at=sent_at,
+                          method=method, recipient=recipient, notes=notes)
+    db.session.add(row)
+    invoice.revision += 1
+    return row
 
 
 def cancel(invoice):

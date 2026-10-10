@@ -18,7 +18,7 @@ from deduction_support import DeductionOwnerCase
 class InvoiceAuthTests(ApiTestCase):
     def test_owner_login_required_for_all_invoice_pages_and_writes(self):
         with patch.dict(app.config, SECRET_KEY='a' * 64), patch('routes.invoices.activate_test_data') as seed:
-            for path in ('/dashboard/invoices', '/dashboard/invoices/new', '/dashboard/invoices/' + str(uuid4())):
+            for path in ('/dashboard/invoices', '/dashboard/invoices/new', '/dashboard/invoices/' + str(uuid4()), '/dashboard/invoices/' + str(uuid4()) + '/print'):
                 for headers in ({}, self.headers):
                     self.assertEqual(self.client.get(path, headers=headers).status_code, 302)
             self.assertEqual(self.client.post('/dashboard/invoices/new', headers=self.headers).status_code, 302)
@@ -50,7 +50,8 @@ class InvoiceWorkflowTests(DeductionOwnerCase):
 
     def fields(self, **changes):
         values=dict(client_name='Test client',client_address='A client address',reference='Work reference',
-            issue_date='2026-04-12',due_date='2026-04-20')
+            issue_date='2026-04-12',due_date='2026-04-20',business_name='Test business',
+            business_address='1 Example Road',business_contact='owner@example.invalid',payment_instructions='Bank transfer, quote invoice number')
         values.update(changes)
         return values
 
@@ -295,3 +296,89 @@ class InvoiceWorkflowTests(DeductionOwnerCase):
         invoice=self.draft([self.ids[0]],issue_date=tomorrow,due_date=tomorrow)
         with self.assertRaises(ValueError): work.issue(work.get_invoice(invoice.id,str(invoice.revision)))
         self.session.rollback()
+
+    def test_issue_requires_business_details_and_print_preview_is_marked(self):
+        invoice = self.draft(business_name='', payment_instructions='')
+        response = self.client.get('/dashboard/invoices/' + invoice.id + '/print')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('DRAFT — NOT ISSUED', response.get_data(as_text=True))
+        self.assertEqual(self.post(invoice, 'issue').status_code, 400)
+        self.assertIsNone(work.get_invoice(invoice.id).number)
+        self.assertEqual(self.post(invoice, 'sent', sent_at='2026-04-12T12:00',
+                                   method='email', recipient='client@example.invalid').status_code, 400)
+
+    def test_print_uses_fixed_details_and_excludes_private_payment_and_sending_history(self):
+        invoice = self.draft(business_name='<script>Business</script>', payment_instructions='Transfer to example account')
+        work.issue(work.get_invoice(invoice.id, str(invoice.revision)))
+        self.session.commit()
+        invoice = work.get_invoice(invoice.id)
+        work.record_delivery(work.get_invoice(invoice.id, str(invoice.revision)),
+                             dict(sent_at='2026-04-12T12:00', method='email',
+                                  recipient='PRIVATE-RECIPIENT', notes='PRIVATE-NOTES'))
+        self.session.commit()
+        shift = self.session.get(IncomeShift, self.ids[0])
+        shift.notes = 'PRIVATE-LATER-SHIFT-EDIT'
+        self.session.get(IncomeStream, self.stream).name = 'PRIVATE-LATER-STREAM-EDIT'
+        self.session.commit()
+        response = self.client.get('/dashboard/invoices/' + invoice.id + '/print')
+        html = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers['Cache-Control'], 'no-store')
+        self.assertIn('&lt;script&gt;Business&lt;/script&gt;', html)
+        self.assertIn('Transfer to example account', html)
+        self.assertIn('INV-000001', html)
+        self.assertIn('GBP 1,000.00', html)
+        for text in ('<script>Business</script>', 'PRIVATE-RECIPIENT', 'PRIVATE-NOTES',
+                     'PRIVATE-LATER-SHIFT-EDIT', 'PRIVATE-LATER-STREAM-EDIT', 'Payment history', 'income-notices'):
+            self.assertNotIn(text, html)
+        self.assertEqual(self.client.get('/dashboard/invoices/' + invoice.id + '/print?unknown=1').status_code, 400)
+        self.bank.assert_not_called()
+
+    def test_record_sending_is_durable_separate_from_payment_and_rejects_duplicate_revision(self):
+        invoice = self.issued()
+        old_revision = str(invoice.revision)
+        data = dict(sent_at='2026-04-12T12:00', method='email',
+                    recipient='client@example.invalid', notes='<script>Sending note</script>')
+        self.assertEqual(self.post(invoice, 'sent', **data).status_code, 303)
+        invoice = work.get_invoice(invoice.id)
+        self.assertEqual(len(invoice.deliveries), 1)
+        self.assertEqual(work.settlement(invoice)['label'], 'Unpaid')
+        self.assertEqual(self.post(invoice, 'sent', version=old_revision, **data).status_code, 409)
+        self.assertEqual(len(work.get_invoice(invoice.id).deliveries), 1)
+        self.assertEqual(self.post(invoice, 'sent', **dict(data, method='post')).status_code, 303)
+        self.session.expire_all()
+        invoice = work.get_invoice(invoice.id)
+        self.assertEqual(len(invoice.deliveries), 2)
+        html = self.client.get('/dashboard/invoices/' + invoice.id).get_data(as_text=True)
+        self.assertIn('&lt;script&gt;Sending note&lt;/script&gt;', html)
+        self.assertIn('Europe/London', html)
+        self.assertEqual(work.settlement(invoice)['outstanding'], 100000)
+        work.cancel(work.get_invoice(invoice.id, str(invoice.revision)))
+        self.session.commit()
+        invoice = work.get_invoice(invoice.id)
+        self.assertEqual(len(invoice.deliveries), 2)
+        self.assertEqual(self.post(invoice, 'sent', **data).status_code, 400)
+        self.assertIn('CANCELLED', self.client.get('/dashboard/invoices/' + invoice.id + '/print').get_data(as_text=True))
+
+    def test_sending_validation_csrf_future_dst_and_invalid_fields(self):
+        invoice = self.issued()
+        path = '/dashboard/invoices/' + invoice.id
+        data = dict(sent_at='2026-04-12T12:00', method='email', recipient='client@example.invalid')
+        self.assertEqual(self.client.post(path, data=dict(action='sent', version=invoice.revision, **data)).status_code, 400)
+        for changes in (dict(sent_at='2099-01-01T12:00'), dict(sent_at='2026-04-11T12:00'),
+                        dict(sent_at='2026-10-25T01:30'), dict(sent_at='invalid'),
+                        dict(method='smtp'), dict(recipient=''), dict(recipient='x'*501),
+                        dict(notes='x'*1001), dict(recipient='bad\x00name'), dict(unknown='1')):
+            with self.subTest(changes=changes):
+                self.assertEqual(self.post(invoice, 'sent', **dict(data, **changes)).status_code, 400)
+        self.assertEqual(len(work.get_invoice(invoice.id).deliveries), 0)
+
+    def test_legacy_issued_invoice_print_does_not_invent_business_details(self):
+        invoice = self.issued()
+        # Simulate an issued row created before migration 025's empty defaults.
+        invoice.business_name = invoice.business_address = invoice.payment_instructions = ''
+        self.session.commit()
+        html = self.client.get('/dashboard/invoices/' + invoice.id + '/print').get_data(as_text=True)
+        self.assertIn('Business details not recorded', html)
+        self.assertIn('Payment instructions not recorded.', html)
+        self.assertEqual(self.client.get('/dashboard/invoices/' + invoice.id + '/edit').status_code, 302)

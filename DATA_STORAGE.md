@@ -289,3 +289,17 @@ The demo schema has its own copies. Notifications derive advice from current
 records; only acknowledgement versions are stored. Restoring an older backup
 can therefore make previously read notices appear again. Earmarks survive
 restarts and restores but do not transfer money or represent an HMRC payment.
+
+## Invoice documents and sending history
+
+Migration 025 adds invoice business/contact/payment fields and
+`invoice_deliveries`, containing sent time, method, recipient, notes and recorded
+time. Document details are editable only on drafts; issued records are never
+backfilled with new seller information. The runtime role can SELECT and INSERT
+real sending history but cannot UPDATE, DELETE or TRUNCATE it. Resends append
+entries. Cancelling an invoice retains its history.
+
+Existing database backups include these fields and tables, including separate
+sample copies. PDF documents are produced through browser printing; no PDF or
+email attachment files are stored by the server. Sending records describe manual
+delivery and are not proof of successful email delivery or receipt.

@@ -1,5 +1,5 @@
 """Owner-only invoice tracking. All writes are explicit CSRF-protected forms."""
-from datetime import timedelta
+from datetime import datetime, timedelta
 from uuid import uuid4
 
 from flask import Blueprint, redirect, render_template, request, url_for
@@ -64,7 +64,8 @@ def edit(identity=None):
     if existing and existing.state != 'draft':
         return redirect(url_for('invoices.detail', identity=identity))
     values = dict(client_name='', client_address='', reference='', issue_date=work.today().isoformat(),
-                  due_date=(work.today() + timedelta(days=30)).isoformat())
+                  due_date=(work.today() + timedelta(days=30)).isoformat(),
+                  **dict.fromkeys(work.BUSINESS_FIELDS, ''))
     selected = []
     if existing:
         values.update({key: getattr(existing, key) for key in values})
@@ -73,7 +74,7 @@ def edit(identity=None):
     error, error_status = None, 400
     if request.method == 'POST':
         check_form({'csrf_token','invoice_id','version','stream_id','client_name','client_address','reference',
-                    'issue_date','due_date','shift_id'}, multiple={'shift_id'})
+                    'issue_date','due_date','shift_id'} | set(work.BUSINESS_FIELDS), multiple={'shift_id'})
         values.update({field: request.form.get(field, '') for field in values})
         selected = request.form.getlist('shift_id')
         stream_id = request.form.get('stream_id', '')
@@ -125,6 +126,8 @@ def detail(identity):
             allowed |= {'payment_id'}
         elif action == 'cancel':
             allowed |= {'confirm_cancel'}
+        elif action == 'sent':
+            allowed |= {'sent_at', 'method', 'recipient', 'notes'}
         elif action != 'issue':
             raise BadRequest('Choose a valid invoice action.')
         check_form(allowed)
@@ -143,6 +146,8 @@ def detail(identity):
                 key = tuple(uid(part) for part in parts)
                 amounts = [parse_amount(request.form.get(field, ''), invoice.currency) or 0 for field in ('cash','tax','ni')]
                 work.allocate(invoice, key, *amounts)
+            elif action == 'sent':
+                work.record_delivery(invoice, request.form)
             else:
                 work.remove_payment(invoice, uid(request.form.get('payment_id', '')))
             record_action('invoice.' + action, invoice.id)
@@ -158,9 +163,20 @@ def detail(identity):
     payments = [dict(payment=payment, current=work.payment_current(payment, invoice) if payment.active else False)
                 for payment in sorted(invoice.payments, key=lambda row: (row.created_at, row.id), reverse=True)]
     return render_template('invoice.html', invoice=invoice, summary=summary, receipts=receipts, payments=payments,
+        deliveries=sorted(invoice.deliveries, key=lambda row: (row.sent_at, row.recorded_at, row.id), reverse=True),
+        delivery_methods=work.DELIVERY_METHODS, local_time=work.LOCAL_TIME,
+        sent_now=datetime.now(work.LOCAL_TIME).strftime('%Y-%m-%dT%H:%M'),
         error=error, values=request.form if error else {},
         form_revision=request.form.get('version', '') if error and error_status == 409 else invoice.revision, format_amount=format_amount, display_amount=display_amount,
         current_user=current_user), error_status if error else 200
+
+
+@invoices.get('/<uuid:identity>/print')
+def print_invoice(identity):
+    query_values(set())
+    invoice = work.get_invoice(identity)
+    return render_template('invoice_print.html', invoice=invoice, format_amount=format_amount,
+                           preview=invoice.state == 'draft', sample=work.test_data_active())
 
 
 def shift_invoice_links(stream_id):

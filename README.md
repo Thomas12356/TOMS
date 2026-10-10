@@ -1358,7 +1358,9 @@ Open **Invoices** in the navigation (`/dashboard/invoices`). On another
 installation, apply migration 023 with `.venv/bin/flask db-upgrade` first.
 
 1. Create a draft for an income stream, choose completed shifts and enter client
-   details and dates. Selected shifts are reserved against duplicate invoicing.
+   details and dates. Add your business name, address and payment instructions
+   before issuing; contact details are optional. Selected shifts are reserved
+   against duplicate invoicing.
 2. Check the draft and issue it. Issuing assigns a sequential `INV-000001` style
    number and freezes its details. If a draft's shifts change, save it again
    before issuing. Later shift edits do not rewrite issued invoices.
@@ -1380,8 +1382,35 @@ Invoicing does not add income to the forecast again. All shifts on an invoice
 must use the stream's currency. Test data includes a sample draft and separate
 `TEST-INV-` numbering.
 
-This version stores invoice records in PostgreSQL. PDF generation, VAT, uploads,
-interpretation and automatic payment matching are deferred.
+This version stores invoice records in PostgreSQL. VAT, uploads, interpretation
+and automatic payment matching are deferred.
+
+### Client-ready documents and sending history
+
+Use **Preview printable invoice** on a draft or **Print / save invoice as PDF**
+on an issued invoice. The separate document shows your business, client, dates,
+work breakdown, currency, total and payment instructions. Choose **Save as PDF**
+in your browser's print dialog; turn off browser headers and footers for a clean
+document. The document excludes internal payment allocations and sending notes.
+Draft, cancelled and sample documents are clearly marked.
+
+Business and payment details are stored with each draft and become fixed when
+issued, alongside the existing client/work snapshots. Older issued invoices keep
+their original contents and show missing business/payment details rather than
+inventing them. To change an issued document, use the existing cancellation and
+replacement workflow after removing allocations.
+
+After delivering an issued invoice, open **Record sending / resend** and enter
+the actual date/time in Europe/London, method, recipient and optional notes.
+Email, post, hand delivery and other methods are supported. This records what
+you did; it does not send email or confirm receipt. Every resend adds a history
+entry. Revision checks reject repeated/stale submissions. Sending history is
+retained after cancellation, while payment status continues separately.
+The invoice list distinguishes **Not recorded as sent** from **Sending recorded**.
+
+Migration `025_invoice_delivery.sql` adds the document details and sending
+history. Run `.venv/bin/flask db-upgrade` and restart the application on another
+installation. Sample documents and sending history remain isolated in test mode.
 
 ## Income stream controls, notices and earmarks
 
