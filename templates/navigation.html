@@ -9,6 +9,7 @@
     <a href="{{ url_for('dashboard.tax_rules') }}"{% if navigation_page == 'tax-rules' %} aria-current="page"{% endif %}>Tax rules</a>
     {% if navigation_owner %}
     <a href="{{ url_for('checklist.page') }}"{% if navigation_page == 'checklist' %} aria-current="page"{% endif %}>Checklist</a>
+    <a href="{{ url_for('reconciliation.page') }}"{% if navigation_page == 'reconciliation' %} aria-current="page"{% endif %}>Reconciliation</a>
     <a href="{{ url_for('invoices.page') }}"{% if navigation_page == 'invoices' %} aria-current="page"{% endif %}>Invoices</a>
     <a href="{{ url_for('system.page') }}"{% if navigation_page == 'system' %} aria-current="page"{% endif %}>System</a>
     <form class="test-data-form" method="post" action="{{ url_for('dashboard.switch_test_data') }}">

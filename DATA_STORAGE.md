@@ -312,3 +312,10 @@ transaction. Real authentication remains in its usual session; sample business
 records use the selected demo schema. The package is a dated evidence snapshot,
 not a restorable database backup. Included records and selection rules are
 described in its README.
+
+## Reconciliation review
+
+Reconciliation creates no additional income, matching records or stored state.
+It derives the review from shifts, invoice snapshots, payment allocations and
+classified receipts in a read-only snapshot. Removing or adding a payment uses
+the existing invoice history tables. No schema change is required.

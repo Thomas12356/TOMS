@@ -535,3 +535,12 @@ snapshot, with the selected real/sample schema inherited from `DataSession`.
 so the exported calculation and evidence share that snapshot. Defaults retain
 the existing dashboard behaviour. Export fields are explicit allowlists, with
 CSV formula protection and exact original JSON.
+
+## Work and receipt reconciliation
+
+`routes/reconciliation.py` renders the owner-only GET review using the existing
+read-only repeatable-read business snapshot. `services/invoices/reconciliation.py`
+derives separate work, receipt and invoice totals. It reuses invoice receipt
+validation, version checks, settlement and frozen work snapshots. Receipt budgets
+consider active allocations across all years. Changes happen only through the
+existing invoice forms, which retain CSRF, revision and budget checks.

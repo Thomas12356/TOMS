@@ -79,11 +79,6 @@ Try the **Test data** switch to learn these steps with synthetic accounts.
 It changes the business records shown in your browser; authentication and real
 scheduled bank sync remain separate. Demo records are rebuilt on migrations.
 
-## Next milestones
-
-1. Reconcile gross work records against bank payments to highlight missing pay
-   without adding the same earnings twice.
-
 ## Open the dashboard
 
 With the server running, visit `/` (the root URL) or `/dashboard`. It redirects to `/login`, where
@@ -1506,3 +1501,31 @@ Forecasts, shifts, invoices and receipts must not be added together.
 This is planning evidence, not a submitted tax return or a full database backup.
 It contains private financial and client information; raw bank payloads and
 login/session records are excluded. No database migration is required.
+
+## Work and payment reconciliation
+
+Open **Reconciliation** in the owner navigation, or **Review work and payments**
+from Invoices. `/dashboard/reconciliation` reads saved evidence without bank
+calls, automatic matches or changes to tax estimates. Filter by income source;
+archived sources remain available. Test data stays in its separate schema.
+
+The screen separates completed work, current receipt gross, outstanding/draft
+invoices, changed invoice work and cash/actual tax/NI available for allocation.
+Work-to-receipt differences appear only for sources using individual shifts;
+regular forecasts may record overtime only. Incomplete, unconfirmed, inconsistent
+or stale receipts need review before a difference is shown. Unknown source
+assignments suppress comparisons even when a source filter is selected.
+
+Invoice balances retain all allocation history, including other tax years.
+Removed allocations release their amounts; stale ones must be reviewed. Work
+reserved by draft invoices is already linked, and cancellation releases it.
+Changed work is compared with the saved invoice snapshot without rewriting an
+issued document. Follow the invoice link and allocate explicitly using the
+existing form, which checks remaining cash and actual withholding.
+
+Timing differences or missing work records can explain a discrepancy. An equal
+total does not prove each shift was paid; work without an invoice may be paid
+through payroll. Transfers, non-taxable receipts and future work/payments are
+excluded from business comparisons. Currencies stay separate. Each evidence
+section shows the first 50 records with full counts; totals use all records.
+No migration is required.

@@ -813,3 +813,30 @@ secret checks passed. No migration is needed.
 RUN_POSTGRES_TESTS=1 .venv/bin/python -m unittest discover -s tests -q
 LD_LIBRARY_PATH=/tmp/toms-checkpoint-libs/root/usr/lib/x86_64-linux-gnu PYTHONPATH=/tmp/toms-checkpoint-tools RUN_POSTGRES_TESTS=1 .venv/bin/python tests/tax_export_browser_checks.py
 ```
+
+## Work and payment reconciliation (2026-10-10)
+
+Nineteen regression checks cover owner/API access separation, actual gross and
+withholding, unchanged tax totals, overtime-only forecast sources, positive and
+negative work/receipt differences, partial/full/removed/stale allocations,
+older invoice payment budgets, draft reservations, cancellation, changed frozen
+invoice work, incomplete/unconfirmed/gross-to-net inconsistent receipts,
+unassigned receipts under filtering, pending/future/out-of-year records,
+automatic/manual transfer classification, current and changed non-taxable
+receipts, separate currencies, archived sources, full counts with capped display,
+query validation, safe database errors and real/sample isolation with escaped
+text. The page uses the existing read-only repeatable-read business snapshot.
+
+Chromium checks at 320, 390, 768 and 1280px use disposable sample schemas and
+exercise source filtering, long names, navigation to an invoice, explicit payment
+allocation and the refreshed reconciliation balance. Existing invoice and
+export browser suites also pass at those widths. No bank calls occur.
+
+Full PostgreSQL verification: 474 tests run, 470 passed and four optional backup
+tests skipped. Ruff F, Bandit, whitespace and configured-secret checks passed.
+No database migration is required.
+
+```bash
+RUN_POSTGRES_TESTS=1 .venv/bin/python -m unittest discover -s tests -q
+LD_LIBRARY_PATH=/tmp/toms-checkpoint-libs/root/usr/lib/x86_64-linux-gnu PYTHONPATH=/tmp/toms-checkpoint-tools RUN_POSTGRES_TESTS=1 .venv/bin/python tests/reconciliation_browser_checks.py
+```
