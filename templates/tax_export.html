@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tax-year export · TOMS</title><link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}"></head>
+<body><header class="site-header"><a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+{% with navigation_page='checklist', navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}</header>
+<main class="checklist-page">{% include 'test_data_notice.html' %}
+<div class="page-heading"><p class="eyebrow">TOMS / RECORDS</p><h1>Tax-year export</h1></div>
+{% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+<p>Download your saved records for {{ tax_year }} as a ZIP file, with spreadsheet files and a calculation report.</p>
+<p>The package includes income sources, bank transactions and withholding, work, expenses, mileage, invoices, payment allocations and sending history. The report includes the estimate, warnings and reviewed rules.</p>
+<p>Forecasts and actual receipts remain separate. Pending, future, stale and incomplete records stay visible for review; their presence does not mean they count towards tax. Invoice records use the issue date and include their complete payment history.</p>
+<p>This is supporting evidence and a planning estimate, not a completed tax return. Unknown amounts remain blank. Amounts are in minor units, such as pence.</p>
+<p><a class="button" href="{{ url_for('tax_export.download') }}">Download {{ tax_year }} ZIP</a></p>
+<p><a href="{{ url_for('checklist.page') }}">Review your checklist</a> · <a href="{{ url_for('dashboard.tax_estimate') }}">Tax estimate</a></p>
+</main></body></html>

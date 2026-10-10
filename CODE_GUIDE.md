@@ -525,3 +525,13 @@ Do not add separate tax rates, guessed withholding or stored completion flags.
 privacy, errors and access. `tests/checklist_browser_checks.py` follows the real
 sample forms through forecast completion, withholding and confirmation at four
 widths, checking that progress updates without touching real records.
+
+## Tax-year exports
+
+`routes/tax_export.py` serves the owner preview and ZIP download.
+`services/tax/export.py` reads a separate, read-only PostgreSQL repeatable-read
+snapshot, with the selected real/sample schema inherited from `DataSession`.
+`current_plan`, `tax_records` and `attach_shift_totals` accept an optional session
+so the exported calculation and evidence share that snapshot. Defaults retain
+the existing dashboard behaviour. Export fields are explicit allowlists, with
+CSV formula protection and exact original JSON.

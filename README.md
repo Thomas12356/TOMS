@@ -81,9 +81,7 @@ scheduled bank sync remain separate. Demo records are rebuilt on migrations.
 
 ## Next milestones
 
-1. A tax-year export containing the calculation, income records, work records,
-   deductions and mileage evidence for checking and backup.
-2. Reconcile gross work records against bank payments to highlight missing pay
+1. Reconcile gross work records against bank payments to highlight missing pay
    without adding the same earnings twice.
 
 ## Open the dashboard
@@ -1482,3 +1480,29 @@ Migration `024_income_workspace.sql` adds the expense treatment flag, earmarks
 and notice acknowledgements. Run `.venv/bin/flask db-upgrade` on another
 installation and restart Flask. Test mode includes sample earmarks and a
 tracking-only expense, and keeps these records separate from your real data.
+
+## Tax-year evidence export
+
+Open **Export tax-year records** from the checklist or tax estimate, then download
+`/dashboard/tax-export/download`. Owner browser login is required; API keys cannot
+download it. Test data mode produces a clearly labelled sample ZIP.
+
+The package contains `README.txt`, a readable `report.html`, `report.json` (calculation, warnings, pinned
+income-tax/NI/mileage rules and original evidence), and ten CSV files: streams,
+work, transactions, income, expenses, mileage, invoices, invoice items,
+allocations and sending history. All amounts ending `_minor` use minor units
+(pence for GBP); unknowns stay null in JSON and blank in CSV. Decimal calculation
+values use exact strings. Spreadsheet formula text is prefixed with an apostrophe
+in CSV; JSON preserves the original text.
+
+The export reads one consistent database snapshot and starts no bank or remote
+rule checks. It selects the supported UK tax year using Europe/London midnight
+boundaries. Transactions include pending/future records and changed expense
+claims for review. Invoices use issue date and retain their complete payment and
+sending history, including linked receipts outside the year. Consult status,
+review and current flags; file presence does not mean inclusion in tax totals.
+Forecasts, shifts, invoices and receipts must not be added together.
+
+This is planning evidence, not a submitted tax return or a full database backup.
+It contains private financial and client information; raw bank payloads and
+login/session records are excluded. No database migration is required.

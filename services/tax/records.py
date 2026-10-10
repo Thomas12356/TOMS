@@ -23,10 +23,11 @@ def expense_current(record):
             and record.amount_minor <= payment.amount_minor)
 
 
-def tax_records(rules, *, as_of=None):
+def tax_records(rules, *, as_of=None, session=None):
+    session = session if session is not None else db.session
     first = datetime.fromisoformat(rules['starts_on']).replace(tzinfo=ZoneInfo('Europe/London'))
     end = (datetime.fromisoformat(rules['ends_on']) + timedelta(days=1)).replace(tzinfo=ZoneInfo('Europe/London'))
-    payments = db.session.scalars(db.select(Transaction).outerjoin(Transaction.expense).where(db.or_(
+    payments = session.scalars(db.select(Transaction).outerjoin(Transaction.expense).where(db.or_(
         db.and_(Transaction.transaction_time >= first, Transaction.transaction_time < end),
         db.and_(ExpenseDeduction.recorded_time >= first, ExpenseDeduction.recorded_time < end))).options(
         load_only(Transaction.amount_minor, Transaction.currency, Transaction.direction, Transaction.status,
@@ -70,7 +71,7 @@ def tax_records(rules, *, as_of=None):
         if income and payment.status == 'SETTLED' and not income.needs_review and income.recorded_currency == payment.currency == 'GBP' and payment.direction == 'IN' and classification_details(payment)['type'] == 'income':
             if income.income_stream_id:
                 ni_paid[income.income_stream_id] += income.ni_deducted_minor or 0
-    journeys = db.session.scalars(db.select(MileageEntry).options(selectinload(MileageEntry.income_stream))).all()
+    journeys = session.scalars(db.select(MileageEntry).options(selectinload(MileageEntry.income_stream))).all()
     if journeys:
         status = cached_status(current_app.instance_path)
         if status.get('status') == 'needs_review':

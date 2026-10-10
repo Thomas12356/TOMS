@@ -784,3 +784,32 @@ temporary browser tools directory:
 .venv/bin/pip install --target /tmp/toms-checkpoint-tools pypdf
 LD_LIBRARY_PATH=/tmp/toms-checkpoint-libs/root/usr/lib/x86_64-linux-gnu PYTHONPATH=/tmp/toms-checkpoint-tools .venv/bin/python tests/invoice_document_browser_checks.py
 ```
+
+## Tax-year evidence export (2026-10-10)
+
+The owner-only preview/download has twelve new regression checks covering
+unauthenticated/API denial, schema isolation, no-store downloads, CSV formula
+protection, exact plan totals, unknown amounts, foreign-currency labels, escaped
+HTML, UK local-midnight boundaries, pending records, changed expense claims,
+complete invoice sending/removed allocation history and cross-year receipt
+support. ZIP row counts match CSVs. Raw bank payloads are excluded. Database
+failures return a safe 503 page without exception content.
+
+An independent PostgreSQL snapshot test verifies repeatable reads while another
+connection changes a stream, and verifies `transaction_read_only` is on. Export
+calculation queries use the same snapshot as evidence. No live Starling or
+remote rule checks run. Existing tax calculation callers retain their normal
+session by default.
+
+Browser checks download and inspect the real ZIP at 320, 390, 768 and 1280px,
+follow checklist/estimate links, verify sample labelling/isolation and render the
+standalone HTML report without overflow or JavaScript errors.
+
+Validation: full PostgreSQL suite, 455 tests (451 passed, four optional backup
+tests skipped); export browser checks, Ruff F, Bandit, whitespace and configured
+secret checks passed. No migration is needed.
+
+```bash
+RUN_POSTGRES_TESTS=1 .venv/bin/python -m unittest discover -s tests -q
+LD_LIBRARY_PATH=/tmp/toms-checkpoint-libs/root/usr/lib/x86_64-linux-gnu PYTHONPATH=/tmp/toms-checkpoint-tools RUN_POSTGRES_TESTS=1 .venv/bin/python tests/tax_export_browser_checks.py
+```

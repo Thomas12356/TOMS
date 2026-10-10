@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>TOMS tax-year report {{ manifest.tax_year }}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:60rem;margin:2rem auto;padding:0 1rem;color:#18232b;line-height:1.5}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{padding:.6rem;text-align:left;border-bottom:1px solid #ccc;overflow-wrap:anywhere}h1{font-size:1.8rem}.warning{padding:1rem;background:#fff3d6}small{overflow-wrap:anywhere}@media print{body{margin:0}}</style></head><body>
+<h1>TOMS · {{ manifest.tax_year }}</h1>
+<p><strong>{{ 'SAMPLE DATA ONLY' if manifest.sample_data else 'Saved owner records' }}</strong><br><small>Generated {{ manifest.generated_at }}</small></p>
+<p>England, Wales and Northern Ireland. Planning evidence, not a completed tax return. Forecasts and bank receipts are separate; adding them together would count income twice.</p>
+{% set plan=manifest.calculation %}
+{% if plan.blockers or plan.received_issues %}<div class="warning"><h2>Needs attention</h2>
+{% if plan.blockers %}<h3>Annual forecast</h3><ul>{% for warning in plan.blockers %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}
+{% if plan.received_issues %}<h3>Received-income target</h3><ul>{% for warning in plan.received_issues %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}</div>{% endif %}
+<h2>Annual planning calculation</h2>
+<table><thead><tr><th scope="col">Measure</th><th scope="col">Amount</th></tr></thead><tbody>
+{% for label,key in [('Forecast gross income','gross_minor'),('Deductions','deductions_minor'),('National Insurance','ni_minor'),('Total liability','total_liability_minor'),('Logged tax withheld','withheld_minor'),('Logged National Insurance paid','ni_paid_minor'),('Reserve target','reserve_minor')] %}<tr><th scope="row">{{ label }}</th><td>{{ money(plan[key]) }}</td></tr>{% endfor %}
+{% if plan.calculation %}<tr><th scope="row">Income tax</th><td>{{ money(plan.calculation.tax_minor) }}</td></tr>{% endif %}</tbody></table>
+<h2>Received-income planning</h2><p>Received gross: {{ money(plan.received_gross_minor) }}<br>Received-income reserve target: {{ money(plan.received_reserve_minor) }}</p>
+<h2>Income sources</h2><table><thead><tr><th scope="col">Source</th><th scope="col">Forecast gross</th><th scope="col">Deductions</th></tr></thead><tbody>
+{% for row in plan.rows %}<tr><td>{% for stream in manifest.records.streams %}{% if stream.id==row.income_stream_id %}{{ stream.name }}{% endif %}{% endfor %}</td><td>{% for stream in manifest.records.streams %}{% if stream.id==row.income_stream_id %}{{ money(row.gross_minor, stream.expected_gross_currency) }}{% endif %}{% endfor %}</td><td>{{ money(row.deductions_minor) }}</td></tr>{% endfor %}</tbody></table>
+{% if plan.attention %}<h2>Record review</h2><ul>{% for item in plan.attention %}<li>{{ item.title }}: {{ item.count }}</li>{% endfor %}</ul>{% endif %}
+<h2>Evidence files</h2><ul>{% for name,count in manifest.counts.items() %}<li>{{ name }}.csv: {{ count }} records</li>{% endfor %}</ul>
+<p>Read README.txt for selection rules. Unknown values remain unavailable. Pending, future, tracking-only and stale evidence stays visible but may be excluded from calculations. Invoice allocations and sending logs are supporting records, not extra income.</p>
+<p>Exact amounts, calculation bands, reviewed rules and original text are in report.json. CSV monetary amounts use minor units, such as pence; currencies must remain separate.</p></body></html>

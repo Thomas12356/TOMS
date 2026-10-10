@@ -303,3 +303,12 @@ Existing database backups include these fields and tables, including separate
 sample copies. PDF documents are produced through browser printing; no PDF or
 email attachment files are stored by the server. Sending records describe manual
 delivery and are not proof of successful email delivery or receipt.
+
+## Tax-year evidence packages
+
+Exports require no schema change and create no stored files or export rows. ZIP
+bytes are assembled in memory from an independent read-only repeatable-read
+transaction. Real authentication remains in its usual session; sample business
+records use the selected demo schema. The package is a dated evidence snapshot,
+not a restorable database backup. Included records and selection rules are
+described in its README.

@@ -89,8 +89,9 @@ def journey_defaults(shift, stream_name):
                 purpose=purpose[:1000])
 
 
-def attach_shift_totals(streams):
+def attach_shift_totals(streams, *, session=None):
     """One query: all work for shift mode, only overtime for regular forecasts."""
+    session = session if session is not None else db.session
     selected = list(streams)
     if not selected:
         return
@@ -98,7 +99,7 @@ def attach_shift_totals(streams):
         IncomeShift.income_stream_id.in_([stream.id for stream in selected]),
         IncomeShift.starts_at >= datetime(2026, 4, 6, tzinfo=LOCAL_TIME),
         IncomeShift.starts_at < datetime(2027, 4, 6, tzinfo=LOCAL_TIME)).group_by(IncomeShift.income_stream_id, IncomeShift.currency, IncomeShift.is_overtime)
-    totals = {(key, currency, overtime): int(total) for key, currency, overtime, total in db.session.execute(query)}
+    totals = {(key, currency, overtime): int(total) for key, currency, overtime, total in session.execute(query)}
     for stream in selected:
         stream.overtime_gross_minor = totals.get((stream.id, stream.expected_gross_currency, True), 0)
         stream.shift_gross_minor = stream.overtime_gross_minor + totals.get((stream.id, stream.expected_gross_currency, False), 0)
