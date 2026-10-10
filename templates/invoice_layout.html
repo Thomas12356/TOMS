@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Invoices{% endblock %} · TOMS</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}"></head>
+<body><header class="site-header"><a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+{% with navigation_page='invoices', navigation_owner=true %}{% include 'navigation.html' %}{% endwith %}</header>
+<main class="invoice-page">{% include 'test_data_notice.html' %}
+{% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+{% block content %}{% endblock %}</main></body></html>

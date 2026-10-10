@@ -40,21 +40,25 @@ def vehicle_key(value):
 
 
 def expense_fields(form, payment):
-    if not (payment.direction == 'OUT' and payment.status == 'SETTLED' and payment.currency == 'GBP'):
-        raise ValueError('Only settled GBP expenses can be deducted.')
+    treatment = form.get('tax_status', 'deduction')
+    if treatment not in ('deduction', 'tracking'):
+        raise ValueError('Choose tracking only or tax deduction.')
+    deductible = treatment == 'deduction'
+    if not (payment.direction == 'OUT' and payment.status == 'SETTLED'):
+        raise ValueError('Choose a settled outgoing expense.')
     day = payment.transaction_time.astimezone(ZoneInfo('Europe/London')).date()
-    if not date(2026, 4, 6) <= day <= min(datetime.now(ZoneInfo('Europe/London')).date(), date(2027, 4, 5)):
+    if deductible and (payment.currency != 'GBP' or not date(2026, 4, 6) <= day <= min(datetime.now(ZoneInfo('Europe/London')).date(), date(2027, 4, 5))):
         raise ValueError('Choose an existing expense in the supported 2026–27 tax year.')
-    amount = parse_amount(form.get('amount', ''), 'GBP')
+    amount = parse_amount(form.get('amount', ''), payment.currency)
     if amount is None or not 0 < amount <= payment.amount_minor:
         raise ValueError('The eligible amount must be greater than zero and no more than the payment.')
     category = form.get('category')
     if category not in ('general', 'vehicle_running', 'parking_tolls'):
         raise ValueError('Choose a valid expense category.')
     key = vehicle_key(form.get('vehicle_key', '')) if category == 'vehicle_running' else ''
-    if form.get('eligible') != '1':
+    if deductible and form.get('eligible') != '1':
         raise ValueError('Confirm that this is an eligible, unreimbursed expense.')
-    return dict(amount_minor=amount, purpose=text(form.get('purpose'), 'business purpose', 1000),
+    return dict(is_tax_deductible=deductible, amount_minor=amount, purpose=text(form.get('purpose'), 'business purpose' if deductible else 'expense purpose', 1000),
                 category=category, vehicle_key=key, recorded_amount_minor=payment.amount_minor,
                 recorded_currency=payment.currency, recorded_time=payment.transaction_time)
 

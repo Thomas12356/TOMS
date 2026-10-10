@@ -54,7 +54,7 @@ with sync_playwright() as playwright:
                 assert page.locator('.activity-record').count() == 2
                 page.get_by_text('Record ID', exact=True).first.click()
                 assert '<script>PRIVATE</script>' in page.locator('.activity-record').first.inner_text()
-                assert page.locator('script').count() == 1  # Navigation script only; escaped record ID.
+                assert page.locator('script:not([src])').count() == 0  # No injected scripts; escaped record ID.
                 assert page.get_by_role('link', name='Older').get_attribute('href').endswith('page=2&mode=all')
             elif state == 'empty':
                 assert page.get_by_text('No actions recorded yet.').is_visible()

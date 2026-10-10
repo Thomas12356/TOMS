@@ -8,6 +8,7 @@
     <a href="{{ url_for('dashboard.tax_estimate') }}"{% if navigation_page == 'tax-estimate' %} aria-current="page"{% endif %}>Tax estimate</a>
     <a href="{{ url_for('dashboard.tax_rules') }}"{% if navigation_page == 'tax-rules' %} aria-current="page"{% endif %}>Tax rules</a>
     {% if navigation_owner %}
+    <a href="{{ url_for('invoices.page') }}"{% if navigation_page == 'invoices' %} aria-current="page"{% endif %}>Invoices</a>
     <a href="{{ url_for('system.page') }}"{% if navigation_page == 'system' %} aria-current="page"{% endif %}>System</a>
     <form class="test-data-form" method="post" action="{{ url_for('dashboard.switch_test_data') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -24,3 +25,21 @@
 </nav>
 
 <script src="{{ url_for('static', filename='js/navigation.js') }}" defer></script>
+
+{% if navigation_owner %}
+<aside id="income-alert-bar" class="income-alert-bar" data-url="{{ url_for('reserves.notifications') }}" hidden aria-label="Income notifications">
+    <span id="income-alert-summary" role="status" aria-live="polite"></span>
+    <button type="button" id="show-income-notices" class="secondary-button">View income notices</button>
+</aside>
+<dialog id="income-notices-dialog" class="review-dialog stream-list-dialog" aria-labelledby="income-notices-heading" data-read-url="{{ url_for('reserves.acknowledge') }}" data-csrf="{{ csrf_token() }}">
+    <button type="button" class="secondary-button" id="close-income-notices">Close</button>
+    <h2 id="income-notices-heading">Income received</h2>
+    <p class="secondary">Suggestions use your annual forecasts and actual logged deductions. They change with your records and do not move money. Check the cumulative target and earmarks in Income streams.</p>
+    <div id="income-notices-list"></div>
+    <p id="income-notices-error" class="message" role="alert" hidden></p>
+    <form method="get" action="{{ url_for('dashboard.income_streams', _anchor='account-reserves') }}">
+        <button class="secondary-button">View account money and tax / NI earmarks</button>
+    </form>
+</dialog>
+<script src="{{ url_for('static', filename='js/income-notifications.js') }}" defer></script>
+{% endif %}

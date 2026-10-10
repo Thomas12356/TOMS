@@ -257,7 +257,7 @@ class OwnerSetup(BaseModel):
 
 
 class ExpenseDeduction(BaseModel):
-    """One eligible portion of a bank expense, claimed once against one stream."""
+    """A linked bank expense, optionally claimed against one income stream."""
     __tablename__ = 'expense_deductions'
     __table_args__ = (
         db.ForeignKeyConstraint(['shift_id', 'income_stream_id'], ['toms.income_shifts.id', 'toms.income_shifts.income_stream_id']),
@@ -274,6 +274,7 @@ class ExpenseDeduction(BaseModel):
     feed_item_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
     income_stream_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.income_streams.id'), nullable=False, index=True)
     shift_id = db.Column(db.Uuid(as_uuid=False), index=True)
+    is_tax_deductible = db.Column(db.Boolean, nullable=False, server_default=db.true())
     amount_minor = db.Column(db.BigInteger, nullable=False)
     purpose = db.Column(db.Text, nullable=False)
     category = db.Column(db.Text, nullable=False)
@@ -349,3 +350,117 @@ class UserAction(BaseModel):
     action = db.Column(db.Text, nullable=False)
     sample_data = db.Column(db.Boolean, nullable=False, server_default=db.false())
     record_id = db.Column(db.Text, nullable=False, server_default='')
+
+
+class Invoice(BaseModel):
+    __tablename__ = 'invoices'
+    __table_args__ = (
+        db.CheckConstraint("state IN ('draft','issued','cancelled')"),
+        db.CheckConstraint('revision > 0 AND total_minor > 0'),
+        db.CheckConstraint('char_length(trim(client_name)) BETWEEN 1 AND 200'),
+        db.CheckConstraint('char_length(client_address) <= 2000 AND char_length(reference) <= 200'),
+        db.CheckConstraint("state <> 'draft' OR (number IS NULL AND issued_at IS NULL)"),
+        db.CheckConstraint("state <> 'issued' OR (number IS NOT NULL AND issued_at IS NOT NULL)"),
+        db.CheckConstraint("state <> 'cancelled' OR cancelled_at IS NOT NULL"),
+        db.CheckConstraint('due_date >= issue_date'),
+        db.CheckConstraint("currency IN ('GBP','EUR','USD')"),
+        {'schema': 'toms'},
+    )
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    income_stream_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.income_streams.id'), nullable=False)
+    stream_name = db.Column(db.Text, nullable=False)
+    number = db.Column(db.Text, unique=True)
+    state = db.Column(db.Text, nullable=False, server_default='draft')
+    revision = db.Column(db.Integer, nullable=False, server_default='1')
+    client_name = db.Column(db.Text, nullable=False)
+    client_address = db.Column(db.Text, nullable=False, server_default='')
+    reference = db.Column(db.Text, nullable=False, server_default='')
+    issue_date = db.Column(db.Date, nullable=False)
+    due_date = db.Column(db.Date, nullable=False)
+    currency = db.Column(db.Text, nullable=False)
+    total_minor = db.Column(db.BigInteger, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
+    issued_at = db.Column(db.DateTime(timezone=True))
+    cancelled_at = db.Column(db.DateTime(timezone=True))
+    items = db.relationship('InvoiceItem', back_populates='invoice', lazy='selectin')
+    payments = db.relationship('InvoicePayment', back_populates='invoice', lazy='selectin')
+
+
+class InvoiceItem(BaseModel):
+    __tablename__ = 'invoice_items'
+    __table_args__ = (
+        db.CheckConstraint('amount_minor > 0'),
+        db.CheckConstraint('NOT active OR shift_id IS NOT NULL'),
+        db.Index('invoice_items_active_shift', 'shift_id', unique=True, postgresql_where=db.text('active')),
+        {'schema': 'toms'},
+    )
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    invoice_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.invoices.id', ondelete='CASCADE'), nullable=False)
+    shift_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.income_shifts.id', ondelete='SET NULL'))
+    active = db.Column(db.Boolean, nullable=False, server_default=db.true())
+    description = db.Column(db.Text, nullable=False)
+    amount_minor = db.Column(db.BigInteger, nullable=False)
+    source_version = db.Column(db.Text, nullable=False)
+    shift_snapshot = db.Column(JSONB, nullable=False)
+    invoice = db.relationship('Invoice', back_populates='items')
+
+
+class InvoicePayment(BaseModel):
+    __tablename__ = 'invoice_payments'
+    __table_args__ = (
+        db.ForeignKeyConstraint(['account_uid', 'category_uid', 'feed_item_uid'],
+            ['toms.transactions.account_uid', 'toms.transactions.category_uid', 'toms.transactions.feed_item_uid']),
+        db.CheckConstraint('cash_minor >= 0 AND tax_minor >= 0 AND ni_minor >= 0'),
+        db.CheckConstraint('cash_minor::numeric + tax_minor::numeric + ni_minor::numeric > 0'),
+        {'schema': 'toms'},
+    )
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    invoice_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.invoices.id'), nullable=False)
+    account_uid = db.Column(db.Uuid(as_uuid=False), nullable=False)
+    category_uid = db.Column(db.Uuid(as_uuid=False), nullable=False)
+    feed_item_uid = db.Column(db.Uuid(as_uuid=False), nullable=False)
+    cash_minor = db.Column(db.BigInteger, nullable=False)
+    tax_minor = db.Column(db.BigInteger, nullable=False, server_default='0')
+    ni_minor = db.Column(db.BigInteger, nullable=False, server_default='0')
+    payment_version = db.Column(db.Text, nullable=False)
+    payment_label = db.Column(db.Text, nullable=False)
+    active = db.Column(db.Boolean, nullable=False, server_default=db.true())
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
+    invoice = db.relationship('Invoice', back_populates='payments')
+    transaction = db.relationship('Transaction', lazy='selectin')
+
+
+class InvoiceSequence(BaseModel):
+    __tablename__ = 'invoice_sequences'
+    __table_args__ = (db.CheckConstraint('id = 1 AND last_number >= 0'), {'schema': 'toms'})
+    id = db.Column(db.Integer, primary_key=True)
+    last_number = db.Column(db.BigInteger, nullable=False)
+
+
+class AccountReserve(BaseModel):
+    """Owner earmarks within an account; this does not transfer bank money."""
+    __tablename__ = 'account_reserves'
+    __table_args__ = (
+        db.CheckConstraint('tax_minor >= 0 AND ni_minor >= 0 AND revision > 0'),
+        db.CheckConstraint('tax_minor::numeric + ni_minor::numeric <= 9223372036854775807'),
+        {'schema': 'toms'},
+    )
+    account_uid = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.accounts.account_uid', ondelete='CASCADE'), primary_key=True)
+    tax_minor = db.Column(db.BigInteger, nullable=False, server_default='0')
+    ni_minor = db.Column(db.BigInteger, nullable=False, server_default='0')
+    revision = db.Column(db.Integer, nullable=False, server_default='1')
+
+
+class IncomeNoticeRead(BaseModel):
+    """Acknowledgement of one version of a linked income receipt."""
+    __tablename__ = 'income_notice_reads'
+    __table_args__ = (
+        db.ForeignKeyConstraint(['account_uid', 'category_uid', 'feed_item_uid'],
+            ['toms.transactions.account_uid', 'toms.transactions.category_uid', 'toms.transactions.feed_item_uid'], ondelete='CASCADE'),
+        db.CheckConstraint('char_length(payment_version) = 64'),
+        {'schema': 'toms'},
+    )
+    account_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    category_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    feed_item_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    payment_version = db.Column(db.Text, nullable=False)

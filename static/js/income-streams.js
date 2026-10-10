@@ -41,3 +41,71 @@ document.querySelectorAll('[data-mileage-relationship]').forEach((select) => {
     kind.addEventListener('change', updateChoices);
     updateChoices();
 });
+
+// Keep each stream's controls together; native dialogs handle keyboard focus.
+const dialogOpeners = new WeakMap();
+function openStreamDialog(dialog, opener) {
+    document.querySelectorAll('dialog[open]').forEach(other => { if (other !== dialog) other.close(); });
+    if (opener) dialogOpeners.set(dialog, opener);
+    if (!dialog.open) dialog.showModal();
+}
+document.addEventListener('close', event => dialogOpeners.get(event.target)?.focus(), true);
+document.addEventListener('click', async event => {
+    const close = event.target.closest('.dialog-close');
+    if (close) { event.preventDefault(); close.closest('dialog').close(); return; }
+    const configure = event.target.closest('[data-open-dialog]');
+    if (configure) {
+        event.preventDefault();
+        openStreamDialog(document.getElementById(configure.dataset.openDialog), configure);
+        return;
+    }
+    const link = event.target.closest('[data-load-dialog]');
+    if (!link) return;
+    event.preventDefault();
+    link.setAttribute('aria-busy', 'true');
+    try {
+        const response = await fetch(link.href, {credentials: 'same-origin', cache: 'no-store'});
+        if (!response.ok || response.redirected) throw new Error('Unable to load records');
+        const documentCopy = new DOMParser().parseFromString(await response.text(), 'text/html');
+        const updated = documentCopy.getElementById(link.dataset.loadDialog);
+        if (!updated) throw new Error('Missing records');
+        const existing = document.getElementById(updated.id);
+        const opener = existing?.open ? dialogOpeners.get(existing) : link;
+        if (existing?.open) existing.close();
+        const dialog = document.importNode(updated, true);
+        dialog.removeAttribute('open');
+        existing.replaceWith(dialog);
+        openStreamDialog(dialog, opener);
+    } catch (error) {
+        // A normal GET is also a usable entry point for errors and expired sessions.
+        window.location.assign(link.href);
+    } finally {
+        link.removeAttribute('aria-busy');
+    }
+});
+document.querySelectorAll('dialog[data-reopen="true"]:not(#create-stream-dialog)').forEach(dialog => {
+    if (dialog.open) dialog.close();
+    openStreamDialog(dialog);
+});
+
+document.querySelectorAll('[data-reserve-form]').forEach(form => {
+    form.addEventListener('submit', async event => {
+        event.preventDefault();
+        const error = form.querySelector('[data-reserve-error]');
+        const button = form.querySelector('button');
+        error.hidden = true;
+        button.disabled = true;
+        try {
+            const response = await fetch(form.action, {method: 'POST', body: new FormData(form), credentials: 'same-origin'});
+            if (!response.ok) {
+                const body = await response.json().catch(() => ({}));
+                throw new Error(body.error || 'Unable to save earmarks. Reload and try again.');
+            }
+            window.location.assign(response.url);
+        } catch (failure) {
+            error.textContent = failure.message;
+            error.hidden = false;
+            button.disabled = false;
+        }
+    });
+});

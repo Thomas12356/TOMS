@@ -32,7 +32,7 @@ deductions.before_request(require_dashboard_login)
 deductions.before_request(activate_test_data)
 deductions.register_error_handler(SQLAlchemyError, database_error)
 
-EXPENSE_FIELDS = {'csrf_token', 'action', 'payment', 'version', 'stream_id', 'amount', 'purpose', 'category', 'vehicle_key', 'eligible', 'shift_id'}
+EXPENSE_FIELDS = {'csrf_token', 'action', 'payment', 'version', 'stream_id', 'amount', 'purpose', 'category', 'vehicle_key', 'eligible', 'shift_id', 'tax_status'}
 MILEAGE_FIELDS = {'csrf_token', 'action', 'entry_id', 'stream_id', 'journey_date', 'location', 'vehicle_type', 'vehicle_key',
                   'miles', 'purpose', 'start_postcode', 'end_postcode', 'reimbursed', 'eligible', 'shift_id', 'version'}
 
@@ -93,7 +93,7 @@ def page():
                     fields = expense_fields(request.form, selected)
                     fields['shift_id'] = linked_shift_id(request.form, stream)
                     journeys = db.session.scalars(db.select(MileageEntry)).all()
-                    if fields['category'] == 'vehicle_running' and any(entry.vehicle_key == fields['vehicle_key'] for entry in journeys):
+                    if fields['is_tax_deductible'] and fields['category'] == 'vehicle_running' and any(entry.vehicle_key == fields['vehicle_key'] for entry in journeys):
                         raise ValueError('Mileage already covers running costs for this vehicle. Parking and tolls may be recorded separately.')
                     if record is None:
                         record = ExpenseDeduction(account_uid=key[0], category_uid=key[1], feed_item_uid=key[2])
@@ -126,7 +126,7 @@ def page():
                     if cached_status(current_app.instance_path).get('status') == 'needs_review':
                         raise ValueError('Official mileage rules need review before new allowances can be saved.')
                     expenses = db.session.scalars(db.select(ExpenseDeduction).where(
-                        ExpenseDeduction.category == 'vehicle_running').options(selectinload(ExpenseDeduction.transaction))).all()
+                        ExpenseDeduction.category == 'vehicle_running', ExpenseDeduction.is_tax_deductible.is_(True)).options(selectinload(ExpenseDeduction.transaction))).all()
                     if any(record.vehicle_key == fields['vehicle_key'] for record in expenses):
                         raise ValueError('Remove actual running-cost deductions for this vehicle before using simplified mileage.')
                     entry = MileageEntry(id=entry_id, income_stream_id=stream.id, **fields)
@@ -143,7 +143,7 @@ def page():
     streams = db.session.scalars(db.select(IncomeStream).order_by(IncomeStream.name, IncomeStream.id)).all()
     expenses = db.session.scalars(db.select(ExpenseDeduction).options(selectinload(ExpenseDeduction.transaction))).all()
     journeys = db.session.scalars(db.select(MileageEntry).options(selectinload(MileageEntry.income_stream)).order_by(MileageEntry.journey_date.desc(), MileageEntry.id)).all()
-    payments = db.session.scalars(db.select(Transaction).where(Transaction.direction == 'OUT', Transaction.status == 'SETTLED', Transaction.currency == 'GBP').options(
+    payments = db.session.scalars(db.select(Transaction).where(Transaction.direction == 'OUT', Transaction.status == 'SETTLED').options(
         load_only(Transaction.transaction_time, Transaction.counterparty_name, Transaction.amount_minor,
                   Transaction.currency, Transaction.direction, Transaction.status, Transaction.source),
         selectinload(Transaction.classification)).order_by(Transaction.transaction_time.desc()).limit(200)).all()
@@ -157,7 +157,7 @@ def page():
             pass
     record = selected.expense if selected else None
     if record and request.method != 'POST':
-        values = dict(stream_id=record.income_stream_id, amount=display_amount(record.amount_minor, 'GBP'), purpose=record.purpose,
+        values = dict(stream_id=record.income_stream_id, amount=display_amount(record.amount_minor, selected.currency), tax_status='deduction' if record.is_tax_deductible else 'tracking', purpose=record.purpose,
                       category=record.category, vehicle_key=record.vehicle_key, shift_id=record.shift_id)
     names = {stream.id: stream.name for stream in streams}
     available_shifts = db.session.scalars(db.select(IncomeShift).order_by(IncomeShift.starts_at.desc(), IncomeShift.id)).all()

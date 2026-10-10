@@ -1,0 +1,10 @@
+{% extends 'invoice_layout.html' %}
+{% block content %}
+<div class="page-heading"><p class="eyebrow">TOMS / INVOICES</p><h1>Invoices</h1><p class="description">Turn completed shifts into invoices and reconcile the payments you receive.</p></div>
+<p><a class="stream-shifts-button" href="{{ url_for('invoices.edit') }}">Create invoice</a></p>
+{% for row in rows %}{% set invoice = row.invoice %}<article class="invoice-list-row">
+<div><h2><a href="{{ url_for('invoices.detail', identity=invoice.id) }}">{{ invoice.number or ('Cancelled draft' if invoice.state == 'cancelled' else 'Draft invoice') }}</a></h2><p>{{ invoice.client_name }} · {{ invoice.stream_name }}</p><p class="secondary">Invoice {{ invoice.issue_date.strftime('%d %b %Y') }} · Due {{ invoice.due_date.strftime('%d %b %Y') }}</p></div>
+<div><span class="invoice-state {{ 'system-ok' if row.summary.label == 'Paid' else '' }}">{{ row.summary.label }}</span>{% if row.summary.overdue %}<span class="invoice-overdue">Overdue</span>{% endif %}<strong>{{ format_amount(invoice.total_minor, invoice.currency) }}</strong>{% if invoice.state == 'issued' %}<p class="secondary">{{ format_amount(row.summary.outstanding, invoice.currency) }} outstanding</p>{% endif %}</div>
+</article>{% else %}{% if not error %}<p class="empty-state">No invoices yet. Record your shifts, then create an invoice from completed work.</p>{% endif %}{% endfor %}
+{% if page and page.pages > 1 %}<nav class="pagination" aria-label="Invoice pages"><span>Page {{ page.page }} of {{ page.pages }}</span><div>{% if page.has_prev %}<a href="{{ url_for('invoices.page', page=page.prev_num) }}">← Newer</a>{% endif %}{% if page.has_next %}<a href="{{ url_for('invoices.page', page=page.next_num) }}">Older →</a>{% endif %}</div></nav>{% endif %}
+{% endblock %}

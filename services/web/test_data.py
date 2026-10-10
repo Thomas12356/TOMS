@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from flask import g, request, session
 from flask_login import current_user
 
-from models import Account, Category, IncomeStream, IncomeShift, Transaction, TransactionIncome, SyncRun
+from models import Account, Category, IncomeStream, IncomeShift, Transaction, TransactionIncome, SyncRun, AccountReserve, ExpenseDeduction
 from services.database.connection import db
 from services.database.session import test_data_active
 
@@ -78,6 +78,27 @@ def ensure_sample_data():
                                          tax_treatment=treatment, source_name='Sample income', gross_minor=gross, tax_deducted_minor=tax, ni_deducted_minor=ni if item == 31 else None,
                                          adjustment_minor=adjustment, adjustment_notes='Demo payroll deductions' if adjustment else None,
                                          recorded_currency='GBP'))
+    db.session.add(AccountReserve(account_uid=sample_id(1), tax_minor=25000, ni_minor=5000))
+    rent = db.session.get(Transaction, (sample_id(1), sample_id(11), sample_id(35)))
+    db.session.add(ExpenseDeduction(account_uid=rent.account_uid, category_uid=rent.category_uid,
+        feed_item_uid=rent.feed_item_uid, income_stream_id=sample_id(22), amount_minor=rent.amount_minor,
+        purpose='Sample rent expense — tracking only', category='general', vehicle_key='',
+        is_tax_deductible=False, recorded_amount_minor=rent.amount_minor, recorded_currency=rent.currency,
+        recorded_time=rent.transaction_time))
+    # One editable example reserves the existing sample overtime without adding
+    # any new income to the forecast. Issuing still requires an owner action.
+    from models import Invoice, InvoiceItem
+    from services.invoices.workflow import snapshot, shift_source_version, today
+    db.session.flush()
+    shift = db.session.get(IncomeShift, sample_id(41))
+    db.session.add(Invoice(id=sample_id(51), income_stream_id=sample_id(21), stream_name='Demo employment',
+        state='draft', revision=1, client_name='Demo employer', client_address='Example client address',
+        reference='Sample overtime invoice — test data only', issue_date=today(),
+        due_date=today() + timedelta(days=30), currency='GBP', total_minor=20000))
+    db.session.flush()
+    db.session.add(InvoiceItem(id=sample_id(61), invoice_id=sample_id(51), shift_id=shift.id, active=True,
+        description='Sample overtime — test data only', amount_minor=20000,
+        source_version=shift_source_version(shift), shift_snapshot=snapshot(shift.as_dict())))
     record_sample_sync()
 
 
@@ -91,10 +112,13 @@ def record_sample_sync():
     db.session.commit()
 
 
-def sample_balances(accounts, format_amount, *, combined):
+def sample_balances(accounts, format_amount, *, combined, include_minor=False):
     # Fixed sample balances, independent of imported real balances or receipts.
     amounts = {sample_id(1): 245075, sample_id(2): 510000}
     cards = [dict(name=account.name, amount=format_amount(amounts.get(account.account_uid, 0), account.currency), error=None) for account in accounts]
+    if include_minor:
+        for card, account in zip(cards, accounts):
+            card['minor_units'] = amounts.get(account.account_uid, 0)
     payload = dict(balances=cards)
     if combined:
         payload['totals'] = [dict(name='Total balance · All demo accounts',

@@ -11,6 +11,7 @@ from services.database.connection import db
 from services.database.session import test_data_active
 
 ACTIONS = {
+    'reserve.save': 'Updated account tax and NI earmarks',
     'login': 'Signed in', 'logout': 'Signed out', 'setup': 'Created owner account',
     'owner.change': 'Changed owner password',
     'classification.save': 'Edited transaction classification',
@@ -18,16 +19,19 @@ ACTIONS = {
     'income.save': 'Updated transaction income details',
     'stream.create': 'Created income stream', 'stream.update': 'Updated income stream',
     'stream.archive': 'Archived income stream', 'stream.restore': 'Restored income stream',
-    'shift.create': 'Added shift or overtime', 'shift.update': 'Updated shift or overtime',
-    'shift.delete': 'Removed shift or overtime',
-    'deduction.save_expense': 'Saved expense deduction',
-    'deduction.delete_expense': 'Removed expense deduction',
+    'shift.create': 'Added work record', 'shift.update': 'Updated work record',
+    'shift.delete': 'Removed work record',
+    'deduction.save_expense': 'Saved linked expense',
+    'deduction.delete_expense': 'Unlinked expense',
     'deduction.save_mileage': 'Added mileage deduction',
     'deduction.delete_mileage': 'Removed mileage deduction',
     'deduction.link_mileage_shift': 'Changed mileage shift link',
     'confirm': 'Confirmed transaction details',
     'test-data.on': 'Enabled test data', 'test-data.off': 'Disabled test data',
     'rules': 'Checked official tax rules',
+    'invoice.create': 'Created invoice draft', 'invoice.update': 'Updated invoice draft',
+    'invoice.issue': 'Issued invoice', 'invoice.cancel': 'Cancelled invoice',
+    'invoice.allocate': 'Allocated invoice payment', 'invoice.remove_payment': 'Removed invoice payment allocation',
     'sync': 'Requested bank sync', 'sync.sample': 'Simulated bank sync',
 }
 

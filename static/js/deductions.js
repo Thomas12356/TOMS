@@ -38,3 +38,18 @@ if (mileageShift) {
     mileageShift.addEventListener('change', suggestJourney);
     document.getElementById('mileage-stream').addEventListener('change', suggestJourney);
 }
+
+// Tax eligibility is a separate, explicit choice from linking an expense.
+const expenseTaxStatus = document.getElementById('expense-tax-status');
+if (expenseTaxStatus) {
+    const eligibility = document.getElementById('expense-eligibility');
+    const checkbox = eligibility.querySelector('input');
+    const updateTaxStatus = () => {
+        const claiming = expenseTaxStatus.value === 'deduction';
+        eligibility.hidden = !claiming;
+        checkbox.required = claiming;
+        checkbox.disabled = !claiming;
+    };
+    expenseTaxStatus.addEventListener('change', updateTaxStatus);
+    updateTaxStatus();
+}

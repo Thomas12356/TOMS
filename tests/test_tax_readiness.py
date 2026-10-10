@@ -65,7 +65,7 @@ class ReadinessTests(unittest.TestCase):
 
     def test_pending_linked_expense_is_excluded_and_requires_review(self):
         item = payment(status='PENDING', direction='OUT')
-        item.expense = SimpleNamespace(transaction=item)
+        item.expense = SimpleNamespace(transaction=item, is_tax_deductible=True)
         result = self.records([item])
         self.assertEqual(result['deductions'], {})
         self.assertTrue(result['issues'])

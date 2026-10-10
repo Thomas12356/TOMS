@@ -1,0 +1,20 @@
+<dialog id="stream-deductions-dialog" {{ 'open' if view == 'deductions' else '' }} class="review-dialog stream-list-dialog" aria-labelledby="stream-deductions-heading" data-reopen="{{ 'true' if view == 'deductions' else 'false' }}">
+    <a href="{{ url_for('dashboard.income_streams') }}" class="secondary-button dialog-close">Close</a>
+    <h2 id="stream-deductions-heading">{{ selected_name }} · deductions and expenses</h2>
+    <p class="secondary">Tracking-only expenses do not reduce tax. Mileage allowances are calculated across the tax year, including related streams.</p>
+    <h3>Expenses</h3>
+    {% for expense in expenses %}<article class="stream-payment">
+        <div><h3>{{ expense.purpose }}</h3><p class="secondary">{{ expense.recorded_time.strftime('%d %b %Y') }} · {{ 'Tax deduction' if expense.is_tax_deductible else 'Tracking only' }}</p>
+        {% if not expense_current(expense) %}<p class="message">Needs review · bank payment changed.</p>{% endif %}</div>
+        <strong>{{ format_amount(expense.amount_minor, expense.recorded_currency) }}</strong>
+        <a href="{{ url_for('deductions.page', expense=expense.account_uid ~ ':' ~ expense.category_uid ~ ':' ~ expense.feed_item_uid) }}">Edit expense</a>
+    </article>{% else %}<p>No linked expenses.</p>{% endfor %}
+    <h3>Mileage</h3>
+    {% for entry in journeys %}<article class="stream-payment"><div><h3>{{ entry.purpose }}</h3><p>{{ entry.journey_date }} · {{ entry.miles }} miles · {{ entry.vehicle_key }}</p><p class="secondary">{{ entry.start_postcode }} → {{ entry.end_postcode }}</p></div></article>{% else %}<p>No mileage recorded.</p>{% endfor %}
+    {% if deduction_pages > 1 %}<nav class="pagination" aria-label="Expense and mileage pages">
+        {% if page.page > 1 %}<a data-load-dialog="stream-deductions-dialog" href="{{ url_for('dashboard.income_streams', view='deductions', stream=selected_stream, page=page.page - 1) }}">Previous</a>{% endif %}
+        <span>Page {{ page.page }} of {{ deduction_pages }}</span>
+        {% if page.page < deduction_pages %}<a data-load-dialog="stream-deductions-dialog" href="{{ url_for('dashboard.income_streams', view='deductions', stream=selected_stream, page=page.page + 1) }}">Next</a>{% endif %}
+    </nav>{% endif %}
+    <p><a href="{{ url_for('deductions.page') }}">Manage expenses and mileage</a></p>
+</dialog>

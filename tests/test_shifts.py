@@ -169,7 +169,7 @@ class ShiftPageTests(DeductionOwnerCase):
 
     def test_overtime_button_opens_form_and_notes_are_escaped(self):
         html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
-        self.assertTrue('>Add overtime</a>' in html)
+        self.assertTrue('>Add work</a>' in html)
         self.assertFalse('>Manage shifts</a>' in html)
         html = self.client.get(self.shift_url + '?add=1').get_data(as_text=True)
         self.assertTrue('<details class="shift-create" open>' in html)

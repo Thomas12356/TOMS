@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only, selectinload
 from werkzeug.exceptions import BadRequest, NotFound, Conflict
 
-from models import Account, Transaction, TransactionIncome, IncomeStream, IncomeShift
+from models import Account, Transaction, TransactionIncome, IncomeStream, IncomeShift, AccountReserve, ExpenseDeduction, MileageEntry
 from services.transactions.shifts import attach_shift_totals
 from uuid import uuid4
 from services.transactions.income_streams import STREAM_KINDS, FORECAST_PERIODS, FORECAST_CURRENCIES, TAX_YEARS, active_days, annual_gross, holiday_amount, stream_id, stream_fields
@@ -111,7 +111,14 @@ def account_balances():
     if request.method == "HEAD":
         return jsonify(balances=[])
 
-    account_uid = requested_account(query_values({"account"}))
+    options = query_values({'account', 'reserves'})
+    include_reserves = options.get('reserves') == '1'
+    if options.get('reserves') not in (None, '1'):
+        raise BadRequest('Choose reserves=1 to include earmarks.')
+    if include_reserves and (request.authorization is not None or not current_user.is_authenticated):
+        return jsonify(error='Owner login is required for account earmarks.'), 403
+    account_uid = requested_account(options)
+    from services.transactions.account_reserves import balance_breakdown
     query = db.select(Account).options(
         load_only(Account.account_uid, Account.name, Account.currency)
     ).order_by(Account.account_uid)
@@ -121,7 +128,8 @@ def account_balances():
     if account_uid and not accounts:
         raise BadRequest("This account is not available. Choose a saved account.")
     if test_data_active():
-        return jsonify(sample_balances(accounts, format_amount, combined=account_uid is None))
+        payload = sample_balances(accounts, format_amount, combined=account_uid is None, include_minor=include_reserves)
+        return jsonify(balance_breakdown(payload, accounts, format_amount) if include_reserves else payload)
     balances = []
     totals = {}
     rate_limited = False
@@ -142,6 +150,8 @@ def account_balances():
                     raise StarlingError("Starling returned an invalid account balance.")
                 card["amount"] = format_amount(balance["minorUnits"], balance["currency"])
                 total["minor_units"] += balance["minorUnits"]
+                if include_reserves:
+                    card["minor_units"] = balance["minorUnits"]
             except StarlingError as error:
                 card["error"] = str(error)
                 rate_limited = error.status_code == 429
@@ -149,13 +159,15 @@ def account_balances():
             total["unavailable"] = True
         balances.append(card)
     if account_uid:
-        return jsonify(balances=balances)
+        payload = dict(balances=balances)
+        return jsonify(balance_breakdown(payload, accounts, format_amount) if include_reserves else payload)
     combined = [{
         "name": "Total balance · All accounts" if len(totals) == 1 else f"Total balance · All {currency} accounts",
         "amount": None if total["unavailable"] else format_amount(total["minor_units"], currency),
         "error": "Total unavailable: one or more account balances could not be loaded." if total["unavailable"] else None,
     } for currency, total in sorted(totals.items())]
-    return jsonify(balances=balances, totals=combined)
+    payload = dict(balances=balances, totals=combined)
+    return jsonify(balance_breakdown(payload, accounts, format_amount) if include_reserves else payload)
 
 
 @dashboard.get("")
@@ -292,7 +304,7 @@ def edit_income(account_uid, category_uid, feed_item_uid):
             stream = stream_id(stream)
             if db.session.get(IncomeStream, stream) is None:
                 raise NotFound('Income stream not found.')
-        back_url = url_for('dashboard.income_streams', stream=stream if stream != 'all' else None, page=page)
+        back_url = url_for('dashboard.income_streams', view='income', stream=stream if stream != 'all' else None, page=page)
     elif options.get('return_to') is not None or options.get('stream') is not None:
         raise BadRequest('Choose a valid return page.')
     query = db.select(Transaction).where(
@@ -362,7 +374,11 @@ def income_streams():
     """Create and manage streams without changing bank records or inferring tax."""
     if request.authorization is not None or not current_user.is_authenticated:
         return redirect(url_for('login.sign_in'))
-    options = query_values({'stream', 'page', 'create'})
+    options = query_values({'stream', 'page', 'create', 'view', 'configure'})
+    view = options.get('view', 'income' if options.get('stream') else '')
+    if view not in ('', 'income', 'deductions'):
+        raise BadRequest('Choose income or deductions.')
+    configure_id = stream_id(options['configure']) if options.get('configure') else None
     selected_id = stream_id(options['stream']) if options.get('stream') else None
     page_number = requested_page(options)
     if selected_id and db.session.get(IncomeStream, selected_id) is None:
@@ -372,7 +388,9 @@ def income_streams():
     create_fields = ('name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'income_mode', 'mileage_with_stream')
     create_values = dict.fromkeys(create_fields, '')
     create_values.update(income_mode='forecast', expected_gross_period='yearly', expected_gross_currency='GBP', unpaid_holiday='0', unpaid_holiday_unit='weeks', forecast_tax_year='2026-27')
-    editing_id, editing_values = None, {}
+    editing_id, editing_values = configure_id, {}
+    if configure_id and db.session.get(IncomeStream, configure_id) is None:
+        raise NotFound('Income stream not found.')
     if request.method == 'POST':
         submitted = {field: request.form.get(field, '') for field in create_fields}
         if request.form.get('action') == 'update':
@@ -435,7 +453,26 @@ def income_streams():
                                   category_uid=payment.category_uid, feed_item_uid=payment.feed_item_uid,
                                   stream=selected_id or 'all', return_to='income-streams', page=page_number))
             for payment in page.items]
-    return render_template('income_streams.html', streams=streams, mileage_partners=partners, selected_stream=selected_id,
+    expenses, journeys, deduction_pages = [], [], 0
+    if view == 'deductions':
+        expense_query = db.select(ExpenseDeduction).options(selectinload(ExpenseDeduction.transaction).selectinload(Transaction.classification)).order_by(ExpenseDeduction.recorded_time.desc(), ExpenseDeduction.feed_item_uid)
+        journey_query = db.select(MileageEntry).order_by(MileageEntry.journey_date.desc(), MileageEntry.id)
+        if selected_id:
+            expense_query = expense_query.where(ExpenseDeduction.income_stream_id == selected_id)
+            journey_query = journey_query.where(MileageEntry.income_stream_id == selected_id)
+        expense_page = db.paginate(expense_query, page=page_number, per_page=50, error_out=False)
+        journey_page = db.paginate(journey_query, page=page_number, per_page=50, error_out=False)
+        expenses, journeys = expense_page.items, journey_page.items
+        deduction_pages = max(expense_page.pages, journey_page.pages)
+    from services.tax.records import expense_current
+    from services.tax.reserves import current_plan, received_split
+    estimate = current_plan()
+    reserve_target = received_split(estimate)
+    accounts = db.session.scalars(db.select(Account).order_by(Account.name, Account.account_uid)).all()
+    earmarks = {row.account_uid: row for row in db.session.scalars(db.select(AccountReserve))}
+    return render_template('income_streams.html', streams=streams, view=view,
+                           expenses=expenses, journeys=journeys, deduction_pages=deduction_pages, expense_current=expense_current,
+                           estimate=estimate, reserve_target=reserve_target, accounts=accounts, earmarks=earmarks, mileage_partners=partners, selected_stream=selected_id,
                            counts=counts, stream_kinds=STREAM_KINDS, create_values=create_values, error=error,
                            forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES,
                            tax_years=TAX_YEARS, active_days=active_days,
@@ -477,30 +514,18 @@ def tax_rules():
 @dashboard.get('/tax-estimate')
 def tax_estimate():
     """Annual planning across all streams; never add bank receipts to forecasts."""
-    from services.tax.estimate import estimate_streams, rounded_minor
-    from services.tax.rules import reviewed_rules, cached_status, start_rule_check
+    from services.tax.estimate import rounded_minor
+    from services.tax.rules import reviewed_rules, cached_status
 
     if request.authorization is not None or not current_user.is_authenticated:
         return redirect(url_for('login.sign_in'))
     options = query_values({'year', 'region'})
     if options.get('year', '2026-27') != '2026-27' or options.get('region', 'uk-ewni') != 'uk-ewni':
         raise BadRequest('The estimate currently supports England, Wales and Northern Ireland, 2026–27 only.')
-    streams = db.session.scalars(db.select(IncomeStream).where(
-        IncomeStream.forecast_tax_year == '2026-27').order_by(IncomeStream.name, IncomeStream.id)).all()
-    start_rule_check(current_app.instance_path)
     rules = reviewed_rules()
     status = cached_status(current_app.instance_path)
-    from services.tax.records import tax_records
-    attach_shift_totals(streams)
-    from services.tax import ni_rules
-    records = tax_records(rules)
-    records.setdefault('issues', [])
-    if status.get('status') == 'needs_review':
-        records['issues'].append('Income-tax rules changed and need review.')
-    ni_status = ni_rules.cached_status(current_app.instance_path)
-    if ni_status.get('status') == 'needs_review':
-        records['issues'].append('National Insurance rules changed and need review.')
-    estimate = estimate_streams(streams, rules, **records)
+    from services.tax.reserves import current_plan
+    estimate = current_plan()
     return render_template('tax_estimate.html', estimate=estimate, rules=rules, status=status,
                            format_amount=format_amount, rounded_minor=rounded_minor, stream_kinds=STREAM_KINDS,
                            current_user=current_user)

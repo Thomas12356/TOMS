@@ -45,7 +45,7 @@ def save_classification(transaction, kind, notes):
     if transaction.income is not None and kind != "income":
         raise ValueError("Delete income details before changing this transaction to a different transfer type.")
     if getattr(transaction, "expense", None) is not None and kind != "expense":
-        raise ValueError("Remove the tax deduction before changing the expense classification.")
+        raise ValueError("Unlink the expense before changing the expense classification.")
     transaction.confirmed_at = None
     if transaction.classification is None:
         transaction.classification = TransactionClassification(type=kind, notes=notes)
@@ -59,6 +59,6 @@ def clear_classification(transaction):
     if transaction.income is not None and (transaction.direction != "IN" or transaction.source == "INTERNAL_TRANSFER"):
         raise ValueError("Delete income details before restoring a non-income automatic classification.")
     if getattr(transaction, "expense", None) is not None and (transaction.direction != "OUT" or transaction.source == "INTERNAL_TRANSFER"):
-        raise ValueError("Remove the tax deduction before restoring a non-expense classification.")
+        raise ValueError("Unlink the expense before restoring a non-expense classification.")
     transaction.classification = None
     transaction.confirmed_at = None

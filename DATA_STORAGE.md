@@ -262,3 +262,30 @@ REVOKE UPDATE, DELETE, TRUNCATE ON TABLE toms.user_actions FROM toms_app;
 Apply `flask db-upgrade` and restart the app when deploying this feature to
 another installation. As with existing migrations, upgrading rebuilds the
 sample business dataset; real records and the action log are preserved.
+
+## Invoice storage and recovery
+
+Migration 023 adds `invoices`, `invoice_items`, `invoice_payments` and
+`invoice_sequences`. These store client details, work snapshots, allocation
+history and sequential numbering. Existing database bundles include them
+and their separate sample records automatically. No invoice PDF files or
+attachments exist in this version.
+
+Restore these tables together with bank payments, streams and shifts. Retain
+cancelled invoices and removed allocations for history. Restoring an older backup
+also rolls back the numbering sequence: reconcile invoices issued since that
+backup before issuing more, to avoid reusing numbers already shared with clients.
+
+## Earmarks, expense treatment and income notices
+
+Migration 024 adds `account_reserves` (per-account tax/NI amounts and revision)
+and `income_notice_reads` (acknowledged payment versions), plus
+`expense_deductions.is_tax_deductible`. Existing claims keep their tax treatment;
+new browser forms default to tracking only. The legacy table name remains to
+preserve its existing bank/shift links and migrations.
+
+All of this state is in PostgreSQL and included in existing database bundles.
+The demo schema has its own copies. Notifications derive advice from current
+records; only acknowledgement versions are stored. Restoring an older backup
+can therefore make previously read notices appear again. Earmarks survive
+restarts and restores but do not transfer money or represent an HMRC payment.

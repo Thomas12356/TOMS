@@ -171,3 +171,93 @@ class ReviewConcurrencyTests(ApiTestCase):
         self.assertEqual(self.submit(1), 200)
         with self.bound.connect() as connection:
             self.assertEqual(connection.scalar(db.select(db.func.count()).select_from(UserAction).where(UserAction.record_id == self.item)), 2)
+
+    def invoice_setup(self, count):
+        from models import IncomeShift, IncomeStream, TransactionIncome
+        stream=str(uuid4())
+        self.sessions.add(IncomeStream(id=stream,name='Invoice concurrency',kind='cis'))
+        self.sessions.commit()
+        shifts=[]
+        for index in range(count):
+            identity=str(uuid4())
+            shifts.append(identity)
+            self.sessions.add(IncomeShift(id=identity,income_stream_id=stream,
+                starts_at=datetime(2026,4,10+index,8,tzinfo=timezone.utc),
+                ends_at=datetime(2026,4,10+index,16,tzinfo=timezone.utc),
+                gross_minor=1000,currency='GBP',payment_mode='total',unpaid_break_minutes=0))
+        transaction=self.sessions.get(Transaction,(self.account,self.category,self.item))
+        transaction.confirmed_at=self.now
+        transaction.income=TransactionIncome(income_stream_id=stream,income_type='other',tax_treatment='no_tax_deducted',
+            gross_minor=1000,tax_deducted_minor=0,ni_deducted_minor=0,adjustment_minor=0,recorded_currency='GBP',needs_review=False)
+        self.sessions.commit()
+        return stream,shifts
+
+    def invoice_fields(self):
+        return dict(client_name='Test customer',client_address='',reference='',issue_date='2026-04-12',due_date='2026-04-20')
+
+    def test_simultaneous_invoice_drafts_cannot_reserve_the_same_shift(self):
+        from services.invoices import workflow as work
+        from models import InvoiceItem
+        from werkzeug.exceptions import Conflict
+        stream,shifts=self.invoice_setup(1)
+        barrier=Barrier(2)
+        def create(_):
+            with app.app_context():
+                try:
+                    barrier.wait(timeout=10)
+                    work.save_draft(str(uuid4()),stream,self.invoice_fields(),shifts)
+                    self.sessions.commit()
+                    return 'saved'
+                except Conflict:
+                    self.sessions.rollback()
+                    return 'conflict'
+                finally: self.sessions.remove()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(sorted(pool.map(create,(0,1))),['conflict','saved'])
+        with self.bound.connect() as connection:
+            self.assertEqual(connection.scalar(db.select(db.func.count()).select_from(InvoiceItem).where(InvoiceItem.active)),1)
+
+    def test_competing_invoice_payments_cannot_spend_one_receipt_twice(self):
+        from services.invoices import workflow as work
+        from models import InvoicePayment
+        stream,shifts=self.invoice_setup(2)
+        invoices=[]
+        for shift in shifts:
+            invoice=work.save_draft(str(uuid4()),stream,self.invoice_fields(),[shift])
+            self.sessions.commit()
+            work.issue(work.get_invoice(invoice.id,str(invoice.revision)))
+            self.sessions.commit()
+            invoices.append((invoice.id,str(invoice.revision)))
+        barrier=Barrier(2)
+        def allocate(index):
+            with app.app_context():
+                try:
+                    barrier.wait(timeout=10)
+                    invoice=work.get_invoice(*invoices[index])
+                    work.allocate(invoice,(self.account,self.category,self.item),1000,0,0)
+                    self.sessions.commit()
+                    return 'saved'
+                except ValueError:
+                    self.sessions.rollback()
+                    return 'rejected'
+                finally: self.sessions.remove()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(sorted(pool.map(allocate,(0,1))),['rejected','saved'])
+        with self.bound.connect() as connection:
+            self.assertEqual(connection.scalar(db.select(db.func.sum(InvoicePayment.cash_minor)).where(InvoicePayment.active)),1000)
+
+    def test_competing_first_earmarks_reject_the_stale_writer(self):
+        from models import AccountReserve
+        barrier = Barrier(2)
+        def save(index):
+            client, csrf, _ = self.clients[index]
+            try:
+                barrier.wait(timeout=10)
+                return client.post('/dashboard/account-reserves', data=dict(
+                    csrf_token=csrf, account=self.account, version='0', tax=str(index + 1), ni='0')).status_code
+            finally:
+                self.sessions.remove()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(sorted(pool.map(save, (0, 1))), [303, 409])
+        with self.bound.connect() as connection:
+            self.assertEqual(connection.scalar(db.select(db.func.count()).select_from(AccountReserve)), 1)

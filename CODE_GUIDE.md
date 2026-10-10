@@ -450,3 +450,50 @@ The System page is `routes/system.py` + `templates/system.html`.
 `services/web/activity.py` adds fixed action codes to the caller's transaction;
 route handlers call it only after validation, immediately before saving. The
 append-only `UserAction` model lives in `models.py` and migration 022.
+
+## Invoices: where to make changes
+
+- `routes/invoices.py`: owner pages, CSRF-protected actions, revisions and logging.
+- `services/invoices/workflow.py`: draft validation, shift selection, issuing,
+  cancellation and payment allocation. `settlement()` derives payment status.
+- `templates/invoices.html`, `invoice_edit.html`, `invoice.html`: list, draft and
+  detail pages, sharing `invoice_layout.html` and dashboard styles.
+- `models.py` and migration `023_invoices.sql`: invoice snapshots, allocations,
+  shift reservations and sequential numbering.
+- `tests/test_invoices.py`: validation and HTTP security. Concurrency checks live
+  in `tests/test_review_concurrency.py`; real browser forms are exercised by
+  `tests/invoices_browser_checks.py` at four screen widths.
+
+Keep cash, actual tax and employee NI budgets separate. Changed receipts
+invalidate allocations until reviewed. The shared transaction advisory lock
+serializes invoice/shift writes; revisions reject stale submissions. Future PDFs
+should use issued snapshots rather than current shift/stream values.
+
+## Stream popups, receipt notices and account earmarks
+
+Start with `templates/income_streams.html` and `static/js/income-streams.js` for
+stream actions. They use native dialogs; record lists load through ordinary
+owner GETs, and keyboard Escape closes them. `stream_deductions_dialog.html` and
+`account_reserves.html` keep the two larger pieces out of the main template.
+
+- `routes/dashboard.py`: stream/page selection and live balance reads. The
+  existing balance response stays compatible; `reserves=1` opts into owner data.
+- `services/tax/reserves.py`: the shared current estimate, and splitting the
+  received-income reserve into tax and NI. Change the planning rules here rather
+  than creating separate percentages for notifications.
+- `services/notifications/income.py`: unread incoming payments and reserve changes.
+  Read receipts still affect the cumulative amount. `services/transactions/review.py`
+  holds stable snapshot/version helpers shared with invoice reconciliation.
+- `routes/reserves.py`: owner-only notice reads/acknowledgements and earmark saves.
+  Payment/account row locks and revisions protect concurrent submissions.
+- `services/transactions/account_reserves.py`: attaches earmarks to balances,
+  keeping unavailable and foreign-currency money separate.
+- `services/tax/deduction_forms.py`: explicit expense tax treatment.
+  `services/tax/records.py` excludes tracking-only expenses from all tax calculations.
+- `static/js/income-notifications.js`: private, visible-page polling and notice
+  popup. All bank text is inserted with `textContent`.
+
+Models and migration 024 define the new stored state; `DATA_TABLES` includes it
+for sample isolation. `tests/test_income_workspace.py` and
+`tests/income_workspace_browser_checks.py` exercise the feature. No frontend
+framework or additional background scheduler is needed.

@@ -17,7 +17,11 @@
     <div class="page-heading"><p class="eyebrow">TOMS / INCOME</p><h1>Income streams</h1></div>
     <p class="secondary">Create a stream for each job or business, then assign income payments to it. <a href="{{ url_for('dashboard.tax_estimate') }}">View tax estimate</a></p>
     {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
-    <a class="secondary-button" id="open-create-stream" href="?create=1">Create a Stream</a>
+    <div class="stream-actions page-actions">
+        <a class="secondary-button" id="open-create-stream" href="?create=1">Create a Stream</a>
+        <a class="secondary-button" data-load-dialog="income-payments-dialog" href="{{ url_for('dashboard.income_streams', view='income') }}">Show all income</a>
+        <a class="secondary-button" href="{{ url_for('deductions.page') }}">Manage expenses and mileage deductions</a>
+    </div>
     <dialog id="create-stream-dialog" class="review-dialog stream-create" aria-labelledby="create-stream-heading" {{ 'open' if request.args.get('create') == '1' or (error and not editing_id) else '' }} data-reopen="{{ 'true' if (error and not editing_id) or request.args.get('create') == '1' else 'false' }}">
         <button type="button" id="close-create-stream" class="secondary-button">Close</button>
         <h2 id="create-stream-heading">Create a stream</h2>
@@ -38,26 +42,33 @@
     <section aria-labelledby="your-streams-heading">
         <h2 id="your-streams-heading">Your streams</h2>
         {% for stream in streams %}
-        <article class="stream-manage">
+        <article class="stream-manage" id="stream-{{ stream.id }}">
             <div class="stream-heading">
-                <div><a href="{{ url_for('dashboard.income_streams', stream=stream.id) }}"{% if selected_stream == stream.id %} aria-current="page"{% endif %}><strong>{{ stream.name }}</strong></a>
+                <div><h3>{{ stream.name }}</h3>
                     <p class="secondary">{{ stream_kinds[stream.kind] }} · {{ counts.get(stream.id, 0) }} payments{{ ' · Archived' if stream.archived else '' }}</p></div>
+                <div class="stream-actions">
                 {% if stream.income_mode == 'shifts' %}
                 <a class="stream-shifts-button" href="{{ url_for('shifts.page', stream_id=stream.id) }}">Manage shifts</a>
                 {% else %}
-                <a class="stream-shifts-button" href="{{ url_for('shifts.page', stream_id=stream.id, add=1) }}">Add overtime</a>
+                <a class="stream-shifts-button" href="{{ url_for('shifts.page', stream_id=stream.id, add=1) }}">{{ 'Add overtime' if stream.kind == 'employed' else 'Add work' }}</a>
                 {% endif %}
+                <a class="secondary-button" data-open-dialog="configure-{{ stream.id }}" href="{{ url_for('dashboard.income_streams', configure=stream.id) }}">Configure stream</a>
+                <a class="secondary-button" data-load-dialog="income-payments-dialog" href="{{ url_for('dashboard.income_streams', view='income', stream=stream.id) }}">Show income</a>
+                <a class="secondary-button" data-load-dialog="stream-deductions-dialog" href="{{ url_for('dashboard.income_streams', view='deductions', stream=stream.id) }}">View deductions and expenses</a>
+                </div>
             </div>
             {% if stream.income_mode == 'shifts' %}
             <p class="secondary">Individual shifts · {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} entered gross for {{ stream.forecast_tax_year }}. Includes entered planned shifts; remaining weeks are not extrapolated.</p>
             {% elif stream.expected_gross_minor is not none %}
             <p class="secondary">Expected gross: {{ format_amount(stream.expected_gross_minor, stream.expected_gross_currency) }} {{ stream.expected_gross_period }} · {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} for {{ stream.forecast_tax_year }} after {{ holiday_amount(stream) }} {{ stream.unpaid_holiday_unit }} unpaid holiday / absence</p>
             {% else %}<p class="secondary">Expected gross income not set.</p>{% endif %}
-            {% if stream.income_mode != 'shifts' and stream.overtime_gross_minor %}<p class="secondary">Includes {{ format_amount(stream.overtime_gross_minor, stream.expected_gross_currency) }} logged overtime above normal pay.</p>{% endif %}
+            {% if stream.income_mode != 'shifts' and stream.overtime_gross_minor %}<p class="secondary">Includes {{ format_amount(stream.overtime_gross_minor, stream.expected_gross_currency) }} logged {{ 'overtime' if stream.kind == 'employed' else 'additional work' }} above normal pay.</p>{% endif %}
             {% set partners = mileage_partners.get(stream.id, []) if mileage_partners is defined else [] %}
             <p class="secondary">Mileage: {% if partners %}counted with {% for partner in partners %}{{ partner.name }}{{ ', ' if not loop.last else '' }}{% endfor %}{% else %}counted separately{% endif %}.</p>
 {% if stream.income_mode != 'shifts' %}            <p class="secondary">{{ stream.forecast_tax_year }} · {{ stream.forecast_starts_on or 'Tax-year start' }} to {{ stream.forecast_ends_on or 'Tax-year end' }} · {{ active_days(stream)[0] }} active days in the tax year</p>{% endif %}
-            <details{% if editing_id == stream.id and error %} open{% endif %}><summary>Edit stream settings</summary>
+            <dialog class="review-dialog stream-create stream-configure" id="configure-{{ stream.id }}" {{ 'open' if editing_id == stream.id else '' }} aria-labelledby="configure-heading-{{ stream.id }}" data-reopen="{{ 'true' if editing_id == stream.id else 'false' }}">
+                <a href="{{ url_for('dashboard.income_streams') }}" class="secondary-button dialog-close">Close</a>
+                <h2 id="configure-heading-{{ stream.id }}">Configure {{ stream.name }}</h2>
                 <form class="login-form" method="post">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="stream_id" value="{{ stream.id }}"><input type="hidden" name="kind" value="{{ stream.kind }}">
                     <label for="rename-{{ stream.id }}">Name</label><input id="rename-{{ stream.id }}" name="name" value="{{ editing_values.name if editing_id == stream.id and error else stream.name }}" maxlength="200" required>
@@ -68,26 +79,29 @@
                     <button name="action" value="{{ 'restore' if stream.archived else 'archive' }}" formnovalidate>{{ 'Restore' if stream.archived else 'Archive' }}</button>
                 </form>
                 <p class="secondary">Archiving keeps existing payments. Create a new stream for a different type.</p>
-            </details>
+            </dialog>
         </article>
         {% else %}<p>No streams yet. Use Create a Stream to add your first one.</p>{% endfor %}
     </section>
-    <section class="stream-records" aria-labelledby="income-payments-heading">
+    <dialog id="income-payments-dialog" {{ 'open' if view == 'income' else '' }} class="review-dialog stream-records stream-list-dialog" aria-labelledby="income-payments-heading" data-reopen="{{ 'true' if view == 'income' else 'false' }}">
+        <a href="{{ url_for('dashboard.income_streams') }}" class="secondary-button dialog-close">Close</a>
         <h2 id="income-payments-heading">{{ selected_name }} payments</h2>
-        {% if selected_stream %}<a href="{{ url_for('dashboard.income_streams') }}">Show all income</a>{% endif %}
+        {% if selected_stream %}<a data-load-dialog="income-payments-dialog" href="{{ url_for('dashboard.income_streams', view='income') }}">Show all income</a>{% endif %}
         <p class="secondary">Assign payments through Edit income details in Transactions. Each payment keeps its own amounts and tax treatment.</p>
         {% for row in rows %}<article class="stream-payment">
             <div><h3>{{ row.source }}</h3><p class="secondary">{{ row.kind }} · {{ row.date }}</p>{% if row.needs_review %}<p class="message">Needs review: the bank changed this payment.</p>{% endif %}</div>
             <strong class="amount incoming">{{ row.amount }}</strong><a href="{{ row.edit_url }}">Edit income details</a>
         </article>{% else %}<p>No recorded income here yet.</p>{% endfor %}
         {% if page.pages > 1 %}<nav class="pagination" aria-label="Income pages">
-            {% if page.has_prev %}<a href="{{ url_for('dashboard.income_streams', stream=selected_stream, page=page.prev_num) }}">Previous</a>{% endif %}
+            {% if page.has_prev %}<a data-load-dialog="income-payments-dialog" href="{{ url_for('dashboard.income_streams', view='income', stream=selected_stream, page=page.prev_num) }}">Previous</a>{% endif %}
             <span>Page {{ page.page }} of {{ page.pages }}</span>
-            {% if page.has_next %}<a href="{{ url_for('dashboard.income_streams', stream=selected_stream, page=page.next_num) }}">Next</a>{% endif %}
+            {% if page.has_next %}<a data-load-dialog="income-payments-dialog" href="{{ url_for('dashboard.income_streams', view='income', stream=selected_stream, page=page.next_num) }}">Next</a>{% endif %}
         </nav>{% endif %}
-    </section>
-    <p><a href="{{ url_for('deductions.page') }}">Manage expenses and mileage deductions</a></p>
+    </dialog>
+    {% include 'stream_deductions_dialog.html' %}
+    {% include 'account_reserves.html' %}
 </main>
 <script src="{{ url_for('static', filename='js/income-streams.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/balances.js') }}" defer></script>
 </body>
 </html>

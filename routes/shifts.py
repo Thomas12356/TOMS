@@ -7,7 +7,7 @@ from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest, NotFound
 
-from models import ExpenseDeduction, IncomeShift, IncomeStream, MileageEntry
+from models import ExpenseDeduction, IncomeShift, IncomeStream, MileageEntry, InvoiceItem
 from routes.dashboard import database_error, format_amount
 from routes.helpers import query_values
 from services.database.connection import db
@@ -73,8 +73,9 @@ def page(stream_id):
             if action == 'delete':
                 linked = db.session.scalar(db.select(ExpenseDeduction.shift_id).where(ExpenseDeduction.shift_id == identity).limit(1))
                 linked = linked or db.session.scalar(db.select(MileageEntry.shift_id).where(MileageEntry.shift_id == identity).limit(1))
+                linked = linked or db.session.scalar(db.select(InvoiceItem.shift_id).where(InvoiceItem.shift_id == identity, InvoiceItem.active.is_(True)).limit(1))
                 if linked:
-                    raise ValueError('Unlink this shift’s expense and mileage deductions before removing it.')
+                    raise ValueError('Unlink this shift’s expense/mileage deductions and cancel its active invoice before removing it.')
                 db.session.delete(selected)
             else:
                 fields = shift_fields(request.form, stream)
@@ -98,7 +99,8 @@ def page(stream_id):
                       notes=selected.notes)
     entries = db.session.scalars(db.select(IncomeShift).where(IncomeShift.income_stream_id == stream.id).order_by(
         IncomeShift.starts_at.desc(), IncomeShift.id)).all()
+    from routes.invoices import shift_invoice_links
     return render_template('shifts.html', stream=stream, selected=selected, values=values, entries=entries, error=error,
-        identity=selected.id if selected else values.get('shift_id') or str(uuid4()), version=shift_version(selected) if selected else '',
+        invoice_links=shift_invoice_links(stream.id), identity=selected.id if selected else values.get('shift_id') or str(uuid4()), version=shift_version(selected) if selected else '',
         format_amount=format_amount, shift_label=shift_label, total=sum(entry.gross_minor for entry in entries if stream.income_mode == 'shifts' or entry.is_overtime),
         currency=stream.expected_gross_currency or 'GBP', current_user=current_user), 400 if error else 200

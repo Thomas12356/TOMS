@@ -1,0 +1,21 @@
+{% extends 'invoice_layout.html' %}
+{% block title %}{{ 'Edit draft' if invoice else 'Create invoice' }}{% endblock %}
+{% block content %}
+<div class="page-heading"><p class="eyebrow">TOMS / INVOICES</p><h1>{{ 'Edit draft' if invoice else 'Create invoice' }}</h1><p class="description">Choose completed shifts from one income stream. Drafts reserve those shifts; the invoice number is assigned when you issue it.</p></div>
+<p><a href="{{ url_for('invoices.detail', identity=invoice.id) if invoice else url_for('invoices.page') }}">← {{ 'Invoice' if invoice else 'Invoices' }}</a></p>
+{% if not invoice %}<form method="get" class="invoice-picker"><label for="invoice-stream">Income stream</label><select id="invoice-stream" name="stream" required><option value="">Choose a stream</option>{% for option in streams %}<option value="{{ option.id }}"{% if stream and stream.id == option.id %} selected{% endif %}>{{ option.name }}</option>{% endfor %}</select><button type="submit">Show shifts</button></form>{% endif %}
+{% if stream %}<h2>{{ stream.name }}</h2>
+{% if stream.archived %}<p>Restore this stream before creating or changing a draft.</p>
+{% elif shifts %}<form method="post" class="invoice-draft-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="invoice_id" value="{{ identity }}"><input type="hidden" name="version" value="{{ form_revision }}"><input type="hidden" name="stream_id" value="{{ stream.id }}">
+<fieldset class="invoice-shifts"><legend>Completed shifts</legend><p class="secondary">Shifts reserved by another draft or issued invoice are excluded. Select up to 100.</p>
+{% for shift in shifts %}<label class="invoice-shift"><input type="checkbox" name="shift_id" value="{{ shift.id }}"{% if shift.id in selected %} checked{% endif %}><span><strong>{{ shift_label(shift) }}</strong><span>{{ shift.notes or ('Overtime' if shift.is_overtime else 'Shift') }}</span></span><strong>{{ format_amount(shift.gross_minor, shift.currency) }}</strong></label>{% endfor %}</fieldset>
+<div class="login-form"><label for="invoice-client">Client name</label><input id="invoice-client" name="client_name" maxlength="200" value="{{ values.client_name }}" required>
+<label for="invoice-address">Client address · optional</label><textarea id="invoice-address" name="client_address" maxlength="2000">{{ values.client_address }}</textarea>
+<label for="invoice-reference">Client / work reference · optional</label><input id="invoice-reference" name="reference" maxlength="200" value="{{ values.reference }}">
+<label for="invoice-date">Invoice date</label><input id="invoice-date" name="issue_date" type="date" value="{{ values.issue_date }}" required>
+<label for="invoice-due">Due date</label><input id="invoice-due" name="due_date" type="date" value="{{ values.due_date }}" required>
+<button type="submit">{{ 'Save draft' if invoice else 'Create draft' }}</button></div></form>
+{% else %}<p class="empty-state">No completed, available shifts in this stream.</p><p><a href="{{ url_for('shifts.page', stream_id=stream.id, add=1) }}">Record a shift or overtime</a>{% if invoice %} · <a href="{{ url_for('invoices.detail', identity=invoice.id) }}">Return to draft</a>{% endif %}</p>{% endif %}
+{% elif not streams %}<p>Create an income stream and record completed shifts first.</p><p><a href="{{ url_for('dashboard.income_streams') }}">Income streams</a></p>{% endif %}
+{% endblock %}

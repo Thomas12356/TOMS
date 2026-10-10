@@ -26,6 +26,8 @@ from services.database.connection import db
 class ApiTestCase(unittest.TestCase):
     def setUp(self):
         self.enterContext(patch.dict(app.config, {"APP_API_KEY": "test-key"}))
+        # UI tests must not launch real official-publication network checks.
+        self.enterContext(patch('services.tax.rules.start_rule_check'))
         self.client = app.test_client()
         self.headers = {"Authorization": "Bearer test-key"}
 

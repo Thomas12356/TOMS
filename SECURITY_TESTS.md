@@ -631,3 +631,70 @@ outside the implemented calculation and this local review respectively.
   populated, empty and error states, escaped record IDs, filters and mobile nav.
   Existing dashboard, real login/password and sample-mode end-to-end browser
   suites also pass. Ruff F and Bandit checks pass.
+
+## Invoice workflow — 2026-10-08
+
+Full PostgreSQL suite: 406 tests passed, with four optional backup integration
+checks skipped. Invoice coverage includes owner-only access, API credential
+rejection, CSRF, stale revisions, escaped client text, dates/currencies, shift
+reservations, issued snapshots, cancellation and allocation ownership.
+Concurrent requests cannot reserve one shift or spend one receipt twice.
+Budgets independently enforce cash, actual tax and employee NI; changed receipts
+invalidate settlement. Sample invoices and allocations remain isolated.
+
+Browser coverage at 320, 390, 768 and 1280 pixels exercises draft creation/editing,
+issue/cancel, partial payments, allocation removal and multi-shift CIS settlement
+through real Flask forms. Checks include overflow, JavaScript errors and unchanged
+forecast totals. Ruff F, Bandit and whitespace checks passed. These checks are
+not an external penetration test.
+
+## Income workspace and money reserves — 2026-10-08
+
+The backend suite now contains 426 tests, with four optional backup integration
+checks skipped. New coverage includes tracking-only expenses, explicit tax
+eligibility, foreign-currency tracking, vehicle/mileage compatibility, stream
+popup filtering, real bank-balance failures, underfunding and earmark revisions.
+Competing first-time earmark writes save once and reject the stale submission.
+
+Income notices require owner sessions, use CSRF for acknowledgement, exclude
+pending/transferred/future payments, flag unassigned or incomplete income, and
+reopen after corrections or confirmation. Tests cover actual CIS withholding,
+employment affecting business tax bands, separate Class 4 provision, and matching
+per-payment reserve changes to the cumulative received-income target across
+streams. Read notices still contribute to that calculation. No raw bank payload
+or credentials are returned. Rule-check startup is mocked in general UI fixtures
+so background network work cannot interfere with rule-check unit tests.
+
+Real PostgreSQL/browser workflows passed at 320, 390, 768 and 1280 pixels:
+configure/income/expense popups, keyboard closing and focus restoration, tracking
+and deductible expense saves, earmarks, confirmation, durable notice reads and
+sample/real isolation. A simulated import while the page remains open verifies
+the one-minute polling path, unassigned-payment advice and bank-text escaping.
+Opening account money from a notice performs a fresh page read. Existing demo,
+income-form and invoice browser regressions also passed. Ruff F, Bandit and
+whitespace checks passed. No external penetration test was performed.
+
+## Stable checkpoint verification — 2026-10-10
+
+- Reviewed the invoice and income-workspace changes, including migrations,
+  owner access, revision/locking behaviour, sample isolation and browser controls.
+- `RUN_POSTGRES_TESTS=1 .venv/bin/python -m unittest discover -s tests -q`:
+  426 tests ran successfully; four optional disposable-server backup integration
+  tests were skipped (422 passed).
+- All nine Chromium scripts passed: income workspace, invoices, demo workflow,
+  income forms/rules, transaction review, tax estimate, System, login and dashboard.
+  The new workflows cover 320, 390, 768 and 1280px; dashboard, tax estimate and
+  System checks include five widths. Bank responses were mocked.
+- Ruff F checks, Bandit application scan, staged whitespace checks and a scan
+  for configured secrets passed. All 24 applied migration checksums matched the
+  repository, including migrations 023 and 024.
+- Corrected the older README statement that the tax calculator and reserve
+  recommendations had not yet been implemented.
+
+Temporary browser tools were installed in `/tmp/toms-checkpoint-tools`; missing
+Chromium libraries were extracted into `/tmp/toms-checkpoint-libs/root`.
+For example, rerun the new owner workflow with:
+
+```bash
+LD_LIBRARY_PATH=/tmp/toms-checkpoint-libs/root/usr/lib/x86_64-linux-gnu PYTHONPATH=/tmp/toms-checkpoint-tools RUN_POSTGRES_TESTS=1 .venv/bin/python tests/income_workspace_browser_checks.py
+```

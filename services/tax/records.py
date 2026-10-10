@@ -15,10 +15,11 @@ from services.tax.readiness import add_attention, check_income
 
 def expense_current(record):
     payment = record.transaction
-    return (payment.direction == 'OUT' and payment.status == 'SETTLED' and payment.currency == 'GBP'
+    return (payment.direction == 'OUT' and payment.status == 'SETTLED' and payment.currency == record.recorded_currency
+            and (not record.is_tax_deductible or payment.currency == 'GBP')
             and classification_details(payment)['type'] == 'expense'
             and record.recorded_amount_minor == payment.amount_minor
-            and record.recorded_currency == payment.currency and record.recorded_time == payment.transaction_time
+            and record.recorded_time == payment.transaction_time
             and record.amount_minor <= payment.amount_minor)
 
 
@@ -39,7 +40,7 @@ def tax_records(rules, *, as_of=None):
         income, expense = payment.income, payment.expense
         # Include the saved claim date in the query so moving a bank payment into
         # another year cannot silently hide a claim that now needs review.
-        if expense:
+        if expense and expense.is_tax_deductible:
             if not expense_current(expense):
                 add_attention(attention, 'deductions', 'Deductions need review', '/dashboard/deductions')
                 issues.append('A linked expense changed at the bank or needs review; its deduction is excluded.')

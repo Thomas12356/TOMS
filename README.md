@@ -1049,8 +1049,8 @@ for partial days without changing the forecast through rounding during storage.
 Open **Tax rules** in the navigation. The first reviewed dataset covers England,
 Wales and Northern Ireland for **2026–27 (6 April 2026 to 5 April 2027)**.
 `data/tax_rules/uk-ewni-2026-27.json` stores the published bands, personal allowance
-and taper, scope, source links and version. This is the data foundation; the annual
-income-tax calculator and reserve recommendations are not implemented yet.
+and taper, scope, source links and version. The Tax estimate page uses these
+reviewed rules for annual planning and received-income reserve recommendations.
 
 The app fetches GOV.UK's public content API with a separate unauthenticated client.
 It checks the year, published bands and allowance wording against reviewed rules.
@@ -1351,3 +1351,83 @@ storage, local backup/restore-test metadata and a paginated user action log.
 It stays real in test mode and labels sample actions separately. Migration 022
 adds the activity table; run `flask db-upgrade` before restarting an existing
 installation. See [DATA_STORAGE.md](DATA_STORAGE.md) for storage and audit scope.
+
+## Invoices
+
+Open **Invoices** in the navigation (`/dashboard/invoices`). On another
+installation, apply migration 023 with `.venv/bin/flask db-upgrade` first.
+
+1. Create a draft for an income stream, choose completed shifts and enter client
+   details and dates. Selected shifts are reserved against duplicate invoicing.
+2. Check the draft and issue it. Issuing assigns a sequential `INV-000001` style
+   number and freezes its details. If a draft's shifts change, save it again
+   before issuing. Later shift edits do not rewrite issued invoices.
+3. Confirm the bank receipt, classify it as income and assign the same stream.
+   Record actual gross and deductions. Only confirmed, settled receipts in the
+   invoice currency can be allocated.
+4. Allocate cash plus actual logged tax and employee NI. For example, £800 cash
+   plus £200 logged CIS tax settles a £1,000 invoice. Partial payments and splitting
+   receipts across invoices are supported. Cash, tax and NI cannot be reused.
+
+The picker shows up to 200 recent matching receipts; search payer/reference to
+find older ones. Changed receipts flag their allocations for review and exclude
+those allocations from settlement. Remove and review them before reallocating.
+Removed allocations remain in history.
+
+Issued invoices cannot be edited. Remove any allocations before cancelling an
+invoice; cancellation releases its shifts without reusing its issued number.
+Invoicing does not add income to the forecast again. All shifts on an invoice
+must use the stream's currency. Test data includes a sample draft and separate
+`TEST-INV-` numbering.
+
+This version stores invoice records in PostgreSQL. PDF generation, VAT, uploads,
+interpretation and automatic payment matching are deferred.
+
+## Income stream controls, notices and earmarks
+
+Each stream now has **Configure stream**, **Show income**, and **View deductions
+and expenses** controls. Employment forecasts offer **Add overtime**;
+self-employed / CIS forecasts offer **Add work**. In either forecast mode, enter
+only additional work not already included in normal expected pay. Streams using
+individual shifts retain **Manage shifts**. Payment and expense lists open in
+keyboard-accessible popups with pagination, instead of a ledger at the bottom.
+**Show all income** and the expense/mileage management link are at the top.
+
+When linking an expense, choose its tax treatment explicitly. New forms default
+to **Tracking only**: the expense belongs to the stream, but never reduces taxable
+income or excludes simplified mileage. **Claim as a tax deduction** requires
+eligibility confirmation; existing saved deductions remain claims after upgrade.
+Deduction support remains eligible GBP expenses in 2026–27; tracking-only links
+can retain other currencies and dates without making a tax claim.
+
+Signed-in pages check for incoming income payments on load and every minute while
+visible. **View income notices** shows received cash and the suggested change in
+tax and Class 4 NI reserves. Complete income details and confirm the transaction
+first; incomplete or unsupported records show **needs review**, never a guessed
+zero. New unassigned payments also notify, asking you to choose a stream before
+showing a tax amount. This does not infer matches from bank names or invoices. Notices stay unread until acknowledged, survive restarts, and
+reopen when the payment or its confirmation changes. These are in-app notices,
+not email, OS notifications or bank webhooks.
+
+The suggestion uses annual employment/business forecasts to choose tax bands,
+apportions the business charge to gross income received, then subtracts actual
+logged business tax credits once. Read receipts remain part of the cumulative
+calculation. Negative reserve changes can release earlier provision; the current
+cumulative target is the reference when forecasts or deductions change.
+Employment payroll deductions are recorded, not predicted. See the reviewed
+[HMRC Class 4 rules](https://www.gov.uk/self-employed-national-insurance-rates)
+and [CIS credit guidance](https://www.gov.uk/what-you-must-do-as-a-cis-subcontractor/pay-tax-and-claim-back-deductions).
+
+**Account money** on Income streams shows current account balances, tax/NI
+amounts you have earmarked, and the remaining balance after those earmarks.
+**Manage earmarks** records your totals per account; it does not move money or
+assume you saved the suggested amount. The page compares the GBP total with the
+cumulative target and shows how much remains to earmark. Currencies stay
+separate; no exchange rate is assumed. If balances cannot load, the available
+amount stays unknown. Earmarks exceeding a balance display a warning.
+Direct HMRC payments remain outside the planning calculation.
+
+Migration `024_income_workspace.sql` adds the expense treatment flag, earmarks
+and notice acknowledgements. Run `.venv/bin/flask db-upgrade` on another
+installation and restart Flask. Test mode includes sample earmarks and a
+tracking-only expense, and keeps these records separate from your real data.

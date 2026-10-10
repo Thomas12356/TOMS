@@ -9,7 +9,7 @@ async function loadBalances() {
         const data = await response.json();
         container.replaceChildren();
 
-        const displayedBalances = data.totals ?? data.balances;
+        const displayedBalances = container.dataset.showAccounts === 'true' ? data.balances : (data.totals ?? data.balances);
         if (displayedBalances.length === 0) {
             container.textContent = "Import your accounts to see their balances here.";
             return;
@@ -25,6 +25,21 @@ async function loadBalances() {
             // textContent displays bank data as text, never as executable HTML.
             amount.textContent = balance.error || balance.amount;
             card.append(name, amount);
+            if (balance.tax_reserved !== undefined) {
+                const breakdown = document.createElement('p');
+                breakdown.className = 'balance-breakdown';
+                breakdown.textContent = `Earmarked: ${balance.tax_reserved} tax · ${balance.ni_reserved} NI`;
+                const remaining = document.createElement('p');
+                remaining.className = balance.underfunded ? 'balance-error' : 'secondary';
+                remaining.textContent = balance.unassigned === null ? 'Unassigned balance unavailable' : `After earmarks: ${balance.unassigned}`;
+                card.append(breakdown, remaining);
+                if (balance.underfunded) {
+                    const warning = document.createElement('p');
+                    warning.className = 'balance-error';
+                    warning.textContent = 'Current balance does not fully cover these earmarks.';
+                    card.append(warning);
+                }
+            }
             container.append(card);
         }
     } catch (error) {

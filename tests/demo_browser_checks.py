@@ -57,6 +57,8 @@ with sync_playwright() as playwright:
                     page.wait_for_function("() => document.querySelector('#transaction-review').open")
                     page.get_by_role('button', name='Close transaction review').click()
             page.goto(origin + '/dashboard/income-streams')
+            page.wait_for_function("() => !document.querySelector('#account-balances').textContent.includes('Loading')")
+            provider.reset_mock()  # Initial real-mode account money read is intentional.
             open_navigation()
             switch = page.get_by_role('switch', name='Test data')
             assert switch.get_attribute('aria-checked') == 'false'
@@ -121,9 +123,9 @@ with sync_playwright() as playwright:
             assert 'Browser-created sample work' in page.locator('#your-streams-heading').locator('..').inner_text()
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.income_streams') == 1
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.transactions WHERE confirmed_at IS NOT NULL') == 0
-            stream_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading strong', has_text='Browser-created sample work'))
+            stream_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading h3', has_text='Browser-created sample work'))
             assert stream_card.get_by_role('link', name='Manage shifts', exact=True).count() == 0
-            overtime_button = stream_card.get_by_role('link', name='Add overtime', exact=True)
+            overtime_button = stream_card.get_by_role('link', name='Add work', exact=True)
             box = overtime_button.bounding_box()
             assert box['height'] >= 44 and box['x'] >= 0 and box['x'] + box['width'] <= width
             with page.expect_navigation():
@@ -136,34 +138,34 @@ with sync_playwright() as playwright:
             page.locator('#shift-rate').fill('oops')
             page.locator('#shift-notes').fill('Browser overtime')
             with page.expect_navigation():
-                page.get_by_role('button', name='Add overtime', exact=True).click()
+                page.get_by_role('button', name='Add work', exact=True).click()
             assert page.locator('#shift-rate').input_value() == 'oops'
             page.locator('#shift-rate').fill('15')
             with page.expect_navigation():
-                page.get_by_role('button', name='Add overtime', exact=True).click()
+                page.get_by_role('button', name='Add work', exact=True).click()
             assert 'GBP 45.00' in page.locator('main').inner_text()
             assert 'GBP 71,045.00' in page.request.get(origin + '/dashboard/tax-estimate').text()
             with page.expect_navigation():
-                page.get_by_role('link', name='Edit overtime', exact=True).click()
+                page.get_by_role('link', name='Edit work', exact=True).click()
             page.locator('#shift-payment-mode').select_option('total')
             page.locator('#shift-total').fill('50')
             with page.expect_navigation():
-                page.get_by_role('button', name='Save overtime', exact=True).click()
+                page.get_by_role('button', name='Save work', exact=True).click()
             assert 'GBP 71,050.00' in page.request.get(origin + '/dashboard/tax-estimate').text()
             with page.expect_navigation():
-                page.get_by_role('link', name='Edit overtime', exact=True).click()
+                page.get_by_role('link', name='Edit work', exact=True).click()
             with page.expect_navigation():
-                page.get_by_role('button', name='Remove overtime', exact=True).click()
+                page.get_by_role('button', name='Remove work', exact=True).click()
             assert 'GBP 71,000.00' in page.request.get(origin + '/dashboard/tax-estimate').text()
             with page.expect_navigation():
                 page.get_by_role('link', name='← Income stream', exact=True).click()
-            stream_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading strong', has_text='Browser-created sample work'))
-            stream_card.locator('summary').click()
+            stream_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading h3', has_text='Browser-created sample work'))
+            stream_card.get_by_role('link', name='Configure stream', exact=True).click()
             stream_card.locator('[data-income-mode]').select_option('shifts')
             assert not stream_card.locator('[data-regular-forecast]').is_visible()
             with page.expect_navigation():
                 stream_card.get_by_role('button', name='Save changes', exact=True).click()
-            stream_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading strong', has_text='Browser-created sample work'))
+            stream_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading h3', has_text='Browser-created sample work'))
             shifts_button = stream_card.get_by_role('link', name='Manage shifts', exact=True)
             assert shifts_button.is_visible()
             box = shifts_button.bounding_box()
@@ -216,9 +218,10 @@ with sync_playwright() as playwright:
             page.locator('#expense-shift').select_option(shift_identity)
             page.locator('#expense-amount').fill('10.00')
             page.locator('#expense-purpose').fill('Sample business tools')
+            page.locator('#expense-tax-status').select_option('deduction')
             page.locator('form:has(#expense-amount) input[name=eligible]').check()
             with page.expect_navigation():
-                page.get_by_role('button', name='Save deduction', exact=True).click()
+                page.get_by_role('button', name='Save expense', exact=True).click()
             assert 'Sample business tools' in page.locator('main').inner_text()
             with page.expect_navigation():
                 page.locator('#deduction-type').select_option('mileage')
@@ -262,11 +265,12 @@ with sync_playwright() as playwright:
             page.locator('#stream-gross').fill('30000')
             with page.expect_navigation():
                 page.get_by_role('button', name='Create stream', exact=True).click()
-            partner_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading strong', has_text='Browser-linked source'))
+            partner_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading h3', has_text='Browser-linked source'))
             assert 'Mileage: counted with Browser-created sample work' in partner_card.inner_text()
-            partner_card.locator('summary').click()
+            partner_card.get_by_role('link', name='Configure stream', exact=True).click()
             partner_id = partner_card.locator('[name=stream_id]').input_value()
             assert partner_card.locator('[data-mileage-relationship]').input_value() == shift_stream_id
+            page.keyboard.press('Escape')
             open_navigation()
             with page.expect_navigation():
                 page.locator('#main-navigation').get_by_role('link', name='Deductions', exact=True).click()
@@ -285,8 +289,8 @@ with sync_playwright() as playwright:
             assert 'calculated mileage relief GBP 5,470.00' in page.locator('main').inner_text()
             with page.expect_navigation():
                 page.get_by_role('link', name='Manage income streams', exact=True).click()
-            partner_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading strong', has_text='Browser-linked source'))
-            partner_card.locator('summary').click()
+            partner_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading h3', has_text='Browser-linked source'))
+            partner_card.get_by_role('link', name='Configure stream', exact=True).click()
             partner_card.locator('[data-mileage-relationship]').select_option('')
             with page.expect_navigation():
                 partner_card.get_by_role('button', name='Save changes', exact=True).click()
@@ -297,12 +301,13 @@ with sync_playwright() as playwright:
             with page.expect_navigation():
                 page.locator('.stream-payment').filter(has_text='Partner journey').get_by_role('button', name='Remove journey', exact=True).click()
             with page.expect_navigation():
-                page.get_by_role('link', name='Edit deduction', exact=True).click()
+                page.locator('.stream-payment').filter(has_text='Sample business tools').get_by_role('link', name='Edit expense', exact=True).click()
             with page.expect_navigation():
-                page.get_by_role('button', name='Remove deduction', exact=True).click()
+                page.get_by_role('button', name='Unlink expense', exact=True).click()
             with page.expect_navigation():
                 page.get_by_role('button', name='Remove journey', exact=True).click()
-            assert 'No linked expenses.' in page.locator('main').inner_text()
+            assert 'Sample business tools' not in page.locator('main').inner_text()
+            assert 'Sample rent expense — tracking only' in page.locator('main').inner_text()
             assert 'No mileage logged.' in page.locator('main').inner_text()
             open_navigation()
             assert page.get_by_role('switch', name='Test data').get_attribute('aria-checked') == 'true'

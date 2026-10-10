@@ -384,3 +384,49 @@ class TestDataTests(unittest.TestCase):
             record_action('shift.delete', sample_id(41), verified_owner=True)
             db.session.rollback()
         self.assertEqual(len(db.session.scalars(db.select(UserAction)).all()), before)
+
+    def test_sample_invoice_issue_payment_and_cancellation_do_not_touch_real_records(self):
+        self.assertEqual(self.toggle(True).status_code,303)
+        path='/dashboard/invoices/'+sample_id(51)
+        html=self.client.get(path).get_data(as_text=True)
+        self.assertIn('Draft invoice',html)
+        token=re.search(r'name="csrf_token" value="([^"]+)"',html)[1]
+        response=self.client.post(path,data=dict(action='issue',version='1',csrf_token=token))
+        self.assertEqual(response.status_code,303)
+        self.assertIn('TEST-INV-000001',self.client.get(path).get_data(as_text=True))
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.invoices'),0)
+        with self.admin.begin() as connection:
+            connection.execute(text(f'UPDATE {self.demo_schema}.transactions SET confirmed_at=now() WHERE feed_item_uid=:id'),dict(id=sample_id(31)))
+        html=self.client.get(path).get_data(as_text=True)
+        token=re.search(r'name="csrf_token" value="([^"]+)"',html)[1]
+        self.assertEqual(self.client.post(path,data=dict(action='allocate',version='2',csrf_token=token,
+            payment='|'.join((sample_id(1),sample_id(11),sample_id(31))),cash='200',tax='0',ni='0')).status_code,303)
+        self.assertIn('Paid',self.client.get(path).get_data(as_text=True))
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.invoice_payments'),0)
+        self.toggle(False)
+        self.assertEqual(self.client.get(path).status_code,404)
+        self.bank.assert_not_called()
+
+    def test_sample_earmarks_notices_and_tracking_costs_are_isolated(self):
+        self.assertEqual(self.toggle(True).status_code, 303)
+        balances = self.client.get('/dashboard/balances?reserves=1').get_json()
+        self.assertEqual(balances['balances'][0]['tax_reserved'], 'GBP 250.00')
+        self.assertEqual(balances['totals'][0]['unassigned'], 'GBP 7,250.75')
+        response = self.client.post('/dashboard/account-reserves', data=dict(
+            csrf_token=self.csrf(), account=sample_id(1), version='1', tax='300', ni='70'))
+        self.assertEqual(response.status_code, 303)
+        notices = self.client.get('/dashboard/income-notifications').get_json()['notices']
+        self.assertEqual(len(notices), 3)
+        self.assertTrue(all(row['tax_minor'] is None for row in notices))
+        row = notices[0]
+        self.assertEqual(self.client.post('/dashboard/income-notifications/read', data=dict(
+            csrf_token=self.csrf(), payment=row['payment'], version=row['version'])).status_code, 204)
+        self.assertEqual(self.client.get('/dashboard/income-notifications').get_json()['count'], 2)
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.account_reserves'), 0)
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.income_notice_reads'), 0)
+        self.assertEqual(self.live_value('SELECT count(*) FROM SCHEMA.expense_deductions'), 0)
+        self.assertEqual(self.toggle(False).status_code, 303)
+        self.assertEqual(self.client.get('/dashboard/income-notifications').get_json()['count'], 1)
+        # A form opened before switching mode cannot mutate the other dataset.
+        self.assertEqual(self.client.post('/dashboard/income-notifications/read', data=dict(
+            csrf_token=self.csrf(), payment=row['payment'], version=row['version'])).status_code, 409)

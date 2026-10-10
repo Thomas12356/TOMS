@@ -1300,3 +1300,77 @@ td.amount {
 .system-filter button { cursor: pointer; font-family: var(--mono); font-size: 12px; font-weight: 600; }
 .system-filter button:hover { border-color: var(--muted); }
 .system-filter select:focus-visible, .system-filter button:focus-visible { outline: 3px solid var(--highlight); outline-offset: 3px; }
+
+/* Invoice tracking: work, issued details and actual settlement. */
+.invoice-section { margin-top: 32px; }
+.invoice-list-row { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: start; padding: 20px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.invoice-list-row > div { min-width: 0; }
+.invoice-list-row h3, .invoice-list-row p { margin: 0 0 6px; }
+.invoice-list-row > div:last-child > strong { display: block; font: 700 18px var(--mono); }
+.invoice-state { display: inline-block; font: 600 12px var(--mono); margin-bottom: 8px; }
+.invoice-overdue { color: var(--accent); font-weight: 600; margin-left: 10px; }
+.invoice-totals .balance-amount { font-size: clamp(20px, 3vw, 26px); letter-spacing: -.5px; }
+.invoice-picker { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 24px 0; }
+.invoice-picker select, .invoice-picker input { flex: 1; min-width: 140px; }
+.invoice-picker select, .invoice-picker input, .invoice-picker button, .invoice-secondary { min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 3px; color: var(--text); background: var(--surface); font: inherit; }
+.invoice-picker button, .invoice-secondary { cursor: pointer; }
+.invoice-picker :focus-visible, .invoice-secondary:focus-visible, .invoice-shift:focus-within { outline: 3px solid var(--highlight); outline-offset: 3px; }
+.invoice-shifts { border: 1px solid var(--border); padding: 16px; margin: 24px 0; }
+.invoice-shifts legend { font-weight: 600; padding: 0 8px; }
+.invoice-shift { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: start; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.invoice-shift input { width: 20px; height: 20px; accent-color: var(--accent); }
+.invoice-shift span > span { display: block; color: var(--muted); overflow-wrap: anywhere; }
+.invoice-details { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+.invoice-details dt { color: var(--muted); font-size: 12px; }
+.invoice-details dd { margin: 3px 0 0; overflow-wrap: anywhere; }
+.invoice-address { white-space: pre-wrap; }
+.invoice-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.invoice-payment-form summary, .invoice-section > summary { cursor: pointer; padding: 12px 0; font-weight: 600; }
+.invoice-page .login-form select { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: 8px; border: 1px solid var(--border); background: var(--surface); font: inherit; }
+.invoice-confirm { display: flex; align-items: center; gap: 10px; margin: 16px 0; }
+.invoice-confirm input { width: 20px; height: 20px; }
+@media (max-width: 640px) {
+    .invoice-picker label { width: 100%; }
+    .invoice-shift { grid-template-columns: 22px minmax(0, 1fr); }
+    .invoice-shift > strong { grid-column: 2; }
+    .invoice-details { grid-template-columns: 1fr; }
+    .invoice-list-row { flex-direction: column; }
+    .invoice-actions > *, .invoice-actions button { width: 100%; }
+}
+
+/* Stream actions stay with their job; records open in focused, scrollable dialogs. */
+.stream-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.stream-heading > .stream-actions { flex: 0 1 auto; }
+.stream-actions a, .stream-actions button { text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.page-actions { margin: 20px 0; }
+.stream-list-dialog { width: min(820px, calc(100% - 32px)); max-height: 85dvh; overflow: auto; margin: auto; }
+.stream-list-dialog:not([open]), .stream-configure:not([open]) { display: none; }
+.stream-list-dialog .stream-payment { gap: 12px; overflow-wrap: anywhere; }
+.stream-configure .login-form { width: 100%; }
+.account-reserve-section { margin-top: 32px; border-top: 1px solid var(--border); padding-top: 20px; }
+.account-earmark { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.account-earmark summary { cursor: pointer; min-height: 44px; padding: 10px 0; }
+.account-earmark .login-form { max-width: 520px; }
+.balance-breakdown { font-size: 14px; line-height: 1.6; }
+.income-alert-bar { flex-basis: 100%; grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid #59645b; color: #f5f0e5; font-size: 13px; line-height: 1.5; }
+.income-alert-bar[hidden] { display: none; }
+.income-alert-bar > span { flex: 1; overflow-wrap: anywhere; }
+.income-alert-bar button { flex-shrink: 0; }
+.income-notice { padding: 16px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+    .stream-heading > .stream-actions { width: 100%; }
+    .stream-actions > a, .stream-actions > button { flex: 1 1 140px; padding: 10px 12px; text-align: center; }
+    .stream-list-dialog .stream-payment { display: grid; grid-template-columns: minmax(0, 1fr); }
+    .income-alert-bar { flex-direction: column; align-items: stretch; }
+    .income-alert-bar button { min-height: 44px; }
+}
+.eligibility[hidden] { display: none; }
+.stream-actions .secondary-button, .stream-list-dialog button.secondary-button,
+.stream-configure > button, .stream-create > button, .income-alert-bar button {
+    padding: 10px 14px; border: 1px solid var(--border); border-radius: 3px;
+    background: var(--surface); color: var(--text); font: 600 13px/1.4 system-ui, sans-serif;
+    text-decoration: none; cursor: pointer; min-height: 44px;
+}
+.stream-actions .secondary-button:hover, .stream-list-dialog button.secondary-button:hover { border-color: var(--accent); }
+.stream-actions .secondary-button:focus-visible { outline: 3px solid var(--highlight); outline-offset: 3px; }
+.review-dialog .dialog-close { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--text); text-decoration: none; }

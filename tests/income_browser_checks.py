@@ -32,6 +32,7 @@ with app.test_request_context('/dashboard/income-streams'):
         format_amount=format_amount, display_amount=display_amount, annual_gross=annual_gross, holiday_amount=holiday_amount,
         editing_id=None, editing_values={}, error=None, selected_name=stream.name, selected_stream=stream.id, rows=[dict(source='Example employer with a very long source name',
         kind='Employment', date='06 Oct 2026', amount='GBP 25.00', needs_review=True, edit_url='/income')],
+        view='', accounts=[], earmarks={}, reserve_target=None, expenses=[], journeys=[], deduction_pages=0,
         page=SimpleNamespace(pages=1), current_user=SimpleNamespace(is_authenticated=True))
 
 with sync_playwright() as playwright:
@@ -82,16 +83,19 @@ with sync_playwright() as playwright:
         for period in ('weekly', 'monthly', 'yearly'):
             page.locator('#stream-period').select_option(period)
         page.locator('#stream-currency').select_option('USD')
-        assert page.locator('.stream-create form').evaluate('(form) => form.checkValidity()')
+        assert page.locator('#create-stream-dialog form').evaluate('(form) => form.checkValidity()')
         page.keyboard.press('Escape')
         assert not page.locator('#create-stream-dialog').is_visible()
-        page.locator('.stream-manage summary').click()
+        page.get_by_role('link', name='Configure stream', exact=True).click()
         assert page.get_by_role('button', name='Save changes', exact=True).is_visible()
         assert page.get_by_role('button', name='Archive', exact=True).is_visible()
+        page.keyboard.press('Escape')
         if width < 640:
             page.get_by_role('button', name='Toggle navigation').click()
         assert page.get_by_role('link', name='Income streams', exact=True).is_visible()
-        assert page.get_by_role('link', name='Edit income details').is_visible()
+        page.get_by_role('link', name='Show income', exact=True).click()
+        page.get_by_role('link', name='Edit income details').wait_for(state='visible')
+        page.keyboard.press('Escape')
         assert page.locator('#forecast-' + stream.id + '-gross').input_value() == '1000.50'
         assert page.locator('#forecast-' + stream.id + '-period').input_value() == 'monthly'
         assert 'GBP 12,006.00 for 2026-27' in page.locator('main').inner_text()

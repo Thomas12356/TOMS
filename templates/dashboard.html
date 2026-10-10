@@ -115,7 +115,7 @@
                                 <span class="secondary income-status">Income: {{ row.income_status }}</span>
                                 <a class="edit-income" href="{{ row.income_url }}">Edit income details</a>
                                 {% endif %}
-                                {% if row.deduction_url %}<a class="edit-income" href="{{ row.deduction_url }}">Tax deduction</a>{% endif %}
+                                {% if row.deduction_url %}<a class="edit-income" href="{{ row.deduction_url }}">Expense details</a>{% endif %}
                                 <a class="edit-classification{{ ' is-manual' if row.origin == 'manual' else '' }}" href="{{ row.edit_url }}">Edit classification</a>
                             </td>
                             <td role="cell" data-label="Amount" class="amount {{ 'incoming' if row.direction == 'IN' else 'outgoing' }}">
