@@ -109,14 +109,7 @@ class TransactionReviewTests(SavedTransactionTestCase):
 
     def test_confirmation_commit_failure_rolls_back_and_does_not_leak_errors(self):
         item = self.pending()['transaction']
-        original = self.session.commit
-        commits = []
-        def commit():
-            commits.append(1)
-            if len(commits) == 1:  # The browser session loader commits last_seen first.
-                return original()
-            raise OperationalError('private query', {}, Exception('private credential'))
-        with patch.object(db.session, 'commit', side_effect=commit), self.assertLogs('toms.errors'):
+        with patch.object(db.session, 'commit', side_effect=OperationalError('private query', {}, Exception('private credential'))), self.assertLogs('toms.errors'):
             response = self.confirm(item)
         self.assertEqual(response.status_code, 503)
         self.assertNotIn('private', response.get_data(as_text=True))

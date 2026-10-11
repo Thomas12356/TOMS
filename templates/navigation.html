@@ -29,6 +29,9 @@
 <script src="{{ url_for('static', filename='js/navigation.js') }}" defer></script>
 
 {% if navigation_owner %}
+<span id="session-activity" data-url="{{ url_for('login.activity') }}" data-login-url="{{ url_for('login.sign_in') }}" data-csrf="{{ csrf_token() }}" hidden></span>
+<p id="session-activity-error" class="message" role="alert" hidden></p>
+<script src="{{ url_for('static', filename='js/session-activity.js') }}" defer></script>
 <aside id="income-alert-bar" class="income-alert-bar" data-url="{{ url_for('reserves.notifications') }}" hidden aria-label="Income notifications">
     <span id="income-alert-summary" role="status" aria-live="polite"></span>
     <button type="button" id="show-income-notices" class="secondary-button">View income notices</button>

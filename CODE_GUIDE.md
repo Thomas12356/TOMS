@@ -162,6 +162,16 @@ Use `tests/test_login.py` to see wrong-password, CSRF, throttling, cookie, expir
 logout-replay and password-reset checks. Database tests roll back their changes;
 they never create or replace your real owner account.
 
+Session loading validates expiry without renewing inactivity for polling. Actual
+interaction uses the CSRF-protected `/session/activity` endpoint and
+`static/js/session-activity.js`; user-activated document navigation also renews a
+live session. Activity refreshes page CSRF tokens but never the absolute expiry.
+`LoginAttempt` maps the existing atomic PostgreSQL throttle so disposable fixtures
+can route authentication queries without hard-coded SQL bypassing their schema.
+Stream configuration uses `settings_version` in `services/transactions/income_streams.py`
+to reject stale settings or mileage choices under the shared write lock. Conflicts
+retain entries until the owner deliberately reloads current settings.
+
 ## Security regression tests
 
 `tests/test_security.py` covers hostile credentials, CSRF, cookie replay,

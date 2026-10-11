@@ -26,7 +26,7 @@ with app.test_request_context('/dashboard/income'):
 
 with app.test_request_context('/dashboard/income-streams'):
     stream_html = render_template('income_streams.html',
-        streams=[stream], stream_kinds=STREAM_KINDS, counts={stream.id: 1},
+        streams=[stream], stream_kinds=STREAM_KINDS, counts={stream.id: 1}, stream_versions={stream.id: 'a' * 64}, stale_version=None,
         create_values={'name': '', 'kind': '', 'expected_gross': '', 'expected_gross_period': 'yearly', 'expected_gross_currency': 'GBP', 'unpaid_holiday': '0', 'unpaid_holiday_unit': 'weeks', 'forecast_tax_year': '2026-27', 'forecast_starts_on': '', 'forecast_ends_on': '', 'withholding_mode': 'unknown', 'expected_tax_deducted': ''},
         forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES, tax_years=TAX_YEARS, active_days=active_days,
         format_amount=format_amount, display_amount=display_amount, annual_gross=annual_gross, holiday_amount=holiday_amount,

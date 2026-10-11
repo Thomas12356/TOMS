@@ -9,6 +9,7 @@ enterContext() and addCleanup() arrange cleanup even when a test fails.
 """
 
 import os
+import re
 import unittest
 from datetime import datetime, timezone
 from unittest.mock import Mock, patch
@@ -21,6 +22,12 @@ from flask import g
 from app import app
 from models import Account, Category, Transaction
 from services.database.connection import db
+
+
+def stream_token(client, identity):
+    html = client.get('/dashboard/income-streams').get_data(as_text=True)
+    form = html.split(f'id="configure-{identity}"')[1].split('</dialog>')[0]
+    return re.search(r'name="version" value="([^"]+)"', form)[1]
 
 
 class ApiTestCase(unittest.TestCase):

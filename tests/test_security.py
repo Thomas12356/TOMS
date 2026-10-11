@@ -265,8 +265,10 @@ class SecuritySessionTests(OwnerLoginFixture):
         absolute_expiry = record.expires_at
         record.last_seen_at = datetime.now(timezone.utc) - timedelta(minutes=29)
         self.session.flush()
+        csrf = csrf_token(self.client)
         with patch.object(db, "paginate", return_value=SimpleNamespace(items=[], total=0, pages=0)):
             self.assertEqual(self.client.get("/dashboard").status_code, 200)
+        self.assertEqual(self.client.post('/session/activity', data={'csrf_token': csrf}).status_code, 204)
         self.assertLess(datetime.now(timezone.utc) - record.last_seen_at, timedelta(seconds=5))
         self.assertEqual(record.expires_at, absolute_expiry)
 
@@ -318,8 +320,7 @@ class ConcurrentLoginSecurityTests(ApiTestCase):
         self.sessions = scoped_session(sessionmaker(bind=self.bound_engine))
         self.addCleanup(self.sessions.remove)
         self.enterContext(patch.object(db, "session", self.sessions))
-        # Redirect only this helper's SQL into an isolated, randomly named schema.
-        self.enterContext(patch("services.web.sessions.text", side_effect=lambda sql: text(sql.replace("toms.login_attempts", self.schema + ".login_attempts"))))
+        # The ORM upsert follows this fixture's schema_translate_map directly.
 
     def drop_schema(self):
         with self.admin_engine.begin() as connection:

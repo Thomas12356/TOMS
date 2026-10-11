@@ -14,7 +14,7 @@ from sqlalchemy import select
 from services.transactions.classification import save_classification
 from services.transactions.income_form import display_amount, form_values, parse_amount
 from services.web.sessions import token_hash
-from support import SavedTransactionTestCase
+from support import SavedTransactionTestCase, stream_token
 
 
 class IncomeAmountTests(unittest.TestCase):
@@ -177,6 +177,8 @@ class IncomeFormTests(SavedTransactionTestCase):
 
     def stream_post(self, **data):
         html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
+        if data.get('action') in ('update', 'archive', 'restore') and data.get('stream_id') == self.stream:
+            data.setdefault('version', stream_token(self.client, self.stream))
         if data.get('action') in ('create', 'update'):
             data.setdefault('forecast_tax_year', '2026-27')
             data.setdefault('expected_gross', '30000.00')
@@ -257,6 +259,32 @@ class IncomeFormTests(SavedTransactionTestCase):
         self.assertEqual(self.stream_post(action='archive', stream_id=self.stream).status_code, 303)
         self.session.expire_all()
         self.assertEqual(self.session.get(IncomeStream, self.stream).expected_gross_minor, 100050)
+
+    def test_stale_stream_settings_cannot_overwrite_newer_forecast(self):
+        html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
+        configure = html.split(f'id="configure-{self.stream}"')[1].split('</dialog>')[0]
+        found = re.search(r'name="version" value="([^"]+)"', configure)
+        older = {'version': found[1]} if found else {}
+        self.assertEqual(self.stream_post(action='update', stream_id=self.stream,
+            name='Current name', kind='employed', expected_gross='5000').status_code, 303)
+        response = self.stream_post(action='update', stream_id=self.stream,
+            name='Older tab', kind='employed', expected_gross='1000', **older)
+        self.assertEqual(response.status_code, 409)
+        self.session.expire_all()
+        self.assertEqual(self.session.get(IncomeStream, self.stream).expected_gross_minor, 500000)
+        self.assertIn('Older tab', response.get_data(as_text=True))
+
+    def test_archive_restore_and_missing_versions_cannot_bypass_conflicts(self):
+        old = stream_token(self.client, self.stream)
+        self.assertEqual(self.stream_post(action='update', stream_id=self.stream,
+            name='New settings', kind='employed').status_code, 303)
+        for action in ('archive', 'restore'):
+            self.assertEqual(self.stream_post(action=action, stream_id=self.stream,
+                version=old).status_code, 409)
+        for token in ('', 'é' * 64, 'invalid'):
+            self.assertEqual(self.stream_post(action='archive', stream_id=self.stream,
+                version=token).status_code, 409)
+        self.assertFalse(self.session.get(IncomeStream, self.stream).archived)
 
     def test_invalid_forecast_does_not_save_and_preserves_inputs(self):
         for value in ('', '-1', '1.001', '1e4', '£10', '1,000', '92233720368547758.08'):

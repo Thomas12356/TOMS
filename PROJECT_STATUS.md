@@ -33,21 +33,45 @@ Recorded on 2026-10-10 in [SECURITY_TESTS.md](SECURITY_TESTS.md), committed as
 These are historical results. Recheck affected behaviour after subsequent changes;
 do not infer deployment status or current database health from them.
 
-## Outstanding publication decision
+## Publication authorization
 
-The user requested testing, committing and pushing. Testing and local commits
-were completed; the push remains pending clarification of repository visibility.
-
-Last checked on 2026-10-10: `origin` was `git@github.com:Thomas12356/TOMS.git`,
-SSH authenticated as `Thomas12356`, and GitHub reported the repository public.
-Earlier project notes specified private publication. The user has not yet chosen
-between keeping it public and making it private before publishing new commits.
-Verify current visibility and remote state, resolve that choice, then push the
-authorized commits without rewriting remote history. Check the remote branch
-matches the local commit before reporting success.
+On 2026-10-11 the user explicitly authorized pushing to the current public
+repository after its visibility was checked. The verified remote is
+, owned by , with default branch
+. Push the completed work without rewriting remote history and verify the
+remote commit. All subsequent implementation belongs on a named  branch.
 
 ## Current handoff
 
-Repository instructions and this status file were added on 2026-10-11. Continue
-with the user's next task; no further feature work has been selected. Changes to
-these documentation files do not imply that the application was redeployed.
+The user authorized starting [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
+Phases 0 and 1 are implemented locally:
+
+- Pinned development tools, private Chromium libraries and setup/verification
+  commands replace dependence on temporary tooling. Single-year and multi-year
+  synthetic performance baselines are in SECURITY_TESTS.md.
+- Stream configure/archive/restore forms compare settings and mileage-choice
+  snapshots under the existing write lock. Conflicts retain submitted values,
+  display the current saved summary and require a deliberate reload.
+- Background requests no longer renew session inactivity. Trusted interaction
+  and user-activated document navigation renew a valid session within the fixed
+  eight-hour expiry. Activity refreshes CSRF tokens without discarding form data.
+- LoginAttempt maps the existing throttle table; its atomic PostgreSQL upsert
+  respects isolated authentication schemas. Repeated browser tests previously
+  bypassed this routing via raw SQL and touched the working attempt counter.
+  No working credentials or owner records were changed; no counter reset was
+  performed. Future browser runs use disposable counters.
+
+Latest backend verification: 486 tests ran, 482 passed and four optional backup
+integration cases were skipped. All affected workflows passed, including three
+consecutive password-browser runs, stale-edit recovery, activity/expiry, sample
+isolation and concurrent stream edits. Ruff F, application Bandit and whitespace
+checks passed. All 16 browser scripts passed on the completed reliability changes;
+the two new scripts cover stale-edit/session recovery and first-owner setup.
+
+No schema migration, deployment, publication or live Starling calls were performed.
+A private backup was created; restore verification could not run because dedicated
+CREATEDB test credentials are absent. Arrange isolated restore verification before
+a later phase changes the working schema. Do not restore over the working database.
+
+Next implementation: Phase 2, shared presentation/base templates, grouped
+navigation and the owner overview. The user authorized public publication as recorded above.

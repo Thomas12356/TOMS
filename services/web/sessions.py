@@ -7,8 +7,9 @@ from flask import current_app, jsonify, redirect, request, url_for, render_templ
 from flask_login import LoginManager, UserMixin, current_user
 from flask_wtf.csrf import CSRFProtect
 from sqlalchemy import text
+from sqlalchemy.dialects.postgresql import insert
 
-from models import BrowserSession
+from models import BrowserSession, LoginAttempt
 from services.database.connection import db
 from services.web.auth import require_api_key
 
@@ -39,9 +40,25 @@ def load_owner(token):
         db.session.delete(saved)
         db.session.commit()
         return None
-    saved.last_seen_at = now
-    db.session.commit()
+    # User-activated document navigation also works when JavaScript is disabled.
+    # Script reloads and background fetches do not carry Sec-Fetch-User.
+    if (request.headers.get('Sec-Fetch-Mode') == 'navigate'
+            and request.headers.get('Sec-Fetch-User') == '?1'
+            and not renew_owner_activity(token)):
+        return None
     return LoggedInOwner(token)
+
+
+def renew_owner_activity(token):
+    """Atomically renew a live session; never recreate a revoked or expired one."""
+    now = datetime.now(timezone.utc)
+    result = db.session.execute(db.update(BrowserSession).where(
+        BrowserSession.token_hash == token_hash(token),
+        BrowserSession.expires_at > now,
+        BrowserSession.last_seen_at > now - IDLE_TIMEOUT,
+    ).values(last_seen_at=db.func.greatest(BrowserSession.last_seen_at, now)))
+    db.session.commit()
+    return result.rowcount == 1
 
 
 def require_dashboard_login():
@@ -67,18 +84,14 @@ def require_dashboard_login():
 
 def consume_login_attempt():
     """Count attempts atomically: at most 20 per fifteen minutes, across workers."""
-    count = db.session.execute(text("""
-        INSERT INTO toms.login_attempts (id, window_started_at, attempts)
-        VALUES (1, now(), 1)
-        ON CONFLICT (id) DO UPDATE SET
-            window_started_at = CASE
-                WHEN login_attempts.window_started_at <= now() - interval '15 minutes'
-                THEN now() ELSE login_attempts.window_started_at END,
-            attempts = CASE
-                WHEN login_attempts.window_started_at <= now() - interval '15 minutes'
-                THEN 1 ELSE least(login_attempts.attempts + 1, 21) END
-        RETURNING attempts
-    """)).scalar_one()
+    now = db.func.now()
+    expired = LoginAttempt.window_started_at <= now - timedelta(minutes=15)
+    statement = insert(LoginAttempt).values(id=1, window_started_at=now, attempts=1)
+    statement = statement.on_conflict_do_update(index_elements=[LoginAttempt.id], set_={
+        'window_started_at': db.case((expired, now), else_=LoginAttempt.window_started_at),
+        'attempts': db.case((expired, 1), else_=db.func.least(LoginAttempt.attempts + 1, 21)),
+    }).returning(LoginAttempt.attempts)
+    count = db.session.execute(statement).scalar_one()
     db.session.commit()
     return count <= 20
 

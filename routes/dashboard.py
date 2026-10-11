@@ -21,6 +21,7 @@ from services.error_logging import log_failure
 from services.transactions.income import TAX_TREATMENTS, save_income
 from services.transactions.review import REVIEW_FIELDS, review_version
 from services.transactions.income_form import FIELDS as INCOME_FORM_FIELDS, display_amount, decimal_places, form_values
+from services.transactions.income_streams import settings_version
 from services.transactions.automatic_sync import latest_sync, start_dashboard_sync
 from services.transactions.classification import CLASSIFICATION_TYPES, classification_details, save_classification, clear_classification
 from services.web.sessions import require_dashboard_login
@@ -389,11 +390,12 @@ def income_streams():
     create_values = dict.fromkeys(create_fields, '')
     create_values.update(income_mode='forecast', expected_gross_period='yearly', expected_gross_currency='GBP', unpaid_holiday='0', unpaid_holiday_unit='weeks', forecast_tax_year='2026-27')
     editing_id, editing_values = configure_id, {}
+    error_status, submitted_version = 400, None
     if configure_id and db.session.get(IncomeStream, configure_id) is None:
         raise NotFound('Income stream not found.')
     if request.method == 'POST':
         submitted = {field: request.form.get(field, '') for field in create_fields}
-        if request.form.get('action') == 'update':
+        if request.form.get('action') in ('update', 'archive', 'restore'):
             editing_id, editing_values = request.form.get('stream_id'), submitted
         else:
             create_values = submitted
@@ -409,6 +411,11 @@ def income_streams():
                     IncomeStream.id == stream_id(request.form.get('stream_id', ''))).with_for_update().execution_options(populate_existing=True))
                 if edited is None:
                     raise BadRequest('Income stream not found.')
+                related = db.session.scalars(db.select(IncomeStream)
+                    .execution_options(populate_existing=True)).all()
+                submitted_version = request.form.get('version', '')
+                if not hmac.compare_digest(submitted_version.encode(), settings_version(edited, related).encode()):
+                    raise Conflict('This stream or its mileage relationships changed. Your entries are retained below. Reload the current settings before applying your changes.')
                 if action == 'update':
                     if kind != edited.kind:
                         raise BadRequest('Create a new stream to use a different type.')
@@ -429,9 +436,10 @@ def income_streams():
             record_action('stream.' + action, edited.id)
             db.session.commit()
             return redirect(url_for('dashboard.income_streams', stream=selected_id, page=page_number), code=303)
-        except BadRequest as invalid:
+        except (BadRequest, Conflict) as invalid:
             db.session.rollback()
             error = invalid.description
+            error_status = invalid.code
     counts = dict(db.session.execute(db.select(TransactionIncome.income_stream_id, db.func.count())
                                     .group_by(TransactionIncome.income_stream_id)).all())
     streams = db.session.scalars(db.select(IncomeStream).order_by(IncomeStream.archived, IncomeStream.name, IncomeStream.id)).all()
@@ -477,9 +485,11 @@ def income_streams():
                            forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES,
                            tax_years=TAX_YEARS, active_days=active_days,
                            editing_id=editing_id, editing_values=editing_values,
+                           stream_versions={stream.id: settings_version(stream, streams) for stream in streams},
+                           stale_version=submitted_version if error_status == 409 else None,
                            display_amount=display_amount, format_amount=format_amount, annual_gross=annual_gross, holiday_amount=holiday_amount,
                            selected_name=names.get(selected_id, 'All income'), rows=rows, page=page,
-                           current_user=current_user), 400 if error else 200
+                           current_user=current_user), error_status if error else 200
 
 
 @dashboard.route('/tax-rules', methods=['GET', 'POST'])

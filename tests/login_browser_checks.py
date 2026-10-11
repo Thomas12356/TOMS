@@ -57,7 +57,7 @@ with sync_playwright() as playwright:
             page.get_by_label('Confirm password', exact=True).fill('different-pass-123')
             with page.expect_navigation():
                 page.get_by_role('button', name='Change password', exact=True).click()
-            assert page.get_by_role('alert').inner_text() == 'Passwords do not match.'
+            assert page.get_by_role('alert').inner_text() == 'Passwords do not match.', page.get_by_role('alert').all_inner_texts()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
             page.get_by_label('Current password', exact=True).fill('test-pass-123')
             page.locator('#password').fill('updated-pass-123')

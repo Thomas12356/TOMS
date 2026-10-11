@@ -92,7 +92,7 @@ def shell_context():
 @app.after_request
 def protect_banking_responses(response):
     if (request.path.startswith(("/starling/", "/sync/", "/transactions/", "/reports/", "/dashboard/"))
-            or request.path in ("/login", "/logout", "/setup", "/settings/password", "/health/db", "/transactions", "/reports", "/dashboard")):
+            or request.path in ("/login", "/logout", "/setup", "/settings/password", "/session/activity", "/health/db", "/transactions", "/reports", "/dashboard")):
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"

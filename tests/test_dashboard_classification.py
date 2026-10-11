@@ -135,16 +135,7 @@ class DashboardClassificationTests(SavedTransactionTestCase):
 
     def test_save_database_failure_does_not_disclose_data(self):
         token = self.form_token()
-        # The loader commits idle activity before the route saves the payment.
-        original_commit = self.session.commit
-        count = 0
-        def fail_second_commit():
-            nonlocal count
-            count += 1
-            if count == 2:
-                raise OperationalError("private SQL", {}, Exception("private-password"))
-            return original_commit()
-        with patch.object(db.session, "commit", side_effect=fail_second_commit), self.assertLogs("toms.errors"):
+        with patch.object(db.session, "commit", side_effect=OperationalError("private SQL", {}, Exception("private-password"))), self.assertLogs("toms.errors"):
             response = self.client.post(self.path(), data={"type": "refund", "csrf_token": token})
         self.assertEqual(response.status_code, 503)
         self.assertNotIn('private-password', response.get_data(as_text=True))

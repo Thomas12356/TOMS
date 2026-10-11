@@ -7,12 +7,24 @@ from types import SimpleNamespace
 from werkzeug.exceptions import BadRequest
 from services.validation import optional_text, uid
 from services.transactions.income_form import parse_amount
+from services.transactions.review import record_version
 
 STREAM_KINDS = {'self_employed': 'Self employed', 'employed': 'Employed', 'cis': 'CIS'}
 
 FORECAST_PERIODS = {'weekly': 'Weekly', 'monthly': 'Monthly', 'yearly': 'Yearly'}
 FORECAST_CURRENCIES = ('GBP', 'EUR', 'USD')
 TAX_YEARS = {'2026-27': (date(2026, 4, 6), date(2027, 4, 5))}
+
+
+def settings_version(stream, streams):
+    """Include saved settings and the related sources displayed in the form."""
+    settings = {column.name: getattr(stream, column.name) for column in stream.__table__.columns}
+    partners = sorted((other.id, other.name, other.kind, other.archived)
+                      for other in streams if other.id != stream.id
+                      and other.mileage_pool_id == stream.mileage_pool_id)
+    choices = sorted((other.id, other.name, other.kind, other.archived, other.mileage_pool_id)
+                     for other in streams if other.id != stream.id)
+    return record_version(dict(settings=settings, partners=partners, choices=choices))
 
 
 def stream_id(value):
@@ -23,7 +35,7 @@ def stream_id(value):
 
 
 def stream_fields(form):
-    if set(form) - {'csrf_token', 'action', 'stream_id', 'name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'income_mode', 'mileage_with_stream'} or any(len(form.getlist(key)) != 1 for key in form):
+    if set(form) - {'csrf_token', 'version', 'action', 'stream_id', 'name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'income_mode', 'mileage_with_stream'} or any(len(form.getlist(key)) != 1 for key in form):
         raise BadRequest('Supply each form field once.')
     action = form.get('action', '')
     if action not in ('create', 'update', 'archive', 'restore'):

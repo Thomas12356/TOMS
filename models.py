@@ -249,6 +249,15 @@ class BrowserSession(BaseModel):
     expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
 
 
+class LoginAttempt(BaseModel):
+    """Map the existing atomic throttle so test schema routing applies to it."""
+    __tablename__ = 'login_attempts'
+    __table_args__ = (db.CheckConstraint('id = 1'), {'schema': 'toms'})
+    id = db.Column(db.Integer, primary_key=True)
+    window_started_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    attempts = db.Column(db.Integer, nullable=False)
+
+
 class OwnerSetup(BaseModel):
     __tablename__ = "owner_setup"
     id = db.Column(db.Integer, primary_key=True)

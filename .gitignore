@@ -5,6 +5,7 @@
 
 # Python virtual environments
 .venv/
+.venv-tools/
 venv/
 env/
 

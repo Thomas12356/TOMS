@@ -4,8 +4,9 @@ import secrets
 import hmac
 from datetime import datetime, timezone
 
-from flask import Blueprint, current_app, redirect, render_template, request, session, url_for, flash
+from flask import Blueprint, current_app, redirect, render_template, request, session, url_for, flash, jsonify
 from flask_login import current_user, login_user, logout_user
+from flask_wtf.csrf import generate_csrf
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -16,6 +17,7 @@ from services.error_logging import log_failure
 from services.web.sessions import (
     LoggedInOwner, SESSION_LIFETIME, consume_login_attempt, csrf, token_hash,
     lock_owner_setup, validate_owner_credentials,
+    renew_owner_activity,
 )
 
 login = Blueprint("login", __name__)
@@ -34,7 +36,22 @@ def protect_forms():
 def database_error(error):
     db.session.rollback()
     log_failure("login.database", error)
+    if request.endpoint == 'login.activity':
+        return jsonify(error='Session activity could not be saved. Try again.'), 503
     return render_template("login.html", error="Login is unavailable. Check PostgreSQL and run flask db-upgrade.", ready=False), 503
+
+
+@login.post('/session/activity')
+def activity():
+    """Called only after user interaction; the blueprint enforces CSRF."""
+    if request.authorization is not None or not current_user.is_authenticated:
+        return jsonify(error='Please sign in again.'), 401
+    if request.args or set(request.form) - {'csrf_token'} or any(
+            len(request.form.getlist(key)) != 1 for key in request.form):
+        return jsonify(error='Supply only one CSRF token.'), 400
+    if not renew_owner_activity(current_user.get_id()):
+        return jsonify(error='Please sign in again.'), 401
+    return '', 204, {'X-CSRFToken': generate_csrf()}
 
 
 @login.route("/login", methods=["GET", "POST"])

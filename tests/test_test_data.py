@@ -18,7 +18,7 @@ from werkzeug.datastructures import MultiDict
 from werkzeug.security import generate_password_hash
 
 from app import app
-from models import Account, BrowserSession, Category, IncomeStream, MileageEntry, OwnerLogin, Transaction
+from models import Account, BrowserSession, Category, IncomeStream, LoginAttempt, MileageEntry, OwnerLogin, Transaction
 from services.banking.client import StarlingError, starling_request
 from services.database.connection import db
 from services.database.migration_connection import migration_engine
@@ -26,6 +26,7 @@ from services.database.session import DATA_TABLES
 from services.transactions.automatic_sync import start_dashboard_sync
 from services.web.test_data import sample_id, ensure_sample_data
 from services.web.sessions import token_hash
+from support import stream_token
 
 
 @unittest.skipUnless(os.getenv('RUN_POSTGRES_TESTS') == '1', 'Requires PostgreSQL.')
@@ -243,6 +244,46 @@ class TestDataTests(unittest.TestCase):
         with self.admin.connect() as connection:
             self.assertEqual(connection.scalar(text(f'SELECT count(*) FROM {self.demo_schema}.transactions')), 7)
 
+    def test_simultaneous_stream_edits_save_once_and_reject_old_snapshot(self):
+        self.toggle(True)
+        browsers, forms = [], []
+        saved_cookie = self.client.get_cookie(app.config['SESSION_COOKIE_NAME'])
+        for index in range(2):
+            browser = app.test_client()
+            browser.set_cookie(saved_cookie.key, saved_cookie.value)
+            forms.append(dict(action='update', stream_id=sample_id(22),
+                name=f'Concurrent source {index}', kind='self_employed',
+                income_mode='forecast', expected_gross='20000', expected_gross_period='yearly',
+                expected_gross_currency='GBP', forecast_tax_year='2026-27',
+                version=stream_token(browser, sample_id(22)), csrf_token=self.csrf(browser)))
+            browsers.append(browser)
+        barrier = Barrier(2)
+        def submit(index):
+            barrier.wait(timeout=10)
+            return browsers[index].post('/dashboard/income-streams', data=forms[index]).status_code
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual(sorted(pool.map(submit, range(2))), [303, 409])
+        self.assertEqual(self.live_value('SELECT name FROM SCHEMA.income_streams LIMIT 1'), 'REAL-INCOME-SENTINEL')
+        self.bank.assert_not_called()
+
+    def test_login_throttle_uses_isolated_authentication_schema_in_sample_mode(self):
+        from services.web.sessions import consume_login_attempt
+        with self.runtime.connect() as connection:
+            before = connection.execute(text('SELECT id, window_started_at, attempts FROM toms.login_attempts')).all()
+        self.toggle(True)
+        with app.test_request_context('/dashboard'):
+            g.use_test_data = True
+            for _ in range(20):
+                self.assertTrue(consume_login_attempt())
+            self.assertFalse(consume_login_attempt())
+            self.assertEqual(db.session.get(LoginAttempt, 1).attempts, 21)
+        with self.runtime.connect() as connection:
+            after = connection.execute(text('SELECT id, window_started_at, attempts FROM toms.login_attempts')).all()
+        self.assertEqual(after, before)
+        with self.admin.connect() as connection:
+            self.assertIsNone(connection.scalar(text('SELECT to_regclass(:table)'), {
+                'table': self.demo_schema + '.login_attempts'}))
+
     def test_session_refuses_mixed_authentication_and_business_queries(self):
         with app.test_request_context('/dashboard'):
             g.use_test_data = True
@@ -284,6 +325,7 @@ class TestDataTests(unittest.TestCase):
         original = self.live_value('SELECT mileage_pool_id FROM SCHEMA.income_streams LIMIT 1')
         self.toggle(True)
         fields = dict(action='update', stream_id=sample_id(22), name='Demo freelance work', kind='self_employed',
+            version=stream_token(self.client, sample_id(22)),
             income_mode='forecast', expected_gross='20000', expected_gross_period='yearly',
             expected_gross_currency='GBP', forecast_tax_year='2026-27', mileage_with_stream=sample_id(23),
             csrf_token=self.csrf(path='/dashboard/income-streams'))
@@ -317,6 +359,7 @@ class TestDataTests(unittest.TestCase):
         from services.tax.mileage import mileage_allowances
         self.toggle(True)
         values = dict(action='update', stream_id=sample_id(23), name='Demo CIS work', kind='cis',
+            version=stream_token(self.client, sample_id(23)),
             income_mode='forecast', expected_gross='10000', expected_gross_period='yearly',
             expected_gross_currency='GBP', forecast_tax_year='2026-27', mileage_with_stream=sample_id(22),
             csrf_token=self.csrf(path='/dashboard/income-streams'))

@@ -288,7 +288,8 @@ class ShiftPageTests(DeductionOwnerCase):
         identity=str(uuid4())
         self.assertEqual(self.post_shift(identity=identity).status_code,303)
         html=self.client.get('/dashboard/income-streams').get_data(as_text=True)
-        data=dict(action='update',stream_id=self.stream,name='Test business',kind='self_employed',income_mode='shifts',
+        from support import stream_token
+        data=dict(action='update',stream_id=self.stream,name='Test business',kind='self_employed',income_mode='shifts',version=stream_token(self.client,self.stream),
                   expected_gross_currency='EUR',forecast_tax_year='2026-27',
                   csrf_token=re.search(r'name="csrf_token" value="([^"]+)"',html)[1])
         self.assertEqual(self.client.post('/dashboard/income-streams',data=data).status_code,400)
@@ -322,7 +323,8 @@ class ShiftPageTests(DeductionOwnerCase):
 
     def test_switching_mode_preserves_regular_forecast(self):
         html=self.client.get('/dashboard/income-streams').get_data(as_text=True)
-        values=dict(action='update',stream_id=self.stream,name='Test business',kind='self_employed',income_mode='shifts',
+        from support import stream_token
+        values=dict(action='update',stream_id=self.stream,name='Test business',kind='self_employed',income_mode='shifts',version=stream_token(self.client,self.stream),
                     expected_gross_currency='GBP',forecast_tax_year='2026-27',
                     csrf_token=re.search(r'name="csrf_token" value="([^"]+)"',html)[1])
         self.assertEqual(self.client.post('/dashboard/income-streams',data=values).status_code,303)

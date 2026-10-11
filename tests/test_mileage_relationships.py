@@ -9,6 +9,7 @@ from services.tax.mileage import mileage_allowances
 from services.tax.records import tax_records
 from services.tax.rules import reviewed_rules
 from deduction_support import DeductionOwnerCase
+from support import stream_token
 
 
 class MileageRelationshipTests(DeductionOwnerCase):
@@ -23,6 +24,7 @@ class MileageRelationshipTests(DeductionOwnerCase):
         stream = self.session.get(IncomeStream, identity or self.stream)
         html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
         fields = dict(action='update', stream_id=stream.id, name=stream.name, kind=stream.kind,
+            version=stream_token(self.client, stream.id),
             income_mode='forecast', expected_gross='30000', expected_gross_period='yearly',
             expected_gross_currency='GBP', unpaid_holiday='0', unpaid_holiday_unit='weeks',
             forecast_tax_year='2026-27', mileage_with_stream='',
@@ -48,6 +50,22 @@ class MileageRelationshipTests(DeductionOwnerCase):
         self.assertEqual(self.client.get('/dashboard/tax-estimate').status_code, 200)
         self.assertEqual(self.link(other.id, None).status_code, 303)
         self.assertEqual(tax_records(reviewed_rules())['deductions'], before)
+
+    def test_partner_changes_reject_an_older_configuration_form(self):
+        other = self.add_stream()
+        self.assertEqual(self.link(other.id, self.stream).status_code, 303)
+        older = self.stream_form()
+        self.assertEqual(self.link(other.id, None).status_code, 303)
+        response = self.client.post('/dashboard/income-streams', data=older)
+        self.assertEqual(response.status_code, 409)
+        self.assertIn('mileage relationships changed', response.get_data(as_text=True))
+
+    def test_selected_target_relationship_is_checked_against_displayed_choices(self):
+        other, third = self.add_stream(), self.add_stream(name='Third business')
+        older = self.stream_form(mileage_with_stream=other.id)
+        self.assertEqual(self.link(other.id, third.id).status_code, 303)
+        self.assertEqual(self.client.post('/dashboard/income-streams', data=older).status_code, 409)
+        self.assertNotEqual(self.session.get(IncomeStream, self.stream).mileage_pool_id, other.mileage_pool_id)
 
     def test_create_can_join_an_existing_business(self):
         fields = self.stream_form(mileage_with_stream=self.stream, name='New linked source', action='create')

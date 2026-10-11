@@ -1,5 +1,92 @@
 # Security checks — 6 October 2026
 
+## Repeatable verification tooling (2026-10-11)
+
+Use the project's application interpreter and separately pinned development tools:
+
+```bash
+.venv/bin/python scripts/setup_checks.py --local-linux-libs
+.venv/bin/python scripts/verify.py --postgres --browser all
+```
+
+The setup script writes ignored `.venv-tools/`, installs Chromium in Playwright's
+normal per-user cache, and unpacks the missing Ubuntu 24.04 x86_64 libraries into
+`.venv-tools/native/root`. It does not install system packages or start the app.
+Omit `--local-linux-libs` on systems with Chromium's libraries already installed.
+The verification runner adds this private library path automatically; it no longer
+depends on temporary `/tmp` tooling. Other Linux distributions need their native
+Chromium dependencies. Downloading packages requires network access.
+
+The runner includes backend checks, selected/all browser workflows, Ruff F,
+application Bandit and whitespace checks, stopping on the first failure. For a
+focused browser run, use `--skip-backend --skip-static --browser
+reliability_browser_checks`. PostgreSQL workflow fixtures require `--postgres`.
+Optional backup integration tests remain separately opt-in as documented below.
+Verification/setup subprocesses use argument lists without a shell; browser
+script names are confined to the repository's tests directory.
+
+Read-path benchmark, using disposable synthetic schemas and mocked bank traffic:
+
+```bash
+RUN_POSTGRES_TESTS=1 .venv/bin/python scripts/benchmark.py
+RUN_POSTGRES_TESTS=1 .venv/bin/python scripts/benchmark.py --multi-year
+```
+
+Measured on 2026-10-11 (one request per size, not a latency guarantee):
+
+| Transactions | Notices: seconds / queries | Reconciliation: seconds / queries |
+| --- | --- | --- |
+| 100 | 0.103 / 12 | 0.061 / 11 |
+| 1,000 | 0.306 / 17 | 0.149 / 13 |
+| 10,000 | 2.918 / 107 | 0.984 / 49 |
+
+With half the generated receipts in the prior year, 10,000 records measured
+2.202 seconds / 80 queries for notices and 0.457 seconds / 31 queries for
+reconciliation. These fixtures emphasize incomplete incoming receipts and do not
+measure every invoice/allocation case. Phase 7 should target under one second and
+25 queries at 10,000 receipts on this same fixture, while preserving complete
+totals and cross-year allocation budgets; repeat timings before claiming success.
+The synthetic fixtures leave the working records unchanged.
+
+Baseline journeys exercised through the browser scripts include first-owner and
+password validation screens, employment/overtime, freelance/CIS receipt details,
+expense/mileage edits, confirmation, invoice issue/allocation, checklist, reserve
+earmarks and evidence export. At 390px the income-workspace screenshot was inspected:
+the current stream list makes users scroll through configuration/work/payment
+controls before reaching account money, supporting the planned workspace split.
+These are synthetic regression journeys, not observed usability sessions with
+independent users.
+
+## Reliability implementation verification — 2026-10-11
+
+- Full PostgreSQL backend run: 486 tests, 482 passed and four optional backup
+  integration cases skipped. New regressions first reproduced stale stream
+  overwrites and polling renewal, then passed after fixes. Coverage includes
+  concurrent stream edits, archive/restore conflicts, changed mileage choices,
+  actual activity, expiry/revocation, absolute expiry, long-lived CSRF refresh,
+  private error responses and authentication-counter isolation.
+- All 16 browser scripts passed, including the new reliability and first-owner
+  setup scripts. Password workflows also passed three consecutive invocations
+  after correcting throttle schema routing. Narrow/desktop layouts, preserved
+  unsaved entries, token refresh, keyboard activity, rejected synthetic events,
+  expiry/invalid-CSRF guidance and conflict reloads were exercised.
+- Ruff F, application Bandit and git diff --check passed. Setup/verification
+  subprocesses were reviewed separately: they execute fixed tools via argument
+  lists without shell interpolation; no server request can invoke them.
+- No live Starling calls, schema migrations, publication or deployment occurred.
+  A private backup was created, but restore verification was blocked by missing
+  dedicated CREATEDB test credentials. Optional backup tests remain skipped in
+  this run; the 2026-10-10 separate integration evidence remains historical.
+
+LoginAttempt maps a table already created by migration 006; no applied migration
+was edited. The PostgreSQL upsert keeps the twenty-attempt/fifteen-minute window
+atomic while following isolated authentication-schema routing. Previously, raw
+SQL bypassed browser-fixture isolation and incremented the working throttle during
+repeated login checks. No working counter reset was performed; current fixture
+checks prove future runs leave it unchanged.
+
+## Historical verification
+
 The full suite passed: **276 tests**, with PostgreSQL checks enabled. This
 includes **24 adversarial tests** in `tests/test_security.py`, plus the
 existing login, API protection, request-boundary and bank-client tests.
