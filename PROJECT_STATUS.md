@@ -32,8 +32,8 @@ verification was performed. Complete mileage evidence still requires a full scan
 
 The owner-observation step is prepared in USABILITY_WALKTHROUGH.md and remains
 pending actual use. Later presets, automation, budgeting, stored balances and
-recovery features are still separately scoped. Deployment/publication details
-will be recorded below after publishing this implementation.
+recovery features are still separately scoped. Implementation `dda2744` is pushed
+to the named branch and main and deployed locally; details are recorded below.
 
 ## Latest delivery — account money, defaults and suggestions
 
@@ -81,8 +81,8 @@ saved-record defaults and explicit payment suggestions are implemented. Budgetin
 scoped milestones. See the latest handoff
 below for deployment revision and verification evidence.
 
-Latest delivery: `codex/account-money-work-defaults-suggestions` separates money
-views, reuses work/journey defaults and offers deliberate payment suggestions.
+Latest delivery: `codex/focused-system-usability` reduces distraction, adds bounded
+entry history and prioritizes actionable review/planning/matching evidence.
 
 ## Implemented
 
@@ -289,3 +289,10 @@ schema change was needed.
 Published on 11 October: the named branch was fast-forwarded into
 main and both remote revisions matched `7e98eb3`. Repository owner/remote/public
 visibility matched the user's existing publication authorization.
+
+## Focused system usability publication and deployment — 2026-10-11
+
+Implementation `dda27443875516baa5283dda6193a54d27b7c26f` was committed on
+`codex/focused-system-usability`, pushed and fast-forwarded into main. Both remote
+implementation revisions were verified. GitHub owner `Thomas12356`, the SSH
+remote and public visibility matched the user's authorized publication preference.
