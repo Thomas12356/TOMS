@@ -8,14 +8,13 @@ not measured results or delivery commitments.
 
 ## Starting point
 
-Delivery update, 11 October: compact navigation is implemented on
-`codex/compact-navigation`, which includes the existing transaction-review and
-roadmap commits. Its first delivery combines navigation and guided review locally.
+Delivery update, 11 October: compact navigation from `codex/compact-navigation`
+is merged into main and deployed locally, including the existing transaction-review
+and roadmap commits. The live implementation is pinned at `867e856`.
 Deployment and verification details are recorded in PROJECT_STATUS.md.
 
-The owner overview and grouped navigation are live locally. Filtered ledger and
-guided transaction review are implemented and published on
-`codex/transaction-review`, but are not merged or deployed. Reconciliation,
+The owner overview, compact navigation, filtered ledger and guided transaction
+review are live locally. Reconciliation,
 tax-year evidence exports, reserve targets and earmarks already exist. Improve
 their discoverability rather than rebuild them. The latest recorded verification
 is 508 backend passes, four optional backup skips and 18 browser scripts.

@@ -125,6 +125,27 @@ Ruff F, application Bandit and whitespace checks passed. Disposable 10,000-recor
 ledger benchmarks measured approximately 0.067s for a matching filter, 0.034s
 for an empty attention filter and 0.019s for guided queue selection. These are
 local synthetic measurements, not production latency guarantees. No schema
-change or live Starling verification was performed. Transaction review has not
-been merged or deployed. Next implementation is Phase 4; measured optimization
+change or live Starling verification was performed. Transaction review was
+subsequently merged and deployed with compact navigation (see below). Next implementation follows
+the revised usability roadmap; measured optimization
 of full checklist/invoice queries remains in Phase 7.
+
+## Compact navigation delivered locally
+
+On 11 October, `codex/compact-navigation` was fast-forwarded into main and pushed
+to the verified, user-authorized public repository. It includes guided transaction
+review and the revised roadmap.
+
+The header now exposes Home, Transactions, Work & income, Planning and Settings,
+with native expandable secondary menus. Sample mode stays visible; logout lives
+in Settings. Mobile collapses the primary menu below 900px when JavaScript is
+available; section menus work without it. Escape restores focus, outside clicks
+close menus, and current sections are highlighted. Guided review and persistent
+ledger filters are now available in the running app.
+
+Verification: 508 backend passes, four optional backup skips, all 18 browser
+scripts passed across focused runs, and affected menu/sample/logout journeys
+rerun after the final activation change. Ten checklist tests passed after copy
+updates. Ruff F, application Bandit and whitespace checks passed. Open/closed
+menu screenshots were inspected. No schema or financial-record changes were
+needed for deployment. Next: unified task home, then staged income workspaces.
