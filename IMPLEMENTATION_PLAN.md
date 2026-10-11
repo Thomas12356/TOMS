@@ -1,5 +1,10 @@
 # TOMS implementation plan
 
+Delivery priorities were revised against the user's supplied usability review on
+11 October 2026. See [USABILITY_ROADMAP.md](USABILITY_ROADMAP.md): compact navigation
+comes first, then deployment of guided review and a unified task home. Existing
+phase safeguards below still apply; budgeting and AI need their own scoped design.
+
 Created: 2026-10-11. Status: baseline, reliability and overview work implemented; later
 phases remain planned. See PROJECT_STATUS.md for the current verification record.
 
