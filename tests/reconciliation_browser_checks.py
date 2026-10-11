@@ -44,7 +44,8 @@ with sync_playwright() as playwright:
                 layout()
             page.goto(origin+'/dashboard/invoices')
             click(page.get_by_role('link',name='Review work and payments'))
-            assert page.get_by_role('heading',name='Work and payment reconciliation').is_visible()
+            assert page.get_by_role('heading',name='Work and payment matching').is_visible()
+            page.get_by_text('All source totals and evidence',exact=True).click()
             assert 'regular forecast' in page.locator('main').inner_text()
             assert 'REAL-INCOME-SENTINEL' not in page.locator('main').inner_text()
             assert page.locator('script:not([src])').count()==0
@@ -63,6 +64,8 @@ with sync_playwright() as playwright:
             assert 'Paid' in page.locator('.invoice-totals').inner_text()
             page.goto(origin+'/dashboard/reconciliation?stream='+sample_id(21))
             layout()
+            assert page.locator('#reconciliation-invoices').is_hidden()
+            page.locator('.matching-group > summary').filter(has_text='Invoices needing attention (0)').click()
             assert page.get_by_role('heading',name='Invoices needing attention (0)').is_visible()
             assert page.get_by_role('heading',name='Receipts available for allocation (1)').is_visible()
             assert fixture.bank.call_count==0

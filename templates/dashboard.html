@@ -81,7 +81,7 @@
                 <div class="ledger-controls">
                     {% if current_user.is_authenticated %}
                     <a class="sync-button" id="review-open" href="{{ url_for('guided_review.start', **filter_options) }}">Review {{ review_count }} transaction{{ '' if review_count == 1 else 's' }}</a>
-                    <button type="button" class="review-open secondary-button" id="quick-review" hidden>Quick confirmation</button>
+                    <details class="expert-confirmation"><summary>Quick confirmation</summary><p class="secondary">Confirm saved details you have already checked. This does not complete missing income evidence.</p><button type="button" class="review-open secondary-button" id="quick-review" hidden>Open quick confirmation</button></details>
                     <div class="sync-controls" data-test-data="{{ 'true' if using_test_data else 'false' }}" data-sync-url="{{ url_for('dashboard.trigger_sync') }}" data-status-url="{{ url_for('dashboard.sync_status') }}" data-csrf="{{ csrf_token() }}">
                         <button type="button" id="sync-now" data-sync-now title="{{ 'Simulates a sync using sample data; no bank connection.' if using_test_data else 'Syncs transactions from your bank account provider.' }}" aria-description="{{ 'Simulates a sync using sample data; no bank connection.' if using_test_data else 'Syncs transactions from your bank account provider.' }}">{{ sync_icon() }}<span>Sync now</span></button>
                     </div>
@@ -118,13 +118,15 @@
                                 <span class="mobile-classification-tip">{{ classification_tip("classification-tip-" ~ row.number) }}</span>
                                 <span class="classification-value">{{ row.classification }}</span>
                                 <span class="secondary classification-origin">{{ 'Manual' if row.origin == 'manual' else 'Automatic' }}</span>
+                                {% if current_user.is_authenticated %}<a class="guided-review-link" href="{{ row.guided_url }}">Guided review</a>{% endif %}
+                                <details class="ledger-editing"><summary>Details and editing</summary>
                                 {% if row.income_url %}
                                 <span class="secondary income-status">Income: {{ row.income_status }}</span>
                                 <a class="edit-income" href="{{ row.income_url }}">Edit income details</a>
                                 {% endif %}
                                 {% if row.deduction_url %}<a class="edit-income" href="{{ row.deduction_url }}">Expense details</a>{% endif %}
                                 <a class="edit-classification{{ ' is-manual' if row.origin == 'manual' else '' }}" href="{{ row.edit_url }}">Edit classification</a>
-                                {% if current_user.is_authenticated %}<a class="guided-review-link" href="{{ row.guided_url }}">Guided review</a>{% endif %}
+                                </details>
                             </td>
                             <td role="cell" data-label="Amount" class="amount {{ 'incoming' if row.direction == 'IN' else 'outgoing' }}">
                                 {{ '+' if row.direction == 'IN' else '−' }}{{ row.amount }}

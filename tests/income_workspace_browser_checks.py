@@ -84,7 +84,7 @@ with sync_playwright() as playwright:
             assert freelance.get_by_role('link', name='Add overtime', exact=True).count() == 0
             employed = page.locator('.stream-manage', has=page.get_by_role('heading', name='Demo employment', exact=True))
             assert employed.get_by_role('link', name='Add overtime', exact=True).is_visible()
-            freelance.get_by_role('link', name='Configure stream', exact=True).click()
+            freelance.get_by_role('link', name='Configure source', exact=True).click()
             assert page.get_by_role('heading', name='Configure Demo freelance work', exact=True).is_visible()
             layout()
             page.keyboard.press('Escape')
@@ -130,6 +130,8 @@ with sync_playwright() as playwright:
             # Confirm every sample through the existing real review popup.
             go('/dashboard?account=all')
             assert not page.locator('#transaction-review').is_visible()
+            if not page.locator('.expert-confirmation').evaluate('(d) => d.open'):
+                page.locator('.expert-confirmation > summary').click()
             page.locator('#quick-review').click()
             page.wait_for_function("() => document.querySelector('#transaction-review').open")
             for _ in range(7):

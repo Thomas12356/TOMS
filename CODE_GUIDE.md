@@ -19,6 +19,22 @@ checks authentication before those functions run.
 
 ## Services by purpose
 
+Daily entry/history uses `services/web/entry_history.py`: strictly validated
+display pagination/source/date filters and known internal source return URLs.
+`routes/shifts.py` and `routes/deductions.py` display 20 records per history page.
+Work totals are SQL aggregates over full source history; mileage allowances use
+complete saved evidence independently of display filters. The shift selector
+loads the latest 200 choices plus older referenced links. History timestamps use
+London calendar-day boundaries. `templates/entry_history_filters.html` shares
+the GET filters; no-JavaScript entry/navigation remains supported.
+
+Source creation's `setup=1` view hides competing list actions. The compact income
+notice retains its existing detail/acknowledgement dialog. Ledger advanced edits,
+planning calculations/source breakdowns and matching summaries use native details;
+material financial warnings and journey eligibility remain visible. Regression
+coverage is in `tests/test_focused_usability.py` and
+`tests/focused_usability_browser_checks.py`.
+
 Account money lives at `/dashboard/account-money` in `routes/reserves.py` and
 `templates/account_money.html`. Saved earmarks and planning targets share a
 database snapshot; bank balances are fetched only on explicit refresh and carry

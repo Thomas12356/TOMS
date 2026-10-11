@@ -82,6 +82,8 @@ with sync_playwright() as playwright:
         page.route('**/*', respond)
         page.goto('http://toms.test/dashboard')
         assert not page.locator('#transaction-review').is_visible()
+        if not page.locator('.expert-confirmation').evaluate('(d) => d.open'):
+            page.locator('.expert-confirmation > summary').click()
         page.locator('#quick-review').click()
         page.wait_for_function("() => document.querySelector('#transaction-review').open")
         assert page.locator('#review-details img, #review-details script').count() == 0
@@ -91,10 +93,14 @@ with sync_playwright() as playwright:
         page.locator('#review-close').click()
         assert not page.locator('#transaction-review').is_visible()
         assert state['remaining'] == 2 and not state['posted']
+        if not page.locator('.expert-confirmation').evaluate('(d) => d.open'):
+            page.locator('.expert-confirmation > summary').click()
         page.locator('#quick-review').click()
         page.wait_for_function("() => document.querySelector('#transaction-review').open")
         page.keyboard.press('Escape')
         assert not page.locator('#transaction-review').is_visible()
+        if not page.locator('.expert-confirmation').evaluate('(d) => d.open'):
+            page.locator('.expert-confirmation > summary').click()
         page.locator('#quick-review').click()
         page.wait_for_function("() => document.querySelector('#transaction-review').open")
 
@@ -136,6 +142,8 @@ with sync_playwright() as playwright:
 
         # A saved confirmation with a failed next fetch must not reconfirm the old item.
         state['mode'] = 'normal'
+        if not page.locator('.expert-confirmation').evaluate('(d) => d.open'):
+            page.locator('.expert-confirmation > summary').click()
         page.locator('#quick-review').click()
         page.wait_for_function("() => document.querySelector('#transaction-review').open")
         state['fail_load'] = True
@@ -156,6 +164,8 @@ with sync_playwright() as playwright:
         state['fail_load'] = True
         page.reload()
         assert not page.locator('#transaction-review').is_visible()
+        if not page.locator('.expert-confirmation').evaluate('(d) => d.open'):
+            page.locator('.expert-confirmation > summary').click()
         page.locator('#quick-review').click()
         page.wait_for_function("() => document.querySelector('#transaction-review').open")
         assert page.locator('#review-retry').is_visible() and page.locator('#review-confirm').is_disabled()

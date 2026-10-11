@@ -34,10 +34,10 @@
 <form class="login-form classification-form income-form" method="post">{{ token() }}
 <h2>Complete income details</h2><p>Enter evidence from the payslip or payment statement. Unknown amounts stay blank; withholding is never assumed.</p>
 {% if record.income and record.income.recorded_currency != record.currency %}<p class="message">Previously saved amounts were in {{ record.income.recorded_currency }}. Re-enter amounts in {{ record.currency }}; no conversion has been applied.</p>{% endif %}
-<label for="income-stream">Income stream (required for taxable receipts)</label><select id="income-stream" name="income_stream_id"><option value="">Not assigned</option>{% for stream in streams %}<option value="{{ stream.id }}"{{ ' selected' if values.income_stream_id == stream.id else '' }}>{{ stream.name }}{{ ' (archived)' if stream.archived else '' }}</option>{% endfor %}</select>
+<label for="income-stream">Income source (required for taxable receipts)</label><select id="income-stream" name="income_stream_id"><option value="">Not assigned</option>{% for stream in streams %}<option value="{{ stream.id }}"{{ ' selected' if values.income_stream_id == stream.id else '' }}>{{ stream.name }}{{ ' (archived)' if stream.archived else '' }}</option>{% endfor %}</select>
 <label for="tax-treatment">Tax treatment</label><select id="tax-treatment" name="tax_treatment">{% for key, label in treatments.items() %}<option value="{{ key }}"{{ ' selected' if values.tax_treatment == key else '' }}>{{ label }}</option>{% endfor %}</select>
-<details><summary>Income description when no stream is assigned</summary><label for="income-type">Income type</label><select id="income-type" name="income_type">{% for key, label in income_types.items() %}<option value="{{ key }}"{{ ' selected' if values.income_type == key else '' }}>{{ label }}</option>{% endfor %}</select></details>
-<label for="source-name">Income source (optional)</label><input id="source-name" name="source_name" maxlength="200" value="{{ values.source_name }}">
+<details><summary>Income description when no source is assigned</summary><label for="income-type">Income type</label><select id="income-type" name="income_type">{% for key, label in income_types.items() %}<option value="{{ key }}"{{ ' selected' if values.income_type == key else '' }}>{{ label }}</option>{% endfor %}</select></details>
+<label for="source-name">Payment description (optional)</label><input id="source-name" name="source_name" maxlength="200" value="{{ values.source_name }}">
 {% set unit = record.currency if record.currency in ('GBP', 'EUR', 'USD') else record.currency ~ ' minor units' %}
 {% for key, label in [('gross', 'Gross income'), ('tax_deducted', 'Income tax deducted'), ('ni_deducted', 'Employee NI deducted (employment only)'), ('adjustment', 'Adjustment')] %}
 <label for="{{ key }}">{{ label }} ({{ unit }})</label><input id="{{ key }}" name="{{ key }}" maxlength="30" inputmode="decimal" value="{{ values.get(key, '') }}">{% endfor %}
@@ -48,7 +48,7 @@
 {% if record.direction == 'OUT' and record.status == 'SETTLED' %}
 <form class="login-form classification-form" method="post">{{ token() }}<h2>Expense details</h2><p>Link a business or tracked expense, or continue without creating an expense claim.</p>
 {% if record.expense and record.expense.recorded_currency != record.currency %}<p class="message">Previously saved expense amounts were in {{ record.expense.recorded_currency }}. Re-enter amounts in {{ record.currency }}; no conversion has been applied.</p>{% endif %}
-<label for="expense-stream">Income stream</label><select id="expense-stream" name="stream_id"><option value="">Choose a stream</option>{% for stream in streams %}<option value="{{ stream.id }}"{{ ' selected' if values.stream_id == stream.id else '' }}>{{ stream.name }}{{ ' (archived)' if stream.archived else '' }}</option>{% endfor %}</select>
+<label for="expense-stream">Income source</label><select id="expense-stream" name="stream_id"><option value="">Choose a source</option>{% for stream in streams %}<option value="{{ stream.id }}"{{ ' selected' if values.stream_id == stream.id else '' }}>{{ stream.name }}{{ ' (archived)' if stream.archived else '' }}</option>{% endfor %}</select>
 <label for="expense-tax-status">Expense treatment</label><select id="expense-tax-status" name="tax_status"><option value="tracking"{{ ' selected' if values.tax_status == 'tracking' else '' }}>Tracking only</option><option value="deduction"{{ ' selected' if values.tax_status == 'deduction' else '' }}>Tax deduction</option></select>
 <label for="expense-amount">Expense amount ({{ record.currency if record.currency in ('GBP', 'EUR', 'USD') else record.currency ~ ' minor units' }})</label><input id="expense-amount" name="amount" value="{{ values.amount }}" maxlength="30" inputmode="decimal">
 <label for="expense-purpose">Expense purpose</label><textarea id="expense-purpose" name="purpose" maxlength="1000" rows="3">{{ values.purpose }}</textarea>
@@ -67,8 +67,8 @@
 <dt>Settlement date</dt><dd>{{ local_date(record.settlement_time).strftime('%d %b %Y, %H:%M %Z') if record.settlement_time else 'Not recorded' }}</dd>
 <dt>Original source amount</dt><dd>{{ format_amount(record.source_amount_minor, record.source_currency) if record.source_currency else 'Not recorded' }}</dd>
 {% if record.income %}{% set income = record.income %}
-<dt>Income stream</dt><dd>{{ income.income_stream.name if income.income_stream else 'Not assigned' }}</dd>
-<dt>Income type</dt><dd>{{ income_types[income.income_type] }}</dd><dt>Tax treatment</dt><dd>{{ treatments[income.tax_treatment] }}</dd><dt>Income source</dt><dd>{{ income.source_name or 'Not specified' }}</dd>
+<dt>Income source</dt><dd>{{ income.income_stream.name if income.income_stream else 'Not assigned' }}</dd>
+<dt>Income type</dt><dd>{{ income_types[income.income_type] }}</dd><dt>Tax treatment</dt><dd>{{ treatments[income.tax_treatment] }}</dd><dt>Payment description</dt><dd>{{ income.source_name or 'Not specified' }}</dd>
 {% for field, label in [('gross_minor', 'Gross income'), ('tax_deducted_minor', 'Tax deducted'), ('ni_deducted_minor', 'Employee NI deducted'), ('adjustment_minor', 'Adjustment')] %}<dt>{{ label }}</dt><dd>{{ format_amount(income[field], income.recorded_currency) }}</dd>{% endfor %}
 <dt>Adjustment notes</dt><dd>{{ income.adjustment_notes or 'None' }}</dd>{% endif %}
 {% if record.expense %}{% set expense = record.expense %}

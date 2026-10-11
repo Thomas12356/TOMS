@@ -1301,6 +1301,19 @@ td.amount {
 .test-data-form [aria-checked="true"] .test-data-track > span { transform: translateX(12px); background: var(--header); }
 .test-data-notice { margin-bottom: 24px; padding: 14px 18px; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--highlight); }
 .test-data-notice p { margin: 6px 0 0; }
+.test-data-notice summary { margin-top: 8px; cursor: pointer; }
+.planning-detail, .matching-group, .entry-history, .planning-next { margin: 20px 0; padding: 16px 0; border-top: 1px solid var(--border); }
+.planning-detail > summary, .matching-group > summary, .entry-history > summary { font-weight: 700; cursor: pointer; padding: 8px 0; }
+.entry-help { margin: 12px 0; }
+.entry-help summary, .ledger-editing summary, .expert-confirmation summary { cursor: pointer; padding: 8px 0; }
+.expert-confirmation { max-width: 260px; }
+.journey-form fieldset { display: grid; gap: 12px; margin: 0 0 18px; border: 0; padding: 0; min-width: 0; }
+.journey-form legend { font-weight: 700; padding: 0 0 12px; }
+.journey-form textarea { width: 100%; min-height: 80px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 3px; font: inherit; background: var(--surface); color: var(--text); }
+.matching-group > summary h2 { display: inline; margin: 0; font-size: 18px; }
+.history-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.history-filters input, .history-filters select, .history-filters button { min-height: 44px; max-width: 100%; padding: 8px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font: inherit; }
+@media (max-width: 600px) { .history-filters { flex-direction: column; align-items: stretch; } .income-alert-bar button { padding: 8px; } }
 @media (max-width: 640px) { .test-data-form { width: 100%; } .site-header .test-data-form button { width: 100%; justify-content: center; min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .test-data-track > span { transition: none; } }
 
@@ -1419,16 +1432,16 @@ td.amount {
 .account-earmark summary { cursor: pointer; min-height: 44px; padding: 10px 0; }
 .account-earmark .login-form { max-width: 520px; }
 .balance-breakdown { font-size: 14px; line-height: 1.6; }
-.income-alert-bar { flex-basis: 100%; grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border: 1px solid #59645b; color: #f5f0e5; font-size: 13px; line-height: 1.5; }
+.income-alert-bar { flex-basis: 100%; grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 4px 0; color: #f5f0e5; font-size: 13px; line-height: 1.5; }
 .income-alert-bar[hidden] { display: none; }
-.income-alert-bar > span { flex: 1; overflow-wrap: anywhere; }
+.income-alert-bar > span { overflow-wrap: anywhere; }
 .income-alert-bar button { flex-shrink: 0; }
 .income-notice { padding: 16px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 @media (max-width: 640px) {
     .stream-heading > .stream-actions { width: 100%; }
     .stream-actions > a, .stream-actions > button { flex: 1 1 140px; padding: 10px 12px; text-align: center; }
     .stream-list-dialog .stream-payment { display: grid; grid-template-columns: minmax(0, 1fr); }
-    .income-alert-bar { flex-direction: column; align-items: stretch; }
+    .income-alert-bar { flex-direction: row; align-items: center; justify-content: space-between; }
     .income-alert-bar button { min-height: 44px; }
 }
 .eligibility[hidden] { display: none; }

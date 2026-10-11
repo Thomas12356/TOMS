@@ -90,7 +90,7 @@ with sync_playwright() as playwright:
         assert page.locator('#create-stream-dialog form').evaluate('(form) => form.checkValidity()')
         page.keyboard.press('Escape')
         assert not page.locator('#create-stream-dialog').is_visible()
-        page.get_by_role('link', name='Configure stream', exact=True).click()
+        page.get_by_role('link', name='Configure source', exact=True).click()
         page.get_by_role('button', name='Save changes', exact=True).wait_for(state='visible')
         assert page.get_by_role('button', name='Save changes', exact=True).is_visible()
         assert page.get_by_role('button', name='Archive', exact=True).is_visible()
@@ -98,7 +98,7 @@ with sync_playwright() as playwright:
         if width <= 900:
             page.get_by_role('button', name='Toggle navigation').click()
         page.locator("#main-navigation summary").filter(has_text="Work & income").click()
-        assert page.get_by_role('link', name='Income streams', exact=True).is_visible()
+        assert page.get_by_role('link', name='Income sources', exact=True).is_visible()
         page.get_by_text('More actions', exact=True).click()
         page.get_by_role('link', name='Show income', exact=True).click()
         page.get_by_role('link', name='Edit income details').wait_for(state='visible')
@@ -117,7 +117,7 @@ with sync_playwright() as playwright:
         page.locator('#stream-starts').fill('2026-10-06')
         page.locator('#stream-ends').fill('2027-03-31')
         with page.expect_request(lambda request: request.method == 'POST') as submitted:
-            page.get_by_role('button', name='Create stream', exact=True).click()
+            page.get_by_role('button', name='Create source', exact=True).click()
         payload = parse_qs(submitted.value.post_data)
         assert payload['expected_gross'] == ['1234.56']
         assert payload['expected_gross_period'] == ['yearly']

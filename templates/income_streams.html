@@ -4,7 +4,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Income streams · TOMS</title>
+    <title>Income sources · TOMS</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
 <body>
@@ -14,16 +14,17 @@
 </header>
 <main>
         {% include 'test_data_notice.html' %}
-    <div class="page-heading"><p class="eyebrow">TOMS / INCOME</p><h1>Income streams</h1></div>
-    <p class="secondary">Create a stream for each job or business, then assign income payments to it. <a href="{{ url_for('dashboard.tax_estimate') }}">View tax estimate</a></p>
+    <div class="page-heading"><p class="eyebrow">TOMS / INCOME</p><h1>Income sources</h1></div>
+    <p class="secondary">Create an income source for each job or business, then assign income payments to it. <a href="{{ url_for('dashboard.tax_estimate') }}">View tax estimate</a></p>
     {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
-    <div class="stream-actions page-actions">
+    {% set starting = request.args.get('setup') == '1' or request.form.get('action') == 'start' %}
+    {% if not starting %}<div class="stream-actions page-actions">
         <a class="secondary-button" href="{{ url_for('dashboard.income_streams', setup=1) }}">Add income source</a>
         <a class="secondary-button" id="open-create-stream" href="?create=1">Create with full details</a>
         <a class="secondary-button" data-load-dialog="income-payments-dialog" href="{{ url_for('dashboard.income_streams', view='income') }}">Show all income</a>
         <a class="secondary-button" href="{{ url_for('deductions.page') }}">Manage expenses and mileage deductions</a>
-    </div>
-    {% if request.args.get('setup') == '1' or request.form.get('action') == 'start' %}
+    </div>{% endif %}
+    {% if starting %}<p><a href="{{ url_for('dashboard.income_streams') }}">All income sources</a></p>
     <section class="stream-manage" aria-labelledby="start-source-heading">
         <h2 id="start-source-heading">1. Name your income source</h2>
         <p class="secondary">Add a job or business first. You can set up its forecast or entered work next. Until then, its expected income stays unknown.</p>
@@ -35,11 +36,11 @@
             </select>
             <button name="action" value="start">Continue to income source</button>
         </form>
-    </section>
+    </section><p><a href="{{ url_for('dashboard.income_streams', create=1) }}">Create with full details instead</a></p>
     {% endif %}
     <dialog id="create-stream-dialog" class="review-dialog stream-create" aria-labelledby="create-stream-heading" {{ 'open' if request.args.get('create') == '1' or (error and not editing_id and request.form.get('action') != 'start') else '' }} data-reopen="{{ 'true' if (error and not editing_id and request.form.get('action') != 'start') or request.args.get('create') == '1' else 'false' }}">
         <button type="button" id="close-create-stream" class="secondary-button">Close</button>
-        <h2 id="create-stream-heading">Create a stream</h2>
+        <h2 id="create-stream-heading">Create an income source</h2>
         <form class="login-form" method="post">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <label for="stream-name">Name</label><input id="stream-name" name="name" value="{{ create_values.name }}" placeholder="e.g. My roofing business" maxlength="200" required>
@@ -49,13 +50,13 @@
             </select>
             {{ mileage_relationship('stream', create_values.mileage_with_stream, streams) }}
             {{ forecast_fields('stream', create_values, forecast_periods, forecast_currencies, tax_years) }}
-            <p class="secondary">For a regular forecast, enter normal weekly/monthly pay or a full-year salary. Individual shifts can be added after creating the stream. We prorate it by active calendar days within the tax year, then subtract unpaid absence. Update it if your income changes.</p>
-            <button name="action" value="create">Create stream</button>
+            <p class="secondary">For a regular forecast, enter normal weekly/monthly pay or a full-year salary. Individual shifts can be added after creating the source. We prorate it by active calendar days within the tax year, then subtract unpaid absence. Update it if your income changes.</p>
+            <button name="action" value="create">Create source</button>
         </form>
     </dialog>
 
-    <section aria-labelledby="your-streams-heading">
-        <h2 id="your-streams-heading">Your streams</h2>
+    {% if not starting %}<section aria-labelledby="your-streams-heading">
+        <h2 id="your-streams-heading">Your income sources</h2>
         {% for stream in streams %}
         <article class="stream-manage" id="stream-{{ stream.id }}">
             <div class="stream-heading">
@@ -70,7 +71,7 @@
                 {% else %}
                 <a class="stream-shifts-button" href="{{ url_for('shifts.page', stream_id=stream.id, add=1) }}">{{ 'Add overtime' if stream.kind == 'employed' else 'Add work' }}</a>
                 {% endif %}
-                {% if stream.expected_gross_currency is not none %}<a class="secondary-button" data-open-dialog="configure-{{ stream.id }}" href="{{ url_for('dashboard.income_streams', configure=stream.id) }}">Configure stream</a>{% endif %}
+                {% if stream.expected_gross_currency is not none %}<a class="secondary-button" data-open-dialog="configure-{{ stream.id }}" href="{{ url_for('dashboard.income_streams', configure=stream.id) }}">Configure source</a>{% endif %}
                 <details><summary>More actions</summary>
                 <a class="secondary-button" data-load-dialog="income-payments-dialog" href="{{ url_for('dashboard.income_streams', view='income', stream=stream.id) }}">Show income</a>
                 <a class="secondary-button" data-load-dialog="stream-deductions-dialog" href="{{ url_for('dashboard.income_streams', view='deductions', stream=stream.id) }}">View deductions and expenses</a>
@@ -101,11 +102,11 @@
                     <button name="action" value="update">Save changes</button>
                     <button name="action" value="{{ 'restore' if stream.archived else 'archive' }}" formnovalidate>{{ 'Restore' if stream.archived else 'Archive' }}</button>
                 </form>
-                <p class="secondary">Archiving keeps existing payments. Create a new stream for a different type.</p>
+                <p class="secondary">Archiving keeps existing payments. Create a new source for a different type.</p>
             </dialog>{% endif %}
         </article>
         {% else %}<p>No sources yet. Use Add income source to add your first job or business.</p>{% endfor %}
-    </section>
+    </section>{% endif %}
     <dialog id="income-payments-dialog" {{ 'open' if view == 'income' else '' }} class="review-dialog stream-records stream-list-dialog" aria-labelledby="income-payments-heading" data-reopen="{{ 'true' if view == 'income' else 'false' }}">
         <a href="{{ url_for('dashboard.income_streams') }}" class="secondary-button dialog-close">Close</a>
         <h2 id="income-payments-heading">{{ selected_name }} payments</h2>
@@ -122,7 +123,7 @@
         </nav>{% endif %}
     </dialog>
     {% include 'stream_deductions_dialog.html' %}
-    <section id="account-reserves"><h2>Account money</h2><p>Balances and tax / NI earmarks now have their own page. <a href="{{ url_for('reserves.page') }}">Open Account money</a>.</p></section>
+    {% if not starting %}<section id="account-reserves"><h2>Account money</h2><p>Balances and tax / NI earmarks now have their own page. <a href="{{ url_for('reserves.page') }}">Open Account money</a>.</p></section>{% endif %}
 </main>
 <script src="{{ url_for('static', filename='js/income-streams.js') }}" defer></script>
 </body>

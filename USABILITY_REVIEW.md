@@ -4,6 +4,37 @@ Reviewed 11 October 2026 after publishing implementation `aeedef9` to main
 and deploying it locally. This is an expert walkthrough with synthetic records,
 not user research or live bank verification.
 
+## Delivery follow-up — 11 October 2026
+
+The recommendations below informed `codex/focused-system-usability`. Completed:
+compact income-notice counts with retained details/recovery, visible sample
+identity with secondary help disclosed, consistent source/matching labels,
+focused short source setup, grouped mileage fields with visible eligibility,
+validated source returns, source/date-filtered history pages, prominent guided
+review, planning next action/received target first, and unresolved matching groups
+before source summaries. Advanced editing and calculations remain accessible.
+
+Full work totals and mileage thresholds/reimbursement still use all evidence,
+independent of history filters. Display pages contain at most 20 work records,
+20 expenses and 20 journeys. Shift choices are the latest 200 plus older linked
+records, preserving historical links. Annual mileage calculation still processes
+complete evidence; bounded display is not a claim that this calculation is constant
+time. No persistence migration, preset manager or broader automatic rule was added.
+
+The repeat 14-page mobile/desktop expert audit had 28 successful visits without
+overflow or JavaScript errors. At 390px, main-content height in the same synthetic
+fixture changed: source setup 2,312 → 890px; work entry 2,065 → 1,604px; mileage
+2,940 → 2,650px; planning 5,488 → 4,196px; matching 2,900 → 2,043px. These figures
+describe layout, not task completion speed. The corrected mileage textarea keeps
+a readable editing area rather than shrinking it just to reduce page height.
+
+The initial user-observation step remains pending. Follow
+[USABILITY_WALKTHROUGH.md](USABILITY_WALKTHROUGH.md) to capture uncertainty during
+the five owner tasks. Long-form explanation still warrants observation; further
+automation, budgeting, named presets, balance persistence and operational recovery
+need their separately scoped design/evidence. The original findings below are the
+pre-delivery record, rather than a claim that these changes remain unimplemented.
+
 ## Assessment
 
 TOMS now has a coherent core journey: Home identifies a saved-record task,

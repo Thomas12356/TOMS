@@ -74,6 +74,8 @@ with sync_playwright() as playwright:
             assert 'Received-income target:' in page.locator('.checklist-summary').inner_text()
             click(page.locator('#check-review').get_by_role('link', name='Open transaction review', exact=True))
             assert not page.locator('#transaction-review').is_visible()
+            if not page.locator('.expert-confirmation').evaluate('(d) => d.open'):
+                page.locator('.expert-confirmation > summary').click()
             page.locator('#quick-review').click()
             page.wait_for_function("() => document.querySelector('#transaction-review').open")
             for remaining in (1, 0):

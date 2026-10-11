@@ -69,11 +69,11 @@ with sync_playwright() as playwright:
             work = nav.locator('details').filter(has=page.locator('summary', has_text='Work & income'))
             settings = nav.locator('details').filter(has=page.locator('summary', has_text='Settings'))
             assert work.get_attribute('open') is None
-            assert nav.get_by_role('link', name='Income streams', exact=True).is_hidden()
+            assert nav.get_by_role('link', name='Income sources', exact=True).is_hidden()
             work.locator('summary').focus()
             page.keyboard.press('Enter')
-            assert nav.get_by_role('link', name='Income streams', exact=True).is_visible()
-            nav.get_by_role('link', name='Income streams', exact=True).focus()
+            assert nav.get_by_role('link', name='Income sources', exact=True).is_visible()
+            nav.get_by_role('link', name='Income sources', exact=True).focus()
             page.keyboard.press('Escape')
             assert work.locator('summary').evaluate('(node) => node === document.activeElement')
             assert work.get_attribute('open') is None
@@ -81,7 +81,7 @@ with sync_playwright() as playwright:
             work.locator('summary').click()
             settings.locator('summary').click()
             assert nav.get_by_role('button', name='Sign out', exact=True).is_visible()
-            nav.get_by_role('link', name='Income streams', exact=True).wait_for(state='hidden')
+            nav.get_by_role('link', name='Income sources', exact=True).wait_for(state='hidden')
             assert work.get_attribute('open') is None
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
             if width in (390, 1024):
@@ -126,7 +126,7 @@ with sync_playwright() as playwright:
             plain = context.new_page()
             plain.goto(origin + '/dashboard/overview')
             plain.locator('#main-navigation summary').filter(has_text='Work & income').click()
-            plain.locator('#main-navigation').get_by_role('link', name='Reconciliation', exact=True).click()
+            plain.locator('#main-navigation').get_by_role('link', name='Work and payment matching', exact=True).click()
             assert plain.url.endswith('/dashboard/reconciliation')
             assert plain.locator('details.current-section summary').inner_text() == 'Work & income'
             assert plain.evaluate('document.documentElement.scrollWidth <= innerWidth')

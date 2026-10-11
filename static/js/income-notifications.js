@@ -36,7 +36,7 @@
             if (recovered) error.hidden = true;
             bar.hidden = data.count === 0;
             const first = data.notices[0];
-            document.getElementById('income-alert-summary').textContent = first ? `${data.count} income notice${data.count === 1 ? '' : 's'} · ${first.source} received ${first.amount}. ${first.message}` : '';
+            document.getElementById('income-alert-summary').textContent = first ? `${data.count} income notice${data.count === 1 ? '' : 's'}` : '';
             // Keep active controls stable while somebody is reading the popup.
             if (forceRender || recovered || !dialog.open || !list.children.length) {
                 const restoreFocus = dialog.open && list.contains(document.activeElement);

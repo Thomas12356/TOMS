@@ -18,6 +18,7 @@ from services.transactions.shifts import FIELDS, LOCAL_TIME, shift_fields, shift
 from services.validation import uid
 from services.web.sessions import require_dashboard_login
 from services.web.test_data import activate_test_data
+from services.web.entry_history import HISTORY_FIELDS, filter_history, history_options, source_return
 
 shifts = Blueprint('shifts', __name__, url_prefix='/dashboard/income-streams')
 shifts.before_request(require_dashboard_login)
@@ -30,7 +31,15 @@ def page(stream_id):
     if request.authorization is not None or not current_user.is_authenticated:
         return redirect(url_for('login.sign_in'))
     stream_id = str(stream_id)
-    options = query_values({'edit', 'add', 'reuse'})
+    options = query_values({'edit', 'add', 'reuse', 'return_to', 'source'} | HISTORY_FIELDS,
+                           empty_ignored={'history_source', 'history_from', 'history_to'})
+    history = history_options(options)
+    return_url = source_return(options, expected=stream_id)
+    if options.get('return_to') not in (None, 'source'):
+        raise BadRequest('Choose a valid work return page.')
+    if history.get('history_source') not in (None, stream_id):
+        raise BadRequest('Choose the current work source.')
+    source_context = {'return_to': 'source', 'source': stream_id} if return_url else {}
     if options.get('edit') and options.get('reuse'):
         raise BadRequest('Choose editing or reusable defaults, not both.')
     if options.get('add') not in (None, '1'):
@@ -91,7 +100,7 @@ def page(stream_id):
                     setattr(selected, field, value)
             record_action('shift.' + action, identity)
             db.session.commit()
-            return redirect(url_for('shifts.page', stream_id=stream.id), code=303)
+            return redirect(return_url or url_for('shifts.page', stream_id=stream.id), code=303)
     except (ValueError, BadRequest) as invalid:
         db.session.rollback()
         error = invalid.description if isinstance(invalid, BadRequest) else str(invalid)
@@ -105,11 +114,22 @@ def page(stream_id):
                       hourly_rate=display_amount(selected.hourly_rate_minor, selected.currency),
                       total_payment=display_amount(selected.gross_minor, selected.currency) if selected.payment_mode == 'total' else '',
                       notes=selected.notes)
-    entries = db.session.scalars(db.select(IncomeShift).where(IncomeShift.income_stream_id == stream.id).order_by(
-        IncomeShift.starts_at.desc(), IncomeShift.id)).all()
+    all_work = db.select(IncomeShift).where(IncomeShift.income_stream_id == stream.id)
+    work_page = db.paginate(filter_history(all_work, IncomeShift, IncomeShift.starts_at, history, timestamp=True)
+        .order_by(IncomeShift.starts_at.desc(), IncomeShift.id), page=int(history.get('history_page', '1')),
+        per_page=20, error_out=False)
+    entries = work_page.items
+    total_query = db.select(db.func.coalesce(db.func.sum(IncomeShift.gross_minor), 0)).where(IncomeShift.income_stream_id == stream.id)
+    if stream.income_mode != 'shifts':
+        total_query = total_query.where(IncomeShift.is_overtime.is_(True))
+    total = int(db.session.scalar(total_query))
+    record_count = db.session.scalar(db.select(db.func.count()).select_from(all_work.subquery()))
     from routes.invoices import shift_invoice_links
     return render_template('shifts.html', stream=stream, selected=selected, values=values, entries=entries, error=error,
-        invoice_links=shift_invoice_links(stream.id), identity=selected.id if selected else values.get('shift_id') or str(uuid4()), version=shift_version(selected) if selected else '',
-        format_amount=format_amount, shift_label=shift_label, total=sum(entry.gross_minor for entry in entries if stream.income_mode == 'shifts' or entry.is_overtime),
+        invoice_links=shift_invoice_links(stream.id, [entry.id for entry in entries]), identity=selected.id if selected else values.get('shift_id') or str(uuid4()), version=shift_version(selected) if selected else '',
+        format_amount=format_amount, shift_label=shift_label, total=total, record_count=record_count,
         currency=stream.expected_gross_currency or 'GBP', current_user=current_user,
-        reused=bool(options.get('reuse') and not error)), 400 if error else 200
+        reused=bool(options.get('reuse') and not error), return_url=return_url, source_context=source_context,
+        history=history, work_page=work_page,
+        history_url=lambda number: url_for('shifts.page', stream_id=stream.id, **source_context,
+            **{**history, 'history_page': number}, _anchor='entry-history')), 400 if error else 200

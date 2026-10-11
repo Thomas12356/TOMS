@@ -3,6 +3,38 @@
 Updated: 2026-10-11. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
+## Latest delivery — focused system usability
+
+Review-informed stages 1–3 are implemented on `codex/focused-system-usability`:
+
+- Compact income notices retain their detail/acknowledgement and failure recovery;
+  sample identity stays visible, with secondary explanation in a disclosure.
+- Consistent Income sources / Work and payment matching labels and distinct
+  payment-description fields. The short source-creation view hides competing
+  management/list actions while preserving the full configuration path.
+- Grouped mileage entry and separate disclosed history. Validated internal source
+  context survives work/journey reuse, invalid input and successful saves, while
+  the filtered-ledger expense return remains supported.
+- Source/date history filters and 20-record pages. Work totals and mileage relief
+  continue to use full evidence. The latest 200 shift choices include older
+  referenced links; invoice badges load only for displayed work records.
+- Guided ledger review is prominent; direct editing and quick confirmation remain
+  under disclosures. Planning puts its next action and received-income target
+  first, with calculation/source details disclosed. Matching shows unresolved
+  groups before source totals; clear groups start collapsed.
+
+Validation: 553 backend tests, 549 passes / four optional backup integration skips;
+all 21 browser scripts passed. Nine new backend regressions and a five-width
+browser journey cover the new behaviour, including JavaScript-disabled entry.
+Ruff F, Bandit, whitespace and outgoing secret checks passed. All 28 expert audit
+page visits passed without overflow or browser errors. No migration or live bank
+verification was performed. Complete mileage evidence still requires a full scan.
+
+The owner-observation step is prepared in USABILITY_WALKTHROUGH.md and remains
+pending actual use. Later presets, automation, budgeting, stored balances and
+recovery features are still separately scoped. Deployment/publication details
+will be recorded below after publishing this implementation.
+
 ## Latest delivery — account money, defaults and suggestions
 
 Implemented on `codex/account-money-work-defaults-suggestions`:

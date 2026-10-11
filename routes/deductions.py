@@ -27,6 +27,7 @@ from routes.dashboard import database_error
 from services.transactions.income_form import display_amount
 from services.transactions.shifts import LOCAL_TIME, journey_defaults, shift_label
 from services.transactions.ledger import FILTERS, ledger_options
+from services.web.entry_history import HISTORY_FIELDS, filter_history, history_options, source_return
 
 
 deductions = Blueprint('deductions', __name__, url_prefix='/dashboard/deductions')
@@ -45,16 +46,19 @@ def page():
         return redirect(url_for('login.sign_in'))
     from services.tax.rules import start_rule_check
     start_rule_check(current_app.instance_path)
-    options = query_values({'expense', 'type', 'shift', 'return_to', 'reuse'} | FILTERS, empty_ignored={'q', 'from', 'to'})
-    return_url = None
+    options = query_values({'expense', 'type', 'shift', 'return_to', 'reuse', 'source'} | FILTERS | HISTORY_FIELDS,
+                           empty_ignored={'q', 'from', 'to', 'history_source', 'history_from', 'history_to'})
+    history = history_options(options)
+    return_url = source_return(options)
+    source_context = {'return_to': 'source', 'source': options['source']} if return_url else {}
     if options.get('return_to') == 'ledger':
         return_url = url_for('dashboard.transactions_page', **ledger_options(options))
-    elif options.get('return_to') or set(options) & FILTERS:
+    elif options.get('return_to') not in (None, 'source') or set(options) & FILTERS:
         raise BadRequest('Choose a valid expense return page.')
     deduction_type = options.get('type', 'expense' if options.get('expense') else '')
     if deduction_type not in ('', 'expense', 'mileage'):
         raise BadRequest('Choose Expense or Mileage.')
-    selected, error, values = None, None, {}
+    selected, error, values = None, None, dict(stream_id=options.get('source', ''), action='save_mileage')
     try:
         if options.get('reuse'):
             if deduction_type != 'mileage' or options.get('expense') or options.get('shift'):
@@ -63,6 +67,8 @@ def page():
                 template = db.session.get(MileageEntry, uid(options['reuse']))
                 if template is None or template.income_stream.archived:
                     raise ValueError('Choose a saved journey for an active income source.')
+                if source_context and template.income_stream_id != options['source']:
+                    raise ValueError('Reuse a journey belonging to this income source.')
                 values = dict(action='save_mileage', stream_id=template.income_stream_id,
                     location=template.location, vehicle_type=template.vehicle_type, vehicle_key=template.vehicle_key,
                     purpose=template.purpose, start_postcode=template.start_postcode, end_postcode=template.end_postcode,
@@ -71,6 +77,8 @@ def page():
             linked_shift = db.session.get(IncomeShift, uid(options['shift']))
             if linked_shift is None:
                 raise ValueError('Shift not found.')
+            if source_context and linked_shift.income_stream_id != options['source']:
+                raise ValueError('Choose work belonging to this income source.')
             values = dict(shift_id=linked_shift.id, stream_id=linked_shift.income_stream_id,
                           action='save_mileage' if deduction_type == 'mileage' else 'save_expense')
             if deduction_type == 'mileage':
@@ -87,6 +95,8 @@ def page():
             allowed = EXPENSE_FIELDS if action in ('save_expense', 'delete_expense') else MILEAGE_FIELDS
             if action not in ('save_expense', 'delete_expense', 'save_mileage', 'delete_mileage', 'link_mileage_shift') or set(request.form) - allowed or any(len(request.form.getlist(key)) != 1 for key in request.form):
                 raise ValueError('Supply valid form fields once.')
+            if source_context and action in ('save_expense', 'save_mileage') and values.get('stream_id') != options['source']:
+                raise ValueError('Save this record to the income source you opened, or return to all sources.')
             # Serialize method selection and journey writes, including across workers.
             # Demo records use a different key and remain isolated from real records.
             db.session.execute(db.select(db.func.pg_advisory_xact_lock(6075157141257144400 + int(test_data_active()))))
@@ -159,8 +169,19 @@ def page():
         db.session.rollback()
         error = invalid.description if isinstance(invalid, BadRequest) else str(invalid)
     streams = db.session.scalars(db.select(IncomeStream).order_by(IncomeStream.name, IncomeStream.id)).all()
-    expenses = db.session.scalars(db.select(ExpenseDeduction).options(selectinload(ExpenseDeduction.transaction))).all()
-    journeys = db.session.scalars(db.select(MileageEntry).options(selectinload(MileageEntry.income_stream)).order_by(MileageEntry.journey_date.desc(), MileageEntry.id)).all()
+    expense_query = filter_history(db.select(ExpenseDeduction).options(selectinload(ExpenseDeduction.transaction)),
+                                  ExpenseDeduction, ExpenseDeduction.recorded_time, history, timestamp=True)
+    journey_query = filter_history(db.select(MileageEntry), MileageEntry, MileageEntry.journey_date, history)
+    expense_page = db.paginate(expense_query.order_by(ExpenseDeduction.recorded_time.desc(), ExpenseDeduction.feed_item_uid,
+                                                    ExpenseDeduction.account_uid, ExpenseDeduction.category_uid),
+                               page=int(history.get('history_page', '1')), per_page=20, error_out=False)
+    journey_page = db.paginate(journey_query.order_by(MileageEntry.journey_date.desc(), MileageEntry.id),
+                               page=int(history.get('history_page', '1')), per_page=20, error_out=False)
+    expenses, journeys = expense_page.items, journey_page.items
+    # Annual allowances always use full evidence, never a filtered display page.
+    allowance_entries = db.session.scalars(db.select(MileageEntry).options(selectinload(MileageEntry.income_stream),
+        load_only(MileageEntry.id, MileageEntry.income_stream_id, MileageEntry.journey_date, MileageEntry.location,
+                  MileageEntry.vehicle_type, MileageEntry.miles, MileageEntry.reimbursed_minor))).all()
     payments = db.session.scalars(db.select(Transaction).where(Transaction.direction == 'OUT', Transaction.status == 'SETTLED').options(
         load_only(Transaction.transaction_time, Transaction.counterparty_name, Transaction.amount_minor,
                   Transaction.currency, Transaction.direction, Transaction.status, Transaction.source),
@@ -178,16 +199,31 @@ def page():
         values = dict(stream_id=record.income_stream_id, amount=display_amount(record.amount_minor, selected.currency), tax_status='deduction' if record.is_tax_deductible else 'tracking', purpose=record.purpose,
                       category=record.category, vehicle_key=record.vehicle_key, shift_id=record.shift_id)
     names = {stream.id: stream.name for stream in streams}
-    available_shifts = db.session.scalars(db.select(IncomeShift).order_by(IncomeShift.starts_at.desc(), IncomeShift.id)).all()
+    shift_query = db.select(IncomeShift)
+    if source_context:
+        shift_query = shift_query.where(IncomeShift.income_stream_id == options['source'])
+    available_shifts = db.session.scalars(shift_query.order_by(IncomeShift.starts_at.desc(), IncomeShift.id).limit(200)).all()
+    referenced = {record.shift_id for record in [*expenses, *journeys] if record.shift_id}
+    if values.get('shift_id'):
+        try:
+            referenced.add(uid(values['shift_id']))
+        except ValueError:
+            pass
+    missing = referenced - {shift.id for shift in available_shifts}
+    if missing:
+        available_shifts.extend(db.session.scalars(db.select(IncomeShift).where(IncomeShift.id.in_(missing))).all())
     return render_template('deductions.html', streams=streams, expenses=expenses, journeys=journeys, payments=payments,
         available_shifts=available_shifts, shift_names={shift.id: shift_label(shift) for shift in available_shifts}, shift_label=shift_label,
         journey_suggestions={shift.id: journey_defaults(shift, names[shift.income_stream_id]) for shift in available_shifts},
         deduction_type=deduction_type, names=names, selected=selected, values=values, error=error,
         entry_id=values.get('entry_id') or str(uuid4()), today=datetime.now(LOCAL_TIME).date(), locations=LOCATIONS, vehicles=VEHICLES,
         rules=reviewed_rules(), status=cached_status(current_app.instance_path), format_amount=format_amount,
-        expense_current=expense_current, expense_version=expense_version, mileage_version=mileage_version, allowance=mileage_allowances(journeys),
+        expense_current=expense_current, expense_version=expense_version, mileage_version=mileage_version, allowance=mileage_allowances(allowance_entries),
         current_user=current_user, return_url=return_url, reused=bool(options.get('reuse') and not error),
-        return_context=ledger_options(options) if return_url else {}), 400 if error else 200
+        return_context=ledger_options(options) if options.get('return_to') == 'ledger' else {},
+        source_context=source_context, history=history, expense_page=expense_page, journey_page=journey_page,
+        history_pages=max(expense_page.pages, journey_page.pages),
+        history_url=lambda number: url_for('deductions.page', **source_context, **{**history, 'history_page': number}, _anchor='entry-history')), 400 if error else 200
 
 
 def linked_shift_id(form, stream):

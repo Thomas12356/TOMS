@@ -180,7 +180,10 @@ def print_invoice(identity):
                            preview=invoice.state == 'draft', sample=work.test_data_active())
 
 
-def shift_invoice_links(stream_id):
+def shift_invoice_links(stream_id, identities=None):
     """One lookup for shift-page badges and links, including draft reservations."""
-    return dict(db.session.execute(db.select(InvoiceItem.shift_id, InvoiceItem.invoice_id).join(Invoice)
-        .where(Invoice.income_stream_id == stream_id, InvoiceItem.active.is_(True))).all())
+    query = db.select(InvoiceItem.shift_id, InvoiceItem.invoice_id).join(Invoice).where(
+        Invoice.income_stream_id == stream_id, InvoiceItem.active.is_(True))
+    if identities is not None:
+        query = query.where(InvoiceItem.shift_id.in_(identities))
+    return dict(db.session.execute(query).all())

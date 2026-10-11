@@ -1099,3 +1099,34 @@ Post-publication expert walkthrough of implementation `aeedef9`: 14 pages at
 errors. Synthetic screenshots and selected regression screenshots were inspected.
 The fixture used disposable schemas and made no bank request. Review findings
 are in USABILITY_REVIEW.md; this is not a user study.
+
+## Review-informed whole-system usability — 2026-10-11
+
+Final full PostgreSQL discovery: 553 tests, 549 passed and four optional backup
+integration tests skipped for unavailable isolated CREATEDB credentials. All 21
+browser scripts passed across the broad run and remaining-script rerun. Existing
+checks now follow the renamed matching/source links, disclosed quick confirmation
+and the source workspace back link. Their financial/security assertions remain.
+Ruff F, Bandit, `git diff --check` and outgoing secret-value checks passed.
+
+Nine new backend regressions cover bounded work/journey display, unchanged full
+totals and mileage thresholds/reimbursement across pages/filters, London date
+boundaries, source isolation, rejected external/invalid returns, preserved invalid
+entry, source redirects, focused creation and older links beyond the latest 200
+shift choices. PostgreSQL's numeric SUM over bigint is explicitly converted to an
+integer for money presentation; the total type is checked.
+
+The new focused browser journey passed 320/390/768/1024/1280px, including 390px
+with JavaScript disabled: compact notice/details, keyboard disclosures, focused
+source creation, work/journey source returns, paged/filterable history with full
+relief unchanged, planning and matching disclosures and retained advanced editing.
+All six existing planning states, invoice snapshots/PDFs/allocations, session and
+stale-form recovery, sample isolation and notice failure/retry checks passed.
+
+A repeat 14-page expert mobile/desktop audit returned 200 on all 28 visits without
+horizontal overflow or JavaScript errors. Screenshots were inspected, including
+correcting a cramped textarea after grouping journey fields. Layout comparisons
+and their limits are recorded in USABILITY_REVIEW.md. This is not owner research.
+No schema migration, working financial-record writes or live bank verification
+was performed; bank traffic was mocked. The mileage calculation still reads full
+annual evidence, independently of the bounded display records.

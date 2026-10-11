@@ -156,7 +156,7 @@ class IncomeWorkspaceTests(DeductionOwnerCase):
     def test_stream_actions_and_popup_filtering(self):
         html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
         self.assertIn('>Add work</a>', html)
-        self.assertIn('>Configure stream</a>', html)
+        self.assertIn('>Configure source</a>', html)
         self.assertIn('>Show all income</a>', html)
         self.assertIn('>View deductions and expenses</a>', html)
         self.assertNotIn('<summary>Edit stream settings', html)

@@ -6,10 +6,10 @@
     <a href="{{ url_for('dashboard.transactions_page') }}"{% if navigation_page == 'transactions' %} aria-current="page"{% endif %}>Transactions</a>
     <details class="navigation-group{% if navigation_page in ['income-streams', 'deductions', 'reconciliation', 'invoices', 'account-money'] %} current-section{% endif %}" role="group" aria-label="Income and work">
     <summary>Work &amp; income</summary><div class="navigation-menu">
-    <a href="{{ url_for('dashboard.income_streams') }}"{% if navigation_page == 'income-streams' %} aria-current="page"{% endif %}>Income streams</a>
+    <a href="{{ url_for('dashboard.income_streams') }}"{% if navigation_page == 'income-streams' %} aria-current="page"{% endif %}>Income sources</a>
     <a href="{{ url_for('reserves.page') }}"{% if navigation_page == 'account-money' %} aria-current="page"{% endif %}>Account money</a>
     <a href="{{ url_for('deductions.page') }}"{% if navigation_page == 'deductions' %} aria-current="page"{% endif %}>Deductions</a>
-    {% if navigation_owner %}<a href="{{ url_for('reconciliation.page') }}"{% if navigation_page == 'reconciliation' %} aria-current="page"{% endif %}>Reconciliation</a>{% endif %}
+    {% if navigation_owner %}<a href="{{ url_for('reconciliation.page') }}"{% if navigation_page == 'reconciliation' %} aria-current="page"{% endif %}>Work and payment matching</a>{% endif %}
     {% if navigation_owner %}<a href="{{ url_for('invoices.page') }}"{% if navigation_page == 'invoices' %} aria-current="page"{% endif %}>Invoices</a>{% endif %}
     </div></details>
     <details class="navigation-group{% if navigation_page in ['tax-estimate', 'checklist'] %} current-section{% endif %}" role="group" aria-label="Planning">

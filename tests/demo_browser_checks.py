@@ -90,7 +90,9 @@ with sync_playwright() as playwright:
             close_review()
             provider.assert_not_called()
             fixture.start_sync.assert_not_called()
-            page.get_by_role('button', name='Quick confirmation', exact=True).click()
+            if not page.locator('.expert-confirmation').evaluate('(d) => d.open'):
+                page.locator('.expert-confirmation > summary').click()
+            page.get_by_role('button', name='Open quick confirmation', exact=True).click()
             page.get_by_role('button', name='Confirm details', exact=True).click()
             page.wait_for_function("() => document.querySelector('#review-count').textContent.includes('6')")
             page.get_by_role('button', name='Close transaction review').click()
@@ -109,19 +111,19 @@ with sync_playwright() as playwright:
             open_navigation()
             page.locator("#main-navigation summary").filter(has_text='Work & income').click()
             with page.expect_navigation():
-                page.get_by_role('link', name='Income streams', exact=True).click()
+                page.get_by_role('link', name='Income sources', exact=True).click()
             page.get_by_role('link', name='Create with full details', exact=True).click()
             page.locator('#stream-name').fill('Browser-created sample work')
             page.locator('#stream-kind').select_option('self_employed')
             page.locator('#stream-gross').fill('oops')
             with page.expect_navigation():
-                page.get_by_role('button', name='Create stream', exact=True).click()
+                page.get_by_role('button', name='Create source', exact=True).click()
             assert page.locator('#create-stream-dialog').is_visible()
             assert page.locator('#stream-name').input_value() == 'Browser-created sample work'
             assert page.locator('#stream-gross').input_value() == 'oops'
             page.locator('#stream-gross').fill('1000')
             with page.expect_navigation():
-                page.get_by_role('button', name='Create stream', exact=True).click()
+                page.get_by_role('button', name='Create source', exact=True).click()
             assert 'Browser-created sample work' in page.locator('#your-streams-heading').locator('..').inner_text()
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.income_streams') == 1
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.transactions WHERE confirmed_at IS NOT NULL') == 0
@@ -160,9 +162,12 @@ with sync_playwright() as playwright:
                 page.get_by_role('button', name='Remove work', exact=True).click()
             assert 'GBP 71,000.00' in page.request.get(origin + '/dashboard/tax-estimate').text()
             with page.expect_navigation():
-                page.get_by_role('link', name='← Income stream', exact=True).click()
+                page.get_by_role('link', name='← Income source', exact=True).click()
+            assert page.get_by_role('heading', name='Browser-created sample work', exact=True).is_visible()
+            with page.expect_navigation():
+                page.get_by_role('link', name='All income sources', exact=True).click()
             stream_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading h3', has_text='Browser-created sample work'))
-            stream_card.get_by_role('link', name='Configure stream', exact=True).click()
+            stream_card.get_by_role('link', name='Configure source', exact=True).click()
             stream_card.locator('[data-income-mode]').select_option('shifts')
             assert not stream_card.locator('[data-regular-forecast]').is_visible()
             with page.expect_navigation():
@@ -257,7 +262,7 @@ with sync_playwright() as playwright:
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.expense_deductions') == 0
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.mileage_entries') == 0
             with page.expect_navigation():
-                page.get_by_role('link', name='Manage income streams', exact=True).click()
+                page.get_by_role('link', name='Manage income sources', exact=True).click()
             page.get_by_role('link', name='Create with full details', exact=True).click()
             page.locator('#stream-name').fill('Browser-linked source')
             page.locator('#stream-kind').select_option('self_employed')
@@ -268,10 +273,10 @@ with sync_playwright() as playwright:
             assert box['x'] >= 0 and box['x'] + box['width'] <= width
             page.locator('#stream-gross').fill('30000')
             with page.expect_navigation():
-                page.get_by_role('button', name='Create stream', exact=True).click()
+                page.get_by_role('button', name='Create source', exact=True).click()
             partner_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading h3', has_text='Browser-linked source'))
             assert 'Mileage: counted with Browser-created sample work' in partner_card.inner_text()
-            partner_card.get_by_role('link', name='Configure stream', exact=True).click()
+            partner_card.get_by_role('link', name='Configure source', exact=True).click()
             partner_id = partner_card.locator('[name=stream_id]').input_value()
             assert partner_card.locator('[data-mileage-relationship]').input_value() == shift_stream_id
             page.keyboard.press('Escape')
@@ -293,9 +298,9 @@ with sync_playwright() as playwright:
                 page.get_by_role('button', name='Save mileage', exact=True).click()
             assert 'calculated mileage relief GBP 5,470.00' in page.locator('main').inner_text()
             with page.expect_navigation():
-                page.get_by_role('link', name='Manage income streams', exact=True).click()
+                page.get_by_role('link', name='Manage income sources', exact=True).click()
             partner_card = page.locator('.stream-manage').filter(has=page.locator('.stream-heading h3', has_text='Browser-linked source'))
-            partner_card.get_by_role('link', name='Configure stream', exact=True).click()
+            partner_card.get_by_role('link', name='Configure source', exact=True).click()
             partner_card.locator('[data-mileage-relationship]').select_option('')
             with page.expect_navigation():
                 partner_card.get_by_role('button', name='Save changes', exact=True).click()

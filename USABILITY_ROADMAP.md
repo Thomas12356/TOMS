@@ -8,6 +8,13 @@ not measured results or delivery commitments.
 
 ## Starting point
 
+Current delivery: review-informed stages 1–3 are implemented on
+`codex/focused-system-usability`: compact notices, consistent source/matching
+labels, focused source creation, grouped mileage entry, source return context,
+bounded history and action-first ledger/planning/matching. Calculations retain
+full evidence independently of the displayed history page. Owner observation is
+the next validation step; USABILITY_WALKTHROUGH.md supplies the five-task guide.
+
 Decision update: the user requested that the whole-system review govern next
 steps. The concrete sequence and acceptance checks are now in
 [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md#next-delivery-sequence): focused
@@ -46,7 +53,7 @@ The owner overview, compact navigation, filtered ledger and guided transaction
 review are live locally. Reconciliation,
 tax-year evidence exports, reserve targets and earmarks already exist. Improve
 their discoverability rather than rebuild them. The latest recorded verification
-is 540 backend passes, four optional backup skips and all 20 browser scripts.
+is 549 backend passes, four optional backup skips and all 21 browser scripts.
 
 The overview does not yet establish available-to-spend cash. Annual tax targets,
 recorded earmarks and bank balances have different meanings. Never use the

@@ -63,7 +63,7 @@ with sync_playwright() as playwright:
                 page.get_by_role('button', name='Toggle navigation').click()
             assert page.locator('nav a[aria-current=page]').text_content() == 'Tax estimate'
             page.locator("#main-navigation summary").filter(has_text="Work & income").click()
-            assert page.get_by_role('link', name='Income streams', exact=True).is_visible()
+            assert page.get_by_role('link', name='Income sources', exact=True).is_visible()
             assert not errors, (state, width, errors)
             if state == 'complete' and width in (390, 1280):
                 page.screenshot(path=f'/tmp/toms-tax-estimate-{width}.png', full_page=True)

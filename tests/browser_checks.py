@@ -130,12 +130,16 @@ with sync_playwright() as playwright:
             page.reload()
             dialog = page.locator('#transaction-review')
             assert not dialog.is_visible()
+            if not page.locator('.expert-confirmation').evaluate('(d) => d.open'):
+                page.locator('.expert-confirmation > summary').click()
             page.locator('#quick-review').click()
             page.wait_for_function("() => document.querySelector('#transaction-review').open")
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             page.keyboard.press('Escape')
             assert not dialog.is_visible() and state['review_remaining'] == 3
             assert page.locator('.is-unconfirmed').count() == 3
+            if not page.locator('.expert-confirmation').evaluate('(d) => d.open'):
+                page.locator('.expert-confirmation > summary').click()
             page.locator('#quick-review').click()
             page.wait_for_function("() => document.querySelector('#transaction-review').open")
             for remaining in (2, 1, 0):

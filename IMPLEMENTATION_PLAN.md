@@ -11,6 +11,13 @@ over the historical phase ordering. See PROJECT_STATUS.md for verified delivery.
 
 ## Next delivery sequence
 
+Implementation update: stages 1–3 are delivered together on
+`codex/focused-system-usability`, using shared notice/disclosure styling and
+validated entry/history context. The branch names below were proposed boundaries;
+this combined delivery keeps the affected journeys coherent. Stage 4 is prepared
+in [USABILITY_WALKTHROUGH.md](USABILITY_WALKTHROUGH.md) and remains pending real
+owner observation. Later feature expansion remains separately scoped.
+
 ### 1. Focus attention and source setup
 
 Branch: `codex/focused-attention-source-setup`.
