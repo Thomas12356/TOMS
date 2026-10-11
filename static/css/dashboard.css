@@ -1404,6 +1404,9 @@ td.amount {
 /* Stream actions stay with their job; records open in focused, scrollable dialogs. */
 .stream-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .stream-heading > .stream-actions { flex: 0 1 auto; }
+.stream-actions details summary { min-height: 44px; padding: 12px; cursor: pointer; }
+.income-workspace { max-width: 1000px; overflow-wrap: anywhere; }
+.income-workspace .secondary-button { display: inline-flex; align-items: center; min-height: 44px; margin: 4px 8px 4px 0; }
 .stream-actions a, .stream-actions button { text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
 .page-actions { margin: 20px 0; }
 .stream-list-dialog { width: min(820px, calc(100% - 32px)); max-height: 85dvh; overflow: auto; margin: auto; }

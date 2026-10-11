@@ -2,7 +2,7 @@
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
-from sqlalchemy.orm import selectinload, load_only
+from sqlalchemy.orm import selectinload, joinedload, load_only
 
 from models import Transaction, MileageEntry, ExpenseDeduction
 from services.database.connection import db
@@ -23,16 +23,25 @@ def expense_current(record):
             and record.amount_minor <= payment.amount_minor)
 
 
-def tax_records(rules, *, as_of=None, session=None):
-    session = session if session is not None else db.session
+def planning_payments(rules, session):
+    """Load shared payment/claim evidence once, including claims moved between years."""
     first = datetime.fromisoformat(rules['starts_on']).replace(tzinfo=ZoneInfo('Europe/London'))
     end = (datetime.fromisoformat(rules['ends_on']) + timedelta(days=1)).replace(tzinfo=ZoneInfo('Europe/London'))
-    payments = session.scalars(db.select(Transaction).outerjoin(Transaction.expense).where(db.or_(
+    return session.scalars(db.select(Transaction).outerjoin(Transaction.expense).where(db.or_(
         db.and_(Transaction.transaction_time >= first, Transaction.transaction_time < end),
         db.and_(ExpenseDeduction.recorded_time >= first, ExpenseDeduction.recorded_time < end))).options(
         load_only(Transaction.amount_minor, Transaction.currency, Transaction.direction, Transaction.status,
                   Transaction.source, Transaction.transaction_time, Transaction.confirmed_at, Transaction.counterparty_name),
-        selectinload(Transaction.income), selectinload(Transaction.expense), selectinload(Transaction.classification))).all()
+        joinedload(Transaction.income), joinedload(Transaction.expense), joinedload(Transaction.classification))
+        .order_by(Transaction.transaction_time.desc(), Transaction.account_uid, Transaction.category_uid,
+                  Transaction.feed_item_uid)).all()
+
+
+def tax_records(rules, *, as_of=None, session=None, payments=None):
+    session = session if session is not None else db.session
+    first = datetime.fromisoformat(rules['starts_on']).replace(tzinfo=ZoneInfo('Europe/London'))
+    end = (datetime.fromisoformat(rules['ends_on']) + timedelta(days=1)).replace(tzinfo=ZoneInfo('Europe/London'))
+    payments = planning_payments(rules, session) if payments is None else payments
     credits, deductions, issues = defaultdict(int), defaultdict(int), []
     received, ni_paid, attention = defaultdict(int), defaultdict(int), {}
     received_issues = []

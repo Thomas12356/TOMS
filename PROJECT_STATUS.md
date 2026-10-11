@@ -6,11 +6,13 @@ Stable working instructions are in [AGENTS.md](AGENTS.md).
 Latest usability work: [USABILITY_ROADMAP.md](USABILITY_ROADMAP.md) incorporates
 the user's supplied review and complaint about crowded navigation. Compact primary
 navigation and guided-review deployment are the first delivery. A unified task
-home is implemented; staged income workspaces are next. Budgeting/AI remain later
+home and staged income workspaces are implemented. Account money and reusable
+defaults are next. Budgeting/AI remain later
 scoped milestones. See the latest handoff
 below for deployment revision and verification evidence.
 
-Latest delivery: `codex/task-home` adds a unified saved-record action inbox.
+Latest delivery: `codex/home-performance-income-workspaces` speeds shared Home
+reads and adds staged source creation with separate evidence workspaces.
 
 ## Implemented
 
@@ -181,3 +183,35 @@ or live Starling verification was required.
 Publication completed on 11 October: `codex/task-home` was fast-forwarded into main
 and pushed to the verified public repository under the user's existing publication
 authorization.
+
+## Home performance and staged income workspaces
+
+Implemented on `codex/home-performance-income-workspaces`: Home reuses one ordered
+payment snapshot for planning and checklist reads, with joined one-to-one evidence
+and one reference time. Original-date claims moved into another year remain
+reviewable; future/unsettled payments retain their exclusions. At 10,000 disposable
+payments, Home measured 0.583s/21 queries (previously 2.294s/122 queries), and the
+filtered category 0.628s/21 queries. These are local synthetic measurements.
+
+Income sources can start with only name and type, preserving unknown forecast
+amount/period/currency rather than zero. The next screen separates forecast,
+entered work, receipts, expenses and mileage, with five-record previews and links
+to existing full lists/forms. Settings opened from that workspace return there
+after saving. The index renders only the requested settings dialog, with normal
+GET navigation and JavaScript-disabled setup supported. Complete creation remains
+available; locks, stale versions, audit actions and sample routing are retained.
+
+No migration or live bank verification is required for these changes. Account
+money still lives in the existing source-index section; a dedicated account view
+and reusable work/mileage defaults are next. Saved bank-balance persistence still
+needs a scoped migration and isolated backup restore verification first.
+
+Verification: 530 backend tests ran, 526 passed and four optional backup cases
+skipped. All 19 browser scripts passed across the full run and remaining-script
+rerun after correcting the synthetic settings-navigation fixture. New regressions
+cover unknown source creation, validation retention, bounded/source-isolated
+previews, owner access, stale settings return context and moved-claim/future-payment
+equivalence for shared reads. Affected backend forms also passed a focused
+67-test run. Mobile/desktop workspace screenshots were inspected. Ruff F, Bandit,
+whitespace and outgoing secret checks passed. Bank traffic was mocked; no working
+schema change was needed. Deployment details follow after publication.

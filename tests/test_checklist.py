@@ -22,6 +22,24 @@ class ChecklistAuthTests(ApiTestCase):
 
 
 class ChecklistTests(DeductionOwnerCase):
+    def test_shared_payment_snapshot_matches_independent_checks_at_boundaries(self):
+        from services.tax.records import planning_payments
+        from services.tax.rules import reviewed_rules
+        now = datetime(2026, 10, 11, tzinfo=timezone.utc)
+        self.assertEqual(self.expense().status_code, 303)
+        # A claim saved in this year must remain visible after its bank date moves.
+        self.payment().transaction_time = datetime(2025, 4, 1, tzinfo=timezone.utc)
+        self.receipt.transaction_time = datetime(2027, 3, 1, tzinfo=timezone.utc)
+        self.session.commit()
+        shared = planning_payments(reviewed_rules(), self.session)
+        independent = current_plan(refresh_rules=False, session=self.session, as_of=now)
+        reused = current_plan(refresh_rules=False, session=self.session, as_of=now, payments=shared)
+        self.assertEqual(independent, reused)
+        self.assertEqual(guided_checklist(independent, as_of=now, session=self.session),
+                         guided_checklist(reused, as_of=now, session=self.session, payments=shared))
+        checks = guided_checklist(reused, as_of=now, session=self.session, payments=shared)
+        self.assertEqual(next(step for step in checks['steps'] if step['key'] == 'deductions')['count'], 1)
+
     def setUp(self):
         super().setUp()
         self.enterContext(patch('services.tax.reserves.cached_status', return_value={'status': 'verified'}))

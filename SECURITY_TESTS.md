@@ -1046,3 +1046,34 @@ shared planning/checklist scan cost; they are not production latency guarantees.
 No schema migration, live Starling calls or working financial-record writes were
 performed. Backup restore integration remains skipped for missing isolated
 CREATEDB credentials; a future balance-persistence migration still requires it.
+
+## Home performance and income workspaces — 2026-10-11
+
+Final PostgreSQL discovery on `codex/home-performance-income-workspaces` ran
+530 tests: 526 passed and four optional backup integration cases skipped. New
+regressions check staged name/type creation with NULL forecast fields, retained
+invalid entries, owner-only reads, five-receipt preview bounds and source isolation,
+safe workspace return context after saves/stale edits, and equivalence between
+shared/independent planning evidence when claims move years and payments are future.
+The affected forms/checklist/workspace also passed a focused 67-test run before
+the last stale-context regression was added; the final complete run includes it.
+
+All 19 browser scripts passed across the broad run and remaining-script rerun.
+The synthetic income fixture now provides the actual requested settings document
+instead of assuming every source's form is embedded in the index. Existing form
+security assertions remain. Real workspace journeys cover 320/390/768/1280px,
+name/type creation, unknown planning, complete forecast setup, safe labels,
+navigation back to the source and real/sample isolation. The 390px journey also
+creates and completes a source with JavaScript disabled. Mobile/desktop workspace
+screenshots were inspected. Invoice PDF, allocation, reconciliation, notice-error,
+session recovery, first-owner setup and tax export journeys all passed.
+
+Ruff F, application Bandit, whitespace and outgoing secret checks passed. Bank
+traffic was mocked. No migration or live bank verification was performed. Optional
+backup integration remains skipped for missing isolated CREATEDB credentials.
+
+The disposable overview benchmark now measured 0.117s/21 queries at 100 records,
+0.087s/21 at 1,000 and 0.583s/21 at 10,000 (previously 2.294s/122 at 10,000).
+The filtered category measured 0.628s/21 at 10,000. These measurements show reduced
+duplicate reads and relationship batches, not a production latency guarantee;
+planning still processes the relevant stored evidence.

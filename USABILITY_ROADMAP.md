@@ -16,7 +16,8 @@ Deployment and verification details are recorded in PROJECT_STATUS.md.
 The unified action home from `codex/task-home` is merged and deployed locally at
 `0d3e6f3`: saved import,
 payment, invoice, income-setup and planning actions, with retained Home context
-after review. Staged income setup remains next. Saved cash balances need a
+after review. Staged income setup and source workspaces are now implemented on
+`codex/home-performance-income-workspaces`, with shared Home reads. Saved cash balances need a
 separately designed persistence change and isolated restore verification first;
 Home will not label live-only or unknown balances as available spending money.
 
@@ -24,7 +25,7 @@ The owner overview, compact navigation, filtered ledger and guided transaction
 review are live locally. Reconciliation,
 tax-year evidence exports, reserve targets and earmarks already exist. Improve
 their discoverability rather than rebuild them. The latest recorded verification
-is 508 backend passes, four optional backup skips and 18 browser scripts.
+is 526 backend passes, four optional backup skips and all 19 browser scripts.
 
 The overview does not yet establish available-to-spend cash. Annual tax targets,
 recorded earmarks and bank balances have different meanings. Never use the

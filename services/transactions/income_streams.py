@@ -38,7 +38,7 @@ def stream_fields(form):
     if set(form) - {'csrf_token', 'version', 'action', 'stream_id', 'name', 'kind', 'expected_gross', 'expected_gross_period', 'expected_gross_currency', 'unpaid_holiday', 'unpaid_holiday_unit', 'forecast_tax_year', 'forecast_starts_on', 'forecast_ends_on', 'income_mode', 'mileage_with_stream'} or any(len(form.getlist(key)) != 1 for key in form):
         raise BadRequest('Supply each form field once.')
     action = form.get('action', '')
-    if action not in ('create', 'update', 'archive', 'restore'):
+    if action not in ('start', 'create', 'update', 'archive', 'restore'):
         raise BadRequest('Choose a valid action.')
     if action in ('archive', 'restore'):
         return action, None, None, {}
@@ -51,6 +51,12 @@ def stream_fields(form):
     kind = form.get('kind')
     if kind not in STREAM_KINDS:
         raise BadRequest('Choose Self employed, Employed or CIS.')
+    if action == 'start':
+        if set(form) - {'csrf_token', 'action', 'name', 'kind'}:
+            raise BadRequest('Start with only a name and income type.')
+        return action, name, kind, dict(income_mode='forecast', expected_gross_minor=None,
+            expected_gross_period=None, expected_gross_currency=None, forecast_tax_year='2026-27',
+            unpaid_holiday_weeks=Decimal(0), unpaid_holiday_unit='weeks')
     mode = form.get('income_mode', 'forecast')
     if mode not in ('forecast', 'shifts'):
         raise BadRequest('Choose Regular forecast or Individual shifts.')

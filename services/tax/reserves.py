@@ -12,7 +12,7 @@ from services.tax.rules import cached_status, reviewed_rules
 from services.transactions.shifts import attach_shift_totals
 
 
-def current_plan(*, refresh_rules=True, session=None):
+def current_plan(*, refresh_rules=True, session=None, payments=None, as_of=None):
     session = session if session is not None else db.session
     if refresh_rules:
         tax_rule_service.start_rule_check(current_app.instance_path)
@@ -20,7 +20,7 @@ def current_plan(*, refresh_rules=True, session=None):
     streams = session.scalars(db.select(IncomeStream).where(
         IncomeStream.forecast_tax_year == rules['tax_year']).order_by(IncomeStream.name, IncomeStream.id)).all()
     attach_shift_totals(streams, session=session)
-    records = tax_record_service.tax_records(rules, session=session)
+    records = tax_record_service.tax_records(rules, session=session, payments=payments, as_of=as_of)
     records.setdefault('issues', [])
     if cached_status(current_app.instance_path).get('status') == 'needs_review':
         records['issues'].append('Income-tax rules changed and need review.')

@@ -372,11 +372,15 @@ def income_streams():
     """Create and manage streams without changing bank records or inferring tax."""
     if request.authorization is not None or not current_user.is_authenticated:
         return redirect(url_for('login.sign_in'))
-    options = query_values({'stream', 'page', 'create', 'view', 'configure'})
+    options = query_values({'stream', 'page', 'create', 'view', 'configure', 'setup', 'workspace'})
+    if options.get('setup', '1') != '1':
+        raise BadRequest('Choose a valid setup step.')
     view = options.get('view', 'income' if options.get('stream') else '')
     if view not in ('', 'income', 'deductions'):
         raise BadRequest('Choose income or deductions.')
     configure_id = stream_id(options['configure']) if options.get('configure') else None
+    if 'workspace' in options and (options['workspace'] != '1' or not configure_id):
+        raise BadRequest('Choose a valid income workspace.')
     selected_id = stream_id(options['stream']) if options.get('stream') else None
     page_number = requested_page(options)
     if selected_id and db.session.get(IncomeStream, selected_id) is None:
@@ -400,7 +404,7 @@ def income_streams():
             action, name, kind, forecast = stream_fields(request.form)
             # Coordinate relationship changes with mileage and shift writes.
             db.session.execute(db.select(db.func.pg_advisory_xact_lock(6075157141257144400 + int(test_data_active()))))
-            if action == 'create':
+            if action in ('start', 'create'):
                 edited = IncomeStream(id=str(uuid4()), name=name, kind=kind, **forecast)
                 db.session.add(edited)
             else:
@@ -430,8 +434,12 @@ def income_streams():
                     edited.archived = action == 'archive'
             if action == 'create' or (action == 'update' and 'mileage_with_stream' in request.form):
                 set_mileage_relationship(edited, request.form.get('mileage_with_stream', ''))
-            record_action('stream.' + action, edited.id)
+            record_action('stream.' + ('create' if action == 'start' else action), edited.id)
             db.session.commit()
+            if action == 'start':
+                return redirect(url_for('dashboard.income_workspace', source_id=edited.id), code=303)
+            if options.get('workspace') == '1' and edited.id == configure_id:
+                return redirect(url_for('dashboard.income_workspace', source_id=edited.id), code=303)
             return redirect(url_for('dashboard.income_streams', stream=selected_id, page=page_number), code=303)
         except (BadRequest, Conflict) as invalid:
             db.session.rollback()
@@ -487,6 +495,38 @@ def income_streams():
                            display_amount=display_amount, format_amount=format_amount, annual_gross=annual_gross, holiday_amount=holiday_amount,
                            selected_name=names.get(selected_id, 'All income'), rows=rows, page=page,
                            current_user=current_user), error_status if error else 200
+
+
+@dashboard.get('/income-streams/<source_id>')
+def income_workspace(source_id):
+    """Keep forecasts, entered work and receipt evidence separate for one source."""
+    if request.authorization is not None or not current_user.is_authenticated:
+        return redirect(url_for('login.sign_in'))
+    query_values(set())
+    from services.tax.export import export_session
+    from services.transactions.shifts import shift_label
+    from services.tax.records import expense_current
+    with export_session() as saved:
+        stream = saved.get(IncomeStream, stream_id(source_id))
+        if stream is None:
+            raise NotFound('Income stream not found.')
+        attach_shift_totals([stream], session=saved)
+        receipts = saved.scalars(db.select(Transaction).join(Transaction.income).where(
+            TransactionIncome.income_stream_id == stream.id).options(selectinload(Transaction.income))
+            .order_by(Transaction.transaction_time.desc(), Transaction.account_uid,
+                      Transaction.category_uid, Transaction.feed_item_uid).limit(5)).all()
+        work = saved.scalars(db.select(IncomeShift).where(IncomeShift.income_stream_id == stream.id)
+            .order_by(IncomeShift.starts_at.desc(), IncomeShift.id).limit(5)).all()
+        expenses = saved.scalars(db.select(ExpenseDeduction).where(ExpenseDeduction.income_stream_id == stream.id)
+            .options(selectinload(ExpenseDeduction.transaction).selectinload(Transaction.classification))
+            .order_by(ExpenseDeduction.recorded_time.desc(), ExpenseDeduction.account_uid,
+                      ExpenseDeduction.category_uid, ExpenseDeduction.feed_item_uid).limit(5)).all()
+        journeys = saved.scalars(db.select(MileageEntry).where(MileageEntry.income_stream_id == stream.id)
+            .order_by(MileageEntry.journey_date.desc(), MileageEntry.id).limit(5)).all()
+        return render_template('income_workspace.html', stream=stream, receipts=receipts, work=work,
+            expenses=expenses, journeys=journeys, stream_kinds=STREAM_KINDS, annual_gross=annual_gross,
+            format_amount=format_amount, date_display=date_display, shift_label=shift_label,
+            expense_current=expense_current, current_user=current_user, navigation_page='income-streams')
 
 
 @dashboard.route('/tax-rules', methods=['GET', 'POST'])

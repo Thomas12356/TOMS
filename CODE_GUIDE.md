@@ -630,3 +630,25 @@ The existing guided review accepts only a bounded `return_to=home` and known tas
 category, preserving context through errors and returning there after confirmation.
 Arbitrary return URLs and mixed Home/ledger contexts are rejected. Coverage is in
 `tests/test_home_tasks.py` and `tests/home_tasks_browser_checks.py`.
+
+## Shared Home evidence and source workspaces
+
+`services/tax/records.py → planning_payments` loads year-relevant payment evidence
+with its one-to-one income, expense and classification records in one ordered
+query. It retains claims whose original recorded date is in the year even when
+the bank date moves. Home supplies these records and a single `as_of` to
+`current_plan` and `guided_checklist`; the checklist still independently filters
+settled, non-future payments. This avoids repeated payment scans and growing
+relationship-loader batches without storing additional completion flags.
+
+`/dashboard/income-streams?setup=1` starts with name and type. The explicit `start`
+action creates an unknown forecast (all three amount/period/currency fields are
+NULL), using the existing schema, write lock, CSRF and create audit action.
+The existing complete creation form remains available. Setup redirects to
+`/dashboard/income-streams/<source_id>`, an owner-only repeatable-read workspace
+with separate forecast, work, receipt, expense and mileage evidence. Previews
+are bounded to five rows per record type and retain original currency labels.
+Only the requested settings form is rendered on the source index; normal GET
+navigation is the fallback when its dialog is not already present. A bounded
+`workspace=1` context returns settings saves to that source. Existing routes,
+stale-version protection and sample routing remain in use.

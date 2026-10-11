@@ -20,13 +20,108 @@ class WorkspaceAuthTests(ApiTestCase):
     def test_owner_only_even_with_api_key(self):
         from app import app
         with patch.dict(app.config, SECRET_KEY='a' * 64):
-            for path in ('/dashboard/income-notifications', '/dashboard/income-notifications/read', '/dashboard/account-reserves'):
-                method = self.client.get if path.endswith('income-notifications') else self.client.post
+            for path in ('/dashboard/income-notifications', '/dashboard/income-notifications/read', '/dashboard/account-reserves', '/dashboard/income-streams/' + str(uuid4())):
+                method = self.client.get if path.endswith('income-notifications') or '/income-streams/' in path else self.client.post
                 for headers in ({}, self.headers):
                     self.assertEqual(method(path, headers=headers).status_code, 302)
 
 
 class IncomeWorkspaceTests(DeductionOwnerCase):
+    def test_workspace_settings_return_context_survives_stale_edits(self):
+        from support import stream_token
+        path = '/dashboard/income-streams?configure=' + self.stream + '&workspace=1'
+        data = dict(csrf_token=self.csrf(), version=stream_token(self.client, self.stream),
+            action='update', stream_id=self.stream, name='Workspace renamed', kind='self_employed',
+            expected_gross='30000', expected_gross_period='yearly', expected_gross_currency='GBP',
+            income_mode='forecast', forecast_tax_year='2026-27', unpaid_holiday='0', unpaid_holiday_unit='weeks')
+        saved = self.client.post(path, data=data)
+        self.assertEqual(saved.status_code, 303)
+        self.assertEqual(saved.location, '/dashboard/income-streams/' + self.stream)
+        stale = self.client.post(path, data=data)
+        self.assertEqual(stale.status_code, 409)
+        self.assertIn('workspace=1', stale.get_data(as_text=True))
+        self.assertEqual(self.client.get('/dashboard/income-streams?workspace=1').status_code, 400)
+        self.assertEqual(self.client.get(path.replace('workspace=1', 'workspace=https://example.com')).status_code, 400)
+
+    def test_workspace_previews_are_bounded_and_never_include_another_source(self):
+        from contextlib import contextmanager
+        @contextmanager
+        def snapshot():
+            yield self.session
+        other = IncomeStream(id=str(uuid4()), name='Different employer', kind='employed')
+        self.session.add(other)
+        for index in range(7):
+            self.session.add(Transaction(account_uid=self.account, category_uid=self.category,
+                feed_item_uid=str(uuid4()), amount_minor=5500, currency='GBP', direction='IN', status='SETTLED',
+                transaction_time=datetime(2026, 5, index + 1, tzinfo=timezone.utc),
+                source_updated_at=datetime(2026, 5, index + 1, tzinfo=timezone.utc), source='FASTER_PAYMENTS_IN',
+                counterparty_name='Unrelated receipt' if index == 6 else f'Workspace receipt {index}', raw_payload={},
+                income=TransactionIncome(income_stream_id=other.id if index == 6 else self.stream,
+                    income_type='other', tax_treatment='no_tax_deducted', gross_minor=5500,
+                    recorded_currency='GBP', adjustment_minor=0, needs_review=False)))
+        self.session.commit()
+        with patch('services.tax.export.export_session', snapshot):
+            html = self.client.get('/dashboard/income-streams/' + self.stream).get_data(as_text=True)
+        self.assertNotIn('Unrelated receipt', html)
+        self.assertNotIn('Workspace receipt 0', html)
+        for index in range(1, 6):
+            self.assertIn(f'Workspace receipt {index}', html)
+        self.bank.assert_not_called()
+
+    def test_staged_creation_keeps_forecast_unknown_and_continues_to_workspace(self):
+        response = self.client.post('/dashboard/income-streams?setup=1', data=dict(
+            csrf_token=self.csrf(), action='start', name='New roofing work', kind='self_employed'))
+        self.assertEqual(response.status_code, 303)
+        source_id = response.location.rsplit('/', 1)[1]
+        source = self.session.get(IncomeStream, source_id)
+        self.assertIsNone(source.expected_gross_minor)
+        self.assertIsNone(source.expected_gross_period)
+        self.assertIsNone(source.expected_gross_currency)
+        self.assertEqual(source.name, 'New roofing work')
+        self.assertIn('New roofing work: enter expected gross income.', current_plan(refresh_rules=False)['blockers'])
+        from contextlib import contextmanager
+        @contextmanager
+        def snapshot():
+            yield self.session
+        with patch('services.tax.export.export_session', snapshot):
+            workspace = self.client.get(response.location)
+        self.assertEqual(workspace.status_code, 200)
+        self.assertIn('Expected income is unknown', workspace.get_data(as_text=True))
+        self.assertNotIn('>Open work records</a>', workspace.get_data(as_text=True))
+        self.bank.assert_not_called()
+
+    def test_staged_validation_retains_name_without_opening_advanced_dialog(self):
+        response = self.client.post('/dashboard/income-streams?setup=1', data=dict(
+            csrf_token=self.csrf(), action='start', name='Roofing <script>', kind='invalid'))
+        self.assertEqual(response.status_code, 400)
+        html = response.get_data(as_text=True)
+        self.assertIn('Roofing &lt;script&gt;', html)
+        self.assertIn('1. Name your income source', html)
+        self.assertNotIn('data-reopen="true"', html)
+        rejected = self.client.post('/dashboard/income-streams', data=dict(
+            csrf_token=self.csrf(), action='start', name='Test', kind='employed', expected_gross='0'))
+        self.assertEqual(rejected.status_code, 400)
+
+    def test_source_workspace_is_owner_only_bounded_and_separates_evidence(self):
+        from contextlib import contextmanager
+        @contextmanager
+        def snapshot():
+            yield self.session
+        self.receipt.counterparty_name = '<script>receipt</script>'
+        self.session.commit()
+        with patch('services.tax.export.export_session', snapshot), patch('services.tax.rules.start_rule_check') as rules:
+            response = self.client.get('/dashboard/income-streams/' + self.stream)
+            self.assertEqual(response.status_code, 200)
+            html = response.get_data(as_text=True)
+            self.assertIn('&lt;script&gt;receipt&lt;/script&gt;', html)
+            self.assertIn('not added together as extra income', html)
+            self.assertIn('Latest five assigned receipts', html)
+            self.assertEqual(response.headers['Cache-Control'], 'no-store')
+            self.assertEqual(self.client.get('/dashboard/income-streams/' + str(uuid4())).status_code, 404)
+            self.assertEqual(self.client.get('/dashboard/income-streams/' + self.stream + '?stream=other').status_code, 400)
+            rules.assert_not_called()
+        self.bank.assert_not_called()
+
     def setUp(self):
         super().setUp()
         self.enterContext(patch('services.tax.reserves.cached_status', return_value={'status': 'verified'}))

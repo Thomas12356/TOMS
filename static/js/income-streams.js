@@ -55,8 +55,10 @@ document.addEventListener('click', async event => {
     if (close) { event.preventDefault(); close.closest('dialog').close(); return; }
     const configure = event.target.closest('[data-open-dialog]');
     if (configure) {
+        const dialog = document.getElementById(configure.dataset.openDialog);
+        if (!dialog) return;
         event.preventDefault();
-        openStreamDialog(document.getElementById(configure.dataset.openDialog), configure);
+        openStreamDialog(dialog, configure);
         return;
     }
     const link = event.target.closest('[data-load-dialog]');

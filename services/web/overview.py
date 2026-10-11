@@ -8,13 +8,16 @@ from services.invoices.reconciliation import invoice_work_changes
 from services.invoices.workflow import invoice_query, settlement, payment_current
 from services.tax.checklist import guided_checklist
 from services.tax.reserves import current_plan
+from services.tax.records import planning_payments
+from services.tax.rules import reviewed_rules
 from services.web.tasks import task_inbox
 
 
 def saved_overview(session, *, task_filter='all', as_of=None):
     now = as_of or datetime.now(timezone.utc)
-    estimate = current_plan(refresh_rules=False, session=session)
-    checks = guided_checklist(estimate, as_of=now, session=session)
+    payments = planning_payments(reviewed_rules(), session)
+    estimate = current_plan(refresh_rules=False, session=session, payments=payments, as_of=now)
+    checks = guided_checklist(estimate, as_of=now, session=session, payments=payments)
     earmarks = defaultdict(int)
     for currency, tax, ni in session.execute(db.select(Account.currency, AccountReserve.tax_minor,
             AccountReserve.ni_minor).join(AccountReserve, AccountReserve.account_uid == Account.account_uid)):

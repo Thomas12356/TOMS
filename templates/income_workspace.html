@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}{{ stream.name }} · TOMS{% endblock %}
+{% block main_class %}income-workspace{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('dashboard.income_streams') }}">All income sources</a></p>
+<div class="page-heading"><p class="eyebrow">TOMS / INCOME SOURCE</p><h1>{{ stream.name }}</h1></div>
+<p class="secondary">{{ stream_kinds[stream.kind] }}{{ ' · Archived' if stream.archived else '' }} · {{ stream.forecast_tax_year }}</p>
+<p class="secondary">Forecasts, entered work and bank receipts describe different evidence. They are not added together as extra income.</p>
+<section class="stream-manage" aria-labelledby="forecast-heading">
+    <h2 id="forecast-heading">2. Set up expected income</h2>
+    {% if stream.expected_gross_currency is none %}
+    <p>Expected income is unknown. Complete your forecast or choose individual shifts before relying on the planning estimate.</p>
+    {% elif stream.income_mode == 'shifts' %}
+    <p>Individual shifts: {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} entered gross. Future weeks are not extrapolated.</p>
+    {% else %}
+    <p>Regular forecast: {{ format_amount(annual_gross(stream), stream.expected_gross_currency) }} gross for the tax year, including explicit additional work and planned unpaid absence.</p>
+    {% endif %}
+    <a class="secondary-button" href="{{ url_for('dashboard.income_streams', configure=stream.id, workspace=1) }}">{{ 'Set up forecast or shifts' if stream.expected_gross_currency is none else 'Edit forecast and settings' }}</a>
+    <p class="secondary">Dates, unpaid absence and related mileage sources are optional settings. Actual withholding comes from payment evidence.</p>
+</section>
+<section class="stream-manage" aria-labelledby="work-heading">
+    <h2 id="work-heading">Entered work</h2>
+    <p class="secondary">Regular forecasts add only explicit overtime or additional work. Individual-shift forecasts use all entered work.</p>
+    {% for shift in work %}<p>{{ shift_label(shift) }} · {{ format_amount(shift.gross_minor, shift.currency) }}{{ ' · Additional work' if shift.is_overtime else '' }}</p>{% else %}<p>No work entered yet.</p>{% endfor %}
+    {% if stream.expected_gross_currency is not none %}<a class="secondary-button" href="{{ url_for('shifts.page', stream_id=stream.id) }}">Open work records</a>{% else %}<p class="secondary">Choose the income pattern and currency before entering work.</p>{% endif %}
+</section>
+<section class="stream-manage" aria-labelledby="receipts-heading">
+    <h2 id="receipts-heading">Saved bank receipts</h2>
+    <p class="secondary">Latest five assigned receipts across saved years. These are deposits, not additional forecast income.</p>
+    {% for payment in receipts %}<p>{{ payment.income.source_name or payment.counterparty_name or 'Unnamed source' }} · {{ date_display(payment.transaction_time).date }} · {{ format_amount(payment.amount_minor, payment.currency) }}{% if payment.income.needs_review %} · Needs review{% endif %}</p>{% else %}<p>No receipts assigned yet. Assign income through Transactions.</p>{% endfor %}
+    <a class="secondary-button" href="{{ url_for('dashboard.income_streams', view='income', stream=stream.id) }}">View all receipts</a>
+</section>
+<section class="stream-manage" aria-labelledby="expenses-heading">
+    <h2 id="expenses-heading">Expenses and mileage</h2>
+    <p class="secondary">Latest five expenses and journeys across saved years. Tracking-only spending does not reduce the tax estimate.</p>
+    {% for expense in expenses %}<p>{{ expense.purpose }} · {{ format_amount(expense.amount_minor, expense.recorded_currency) }} · {{ 'Tax deduction' if expense.is_tax_deductible else 'Tracking only' }}{{ ' · Needs review' if not expense_current(expense) else '' }}</p>{% endfor %}
+    {% for journey in journeys %}<p>{{ journey.journey_date }} · {{ journey.purpose }} · Mileage record</p>{% endfor %}
+    {% if not expenses and not journeys %}<p>No expenses or journeys assigned yet.</p>{% endif %}
+    <a class="secondary-button" href="{{ url_for('dashboard.income_streams', view='deductions', stream=stream.id) }}">View expenses and mileage</a>
+    <a class="secondary-button" href="{{ url_for('deductions.page') }}">Manage deductions</a>
+</section>
+{% endblock %}

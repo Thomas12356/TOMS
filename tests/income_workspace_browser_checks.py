@@ -23,6 +23,7 @@ with sync_playwright() as playwright:
             fixture.setUp()
             fixture.start_sync.return_value = False
             assert fixture.toggle(True).status_code == 303
+            original_sources = fixture.live_value('SELECT count(*) FROM SCHEMA.income_streams')
             server = make_server('127.0.0.1', 0, app, threaded=True)
             worker = Thread(target=server.serve_forever, daemon=True)
             worker.start()
@@ -46,6 +47,24 @@ with sync_playwright() as playwright:
             def submit(button):
                 with page.expect_navigation(): button.click()
                 layout()
+            go('/dashboard/income-streams?setup=1')
+            page.locator('#source-name').fill('Browser staged source <img src=x>')
+            page.locator('#source-kind').select_option('self_employed')
+            submit(page.get_by_role('button', name='Continue to income source', exact=True))
+            workspace_url = page.url
+            assert 'Expected income is unknown' in page.locator('main').inner_text()
+            assert page.locator('main img').count() == 0
+            assert page.get_by_role('link', name='Open work records', exact=True).count() == 0
+            with page.expect_navigation():
+                page.get_by_role('link', name='Set up forecast or shifts', exact=True).click()
+            page.locator('dialog[open] [name=expected_gross]').fill('0')
+            submit(page.get_by_role('button', name='Save changes', exact=True))
+            page.goto(workspace_url)
+            layout()
+            assert 'GBP 0.00 gross for the tax year' in page.locator('main').inner_text()
+            assert page.get_by_role('link', name='Open work records', exact=True).is_visible()
+            assert 'not added together as extra income' in page.locator('main').inner_text()
+            page.screenshot(path=f'/tmp/toms-source-workspace-{width}.png', full_page=True)
             go()
             page.wait_for_function("() => document.querySelector('#account-balances').textContent.includes('After earmarks:')")
             assert 'GBP 2,450.75' in page.locator('#account-balances').inner_text()
@@ -66,6 +85,7 @@ with sync_playwright() as playwright:
             assert page.get_by_role('heading', name='Configure Demo freelance work', exact=True).is_visible()
             layout()
             page.keyboard.press('Escape')
+            freelance.get_by_text('More actions', exact=True).click()
             freelance.get_by_role('link', name='Show income', exact=True).click()
             page.locator('#income-payments-dialog').wait_for(state='visible')
             assert page.locator('#income-payments-dialog .stream-payment').count() == 1
@@ -160,6 +180,25 @@ with sync_playwright() as playwright:
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.account_reserves') == 0
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.income_notice_reads') == 0
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.expense_deductions') == 0
+            assert fixture.live_value('SELECT count(*) FROM SCHEMA.income_streams') == original_sources
+            if width == 390:
+                html_context = browser.new_context(java_script_enabled=False, viewport={'width': width, 'height': 900})
+                html_context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+                html_page = html_context.new_page()
+                html_page.goto(origin + '/dashboard/income-streams?setup=1')
+                html_page.locator('#source-name').fill('Source without JavaScript')
+                html_page.locator('#source-kind').select_option('employed')
+                with html_page.expect_navigation():
+                    html_page.get_by_role('button', name='Continue to income source', exact=True).click()
+                assert 'Expected income is unknown' in html_page.locator('main').inner_text()
+                assert html_page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                with html_page.expect_navigation():
+                    html_page.get_by_role('link', name='Set up forecast or shifts', exact=True).click()
+                html_page.locator('dialog[open] [name=expected_gross]').fill('1200')
+                with html_page.expect_navigation():
+                    html_page.get_by_role('button', name='Save changes', exact=True).click()
+                assert 'GBP 1,200.00 gross for the tax year' in html_page.locator('main').inner_text()
+                html_context.close()
             fixture.bank.assert_not_called()
             assert not errors, errors
             page.close()

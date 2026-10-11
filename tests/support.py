@@ -25,7 +25,7 @@ from services.database.connection import db
 
 
 def stream_token(client, identity):
-    html = client.get('/dashboard/income-streams').get_data(as_text=True)
+    html = client.get('/dashboard/income-streams?configure=' + identity).get_data(as_text=True)
     form = html.split(f'id="configure-{identity}"')[1].split('</dialog>')[0]
     return re.search(r'name="version" value="([^"]+)"', form)[1]
 

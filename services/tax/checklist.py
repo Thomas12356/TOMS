@@ -25,7 +25,7 @@ def add(step, label, reason, url):
         step['items'].append(dict(label=label, reason=reason, url=url))
 
 
-def guided_checklist(estimate, *, as_of=None, session=None):
+def guided_checklist(estimate, *, as_of=None, session=None, payments=None):
     session = session if session is not None else db.session
     rules = reviewed_rules()
     first = datetime.fromisoformat(rules['starts_on']).replace(tzinfo=ZoneInfo('Europe/London'))
@@ -60,15 +60,18 @@ def guided_checklist(estimate, *, as_of=None, session=None):
                 '/dashboard/income-streams?' + urlencode({'configure': stream.id}))
     if not estimate['rows']:
         add(forecasts, 'Create your first income stream', 'Add each job or business to start the estimate.',
-            '/dashboard/income-streams?create=1')
+            '/dashboard/income-streams?setup=1')
     payments = session.scalars(db.select(Transaction).where(
         Transaction.transaction_time >= first, Transaction.transaction_time < end,
         Transaction.transaction_time <= now, Transaction.status == 'SETTLED').options(
         load_only(Transaction.amount_minor, Transaction.currency, Transaction.direction, Transaction.status,
                   Transaction.source, Transaction.transaction_time, Transaction.confirmed_at, Transaction.counterparty_name),
         selectinload(Transaction.income), selectinload(Transaction.classification)).order_by(
-        Transaction.transaction_time.desc(), Transaction.account_uid, Transaction.category_uid, Transaction.feed_item_uid)).all()
+        Transaction.transaction_time.desc(), Transaction.account_uid, Transaction.category_uid, Transaction.feed_item_uid)).all() if payments is None else payments
     for payment in payments:
+        if not (first <= payment.transaction_time < end and payment.transaction_time <= now
+                and payment.status == 'SETTLED'):
+            continue
         label = payment.counterparty_name or 'Unnamed payment'
         label += ' · ' + payment.transaction_time.astimezone(ZoneInfo('Europe/London')).strftime('%d %b %Y')
         if payment.confirmed_at is None:

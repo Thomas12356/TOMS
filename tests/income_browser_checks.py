@@ -25,7 +25,7 @@ with app.test_request_context('/dashboard/income'):
         needs_review=False, back_url='/dashboard?account=example&page=2', error=None)
 
 with app.test_request_context('/dashboard/income-streams'):
-    stream_html = render_template('income_streams.html',
+    stream_context = dict(
         streams=[stream], stream_kinds=STREAM_KINDS, counts={stream.id: 1}, stream_versions={stream.id: 'a' * 64}, stale_version=None,
         create_values={'name': '', 'kind': '', 'expected_gross': '', 'expected_gross_period': 'yearly', 'expected_gross_currency': 'GBP', 'unpaid_holiday': '0', 'unpaid_holiday_unit': 'weeks', 'forecast_tax_year': '2026-27', 'forecast_starts_on': '', 'forecast_ends_on': '', 'withholding_mode': 'unknown', 'expected_tax_deducted': ''},
         forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES, tax_years=TAX_YEARS, active_days=active_days,
@@ -34,6 +34,10 @@ with app.test_request_context('/dashboard/income-streams'):
         kind='Employment', date='06 Oct 2026', amount='GBP 25.00', needs_review=True, edit_url='/income')],
         view='', accounts=[], earmarks={}, reserve_target=None, expenses=[], journeys=[], deduction_pages=0,
         page=SimpleNamespace(pages=1), current_user=SimpleNamespace(is_authenticated=True))
+    stream_html = render_template('income_streams.html', **stream_context)
+
+with app.test_request_context('/dashboard/income-streams?configure=' + stream.id):
+    configure_html = render_template('income_streams.html', **dict(stream_context, editing_id=stream.id))
 
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
@@ -66,13 +70,13 @@ with sync_playwright() as playwright:
             if path.startswith('/static/'):
                 route.fulfill(path=str(ROOT / path.lstrip('/')))
             else:
-                route.fulfill(body=stream_html, content_type='text/html')
+                route.fulfill(body=configure_html if 'configure=' in route.request.url else stream_html, content_type='text/html')
         page.route('http://toms.test/**', respond_stream)
         page.goto('http://toms.test/dashboard/income-streams')
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
         assert page.locator('.stream-manage').count() == 1
         assert not page.locator('#create-stream-dialog').is_visible()
-        page.get_by_role('link', name='Create a Stream', exact=True).click()
+        page.get_by_role('link', name='Create with full details', exact=True).click()
         page.locator('#stream-name').fill('New business')
         page.locator('#stream-kind').select_option('cis')
         page.locator('#stream-gross').fill('1234.56')
@@ -87,6 +91,7 @@ with sync_playwright() as playwright:
         page.keyboard.press('Escape')
         assert not page.locator('#create-stream-dialog').is_visible()
         page.get_by_role('link', name='Configure stream', exact=True).click()
+        page.get_by_role('button', name='Save changes', exact=True).wait_for(state='visible')
         assert page.get_by_role('button', name='Save changes', exact=True).is_visible()
         assert page.get_by_role('button', name='Archive', exact=True).is_visible()
         page.keyboard.press('Escape')
@@ -94,13 +99,23 @@ with sync_playwright() as playwright:
             page.get_by_role('button', name='Toggle navigation').click()
         page.locator("#main-navigation summary").filter(has_text="Work & income").click()
         assert page.get_by_role('link', name='Income streams', exact=True).is_visible()
+        page.get_by_text('More actions', exact=True).click()
         page.get_by_role('link', name='Show income', exact=True).click()
         page.get_by_role('link', name='Edit income details').wait_for(state='visible')
         page.keyboard.press('Escape')
         assert page.locator('#forecast-' + stream.id + '-gross').input_value() == '1000.50'
         assert page.locator('#forecast-' + stream.id + '-period').input_value() == 'monthly'
         assert 'GBP 12,006.00 for 2026-27' in page.locator('main').inner_text()
-        page.get_by_role('link', name='Create a Stream', exact=True).click()
+        page.get_by_role('link', name='Create with full details', exact=True).click()
+        page.locator('#stream-name').fill('New business')
+        page.locator('#stream-kind').select_option('cis')
+        page.locator('#stream-gross').fill('1234.56')
+        page.locator('#stream-period').select_option('yearly')
+        page.locator('#stream-currency').select_option('USD')
+        page.locator('#stream-holiday').fill('2.5')
+        page.locator('#stream-holiday-unit').select_option('days')
+        page.locator('#stream-starts').fill('2026-10-06')
+        page.locator('#stream-ends').fill('2027-03-31')
         with page.expect_request(lambda request: request.method == 'POST') as submitted:
             page.get_by_role('button', name='Create stream', exact=True).click()
         payload = parse_qs(submitted.value.post_data)

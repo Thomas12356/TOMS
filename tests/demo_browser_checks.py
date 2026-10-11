@@ -109,7 +109,7 @@ with sync_playwright() as playwright:
             page.locator("#main-navigation summary").filter(has_text='Work & income').click()
             with page.expect_navigation():
                 page.get_by_role('link', name='Income streams', exact=True).click()
-            page.get_by_role('link', name='Create a Stream', exact=True).click()
+            page.get_by_role('link', name='Create with full details', exact=True).click()
             page.locator('#stream-name').fill('Browser-created sample work')
             page.locator('#stream-kind').select_option('self_employed')
             page.locator('#stream-gross').fill('oops')
@@ -257,7 +257,7 @@ with sync_playwright() as playwright:
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.mileage_entries') == 0
             with page.expect_navigation():
                 page.get_by_role('link', name='Manage income streams', exact=True).click()
-            page.get_by_role('link', name='Create a Stream', exact=True).click()
+            page.get_by_role('link', name='Create with full details', exact=True).click()
             page.locator('#stream-name').fill('Browser-linked source')
             page.locator('#stream-kind').select_option('self_employed')
             relationship = page.locator('#stream-mileage-business')

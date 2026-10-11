@@ -228,7 +228,7 @@ class IncomeFormTests(SavedTransactionTestCase):
         self.session.delete(self.session.get(IncomeStream, self.stream))
         self.session.commit()
         html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
-        self.assertIn('No streams yet', html)
+        self.assertIn('No sources yet', html)
         self.assertNotIn('Amazon Flex', html)
         self.assertIn('Self employed', html)
         self.assertIn('Employed', html)
@@ -261,7 +261,7 @@ class IncomeFormTests(SavedTransactionTestCase):
         self.assertEqual(self.session.get(IncomeStream, self.stream).expected_gross_minor, 100050)
 
     def test_stale_stream_settings_cannot_overwrite_newer_forecast(self):
-        html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
+        html = self.client.get('/dashboard/income-streams?configure=' + self.stream).get_data(as_text=True)
         configure = html.split(f'id="configure-{self.stream}"')[1].split('</dialog>')[0]
         found = re.search(r'name="version" value="([^"]+)"', configure)
         older = {'version': found[1]} if found else {}
@@ -315,7 +315,7 @@ class IncomeFormTests(SavedTransactionTestCase):
         self.assertEqual(self.payment().income.gross_minor, 3000)
         html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
         self.assertIn('GBP 24,000.00 for 2026-27', html)
-        self.assertIn('value="4.00"', html)
+        self.assertIn('value="4.00"', self.client.get('/dashboard/income-streams?configure=' + self.stream).get_data(as_text=True))
         self.assertEqual(self.stream_post(action='create', name='Holiday business', kind='self_employed',
             expected_gross='500', expected_gross_period='weekly', unpaid_holiday='2.5').status_code, 303)
         created = self.session.scalar(select(IncomeStream).where(IncomeStream.name == 'Holiday business'))
@@ -347,7 +347,7 @@ class IncomeFormTests(SavedTransactionTestCase):
             self.assertEqual(annual_gross(stream), annual)
         html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
         self.assertIn('260.00 days unpaid holiday', html)
-        self.assertIn('value="days" selected', html)
+        self.assertIn('value="days" selected', self.client.get('/dashboard/income-streams?configure=' + self.stream).get_data(as_text=True))
 
     def test_holiday_units_and_day_bounds_are_validated(self):
         for days in ('-1', '260.01', '261', '1.001', 'NaN'):
@@ -451,7 +451,7 @@ class IncomeFormTests(SavedTransactionTestCase):
         self.assertEqual(self.payment().income.gross_minor, 3000)
         html = self.client.get('/dashboard/income-streams').get_data(as_text=True)
         self.assertIn('GBP 10,964.38 for 2026-27', html)
-        self.assertIn('value="2026-10-06"', html)
+        self.assertIn('value="2026-10-06"', self.client.get('/dashboard/income-streams?configure=' + self.stream).get_data(as_text=True))
         self.assertIn('182 active days', html)
         self.bank.assert_not_called()
 
