@@ -3,6 +3,35 @@
 Updated: 2026-10-11. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
+## Latest review — performance as history grows
+
+Measured on `codex/performance-review`; see [PERFORMANCE_REVIEW.md](PERFORMANCE_REVIEW.md)
+and the opt-in `tests/performance_review.py` harness. Application behaviour is
+unchanged. Disposable schemas contained 10k/50k synthetic transactions, 1k/5k
+work records and 250/1,250 invoices with partial allocations and sending history.
+Bank and background rule/import requests were blocked. Only index metadata was
+read from the working schema; working financial data was not benchmarked.
+
+At 50k records, warm median response generation was 49–161 ms for ledger variants,
+2.0 seconds for Home, 2.9 seconds for matching and 5.4 seconds for the tax ZIP.
+Export Python allocation peak was 239.6 MiB. Ledger query counts stayed at seven;
+the other paths materialise complete evidence and use batched relationship loads.
+Read-only query plans showed scans and disk sorts on selected large queries.
+
+Prioritise bounded Home details with complete shared summaries, then incremental
+export generation, then matching detail/candidate loading. Evaluate a global
+ledger ordering index afterward. These remain proposals; no schema, calculation,
+live deployment or credential change was made. Full snapshot consistency,
+stale evidence, all-year allocations and currency separation must be retained.
+
+Validation: both large benchmark datasets passed, followed by a 100-record final
+harness smoke run checking schema removal. Full backend: 568 tests, 564 passes /
+four optional backup integration skips. Ruff F, application/harness Bandit and
+whitespace checks passed. No fixture real/demo schemas remained. Browser reruns
+were unnecessary because this delivery changes only benchmark tooling and docs.
+Owner walkthrough and excluded
+backup restore verification remain outstanding.
+
 ## Latest review — failure recovery and evidence consistency
 
 Reviewed on `codex/failure-recovery-review`: transaction import orchestration and

@@ -1169,3 +1169,19 @@ evidence against the original calculation. Import checks use rollback-only
 fixtures; they simulate abandonment rather than killing the production service.
 Reliability, reconciliation, tax-export and invoice browser scripts passed at
 320, 390, 768 and 1280px. Ruff F, application Bandit and whitespace checks passed.
+
+## Synthetic performance verification — 2026-10-11
+
+`tests/performance_review.py` exercises actual owner GETs in disposable schemas
+with blocked bank/background traffic. Both 10k and 50k transaction datasets
+passed, including invoices, partial allocations, sending records, stale work and
+cross-year invoice dates. Read-only EXPLAIN ANALYZE inspects synthetic queries;
+reported output excludes SQL parameters, financial records and credentials.
+The final 100-record smoke run additionally verifies schema removal. Catalog
+verification after the suite found no remaining fixture real/demo schemas.
+
+Full backend: 568 tests, 564 passes / four optional backup integration skips.
+Ruff F, Bandit for application code and the harness, and whitespace checks passed.
+No browser interface, application logic or schema migration changed; no new
+credentials, live bank calls or working restore. Measurements and limitations
+are recorded in [PERFORMANCE_REVIEW.md](PERFORMANCE_REVIEW.md).
