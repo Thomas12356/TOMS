@@ -68,9 +68,9 @@ class DashboardTests(ApiTestCase):
                     self.assertEqual(response.headers["Cache-Control"], "no-store")
             paginate.assert_not_called()
 
-    def test_day_labels_use_the_same_utc_date_as_the_ledger(self):
+    def test_day_labels_use_the_same_london_date_as_the_ledger(self):
         payments = [saved_payment(), saved_payment(transaction_time=datetime(2026, 10, 4, 12, tzinfo=timezone.utc))]
-        with patch("routes.dashboard.datetime") as clock, patch.object(db, "paginate", return_value=saved_page(payments)):
+        with patch("services.web.presentation.datetime") as clock, patch.object(db, "paginate", return_value=saved_page(payments)):
             clock.now.return_value = datetime(2026, 10, 5, 12, tzinfo=timezone.utc)
             response = self.client.get("/dashboard", headers=self.headers)
         html = response.get_data(as_text=True)

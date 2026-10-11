@@ -952,3 +952,28 @@ migration checksums match the repository. The outgoing six feature/fix commits
 were scanned across 258 unique blobs for configured application/bank/database
 secrets and excluded private files; no matches were found. Bank calls were mocked
 throughout. No application bugs were found in this final verification run.
+# Overview and navigation verification — 2026-10-11
+
+On `codex/overview-navigation`, the full PostgreSQL suite ran 496 tests: 492
+passed and four optional backup integration cases were skipped. Overview tests
+cover owner-only access, unknown and available targets, agreement with existing
+planning, GBP/EUR separation, all-year issued invoice totals, stale allocation
+exclusion, escaped record labels, safe errors and real/sample snapshot routing.
+The six overview tests passed again after extending the stale allocation check.
+Presentation checks cover integer precision, unknown money, unsupported currency
+scales, summer midnight, DST, winter day labels and rejecting naive timestamps.
+
+All 17 browser scripts passed. The new overview script covers 320, 390, 768 and
+1280px, initial/incomplete/sample states, the signed-in landing URL, skip-link
+focus, grouped navigation, Escape focus restoration and saved-only overview
+requests. Existing sample switching still redirects to the ledger and loads
+mock balances; that transition is outside the overview-only network assertion.
+Screenshots at mobile and desktop widths were inspected. The initial broad run
+stopped at that overbroad assertion; it was corrected and all remaining scripts
+passed. No application change was needed for it.
+
+Ruff F, application Bandit and git diff --check passed. Bank requests and rule
+checks were mocked. No schema migration, deployment or live Starling verification
+was performed. Optional backup integration remains unrun because isolated CREATEDB
+test credentials are not configured; prior historical backup results above do
+not replace current restore verification before future schema changes.

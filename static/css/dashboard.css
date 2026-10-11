@@ -29,6 +29,9 @@ a {
     text-underline-offset: 4px;
 }
 
+.skip-link { position: absolute; left: 16px; top: -100px; z-index: 100; padding: 12px; background: var(--surface); }
+.skip-link:focus { top: 16px; }
+
 a:focus-visible, .table-scroll:focus-visible {
     outline: 3px solid var(--accent);
     outline-offset: 4px;
@@ -115,6 +118,9 @@ a:focus-visible, .table-scroll:focus-visible {
     gap: 6px;
     margin-left: auto;
 }
+
+.navigation-group { display: flex; flex-wrap: wrap; align-items: center; border-left: 1px solid #59645b; padding-left: 6px; }
+.navigation-group-label { width: 100%; padding: 0 14px; color: #e8b976; font: 11px/18px var(--mono); }
 
 .site-header nav a, .site-header nav button {
     display: inline-flex;

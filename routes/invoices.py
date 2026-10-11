@@ -8,7 +8,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest, Conflict, NotFound
 
 from models import IncomeStream, Invoice, InvoiceItem
-from routes.dashboard import format_amount, requested_page
+from services.web.presentation import format_amount
+from routes.dashboard import requested_page
 from routes.helpers import query_values
 from services.database.connection import db
 from services.error_logging import log_failure

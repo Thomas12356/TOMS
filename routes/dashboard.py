@@ -2,7 +2,6 @@
 
 import re
 import hmac
-from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, current_app, session
 from flask_login import current_user
@@ -25,6 +24,7 @@ from services.transactions.income_streams import settings_version
 from services.transactions.automatic_sync import latest_sync, start_dashboard_sync
 from services.transactions.classification import CLASSIFICATION_TYPES, classification_details, save_classification, clear_classification
 from services.web.sessions import require_dashboard_login
+from services.web.presentation import format_amount, date_display
 from services.web.test_data import activate_test_data, ensure_sample_data, record_sample_sync, sample_balances
 from services.database.session import test_data_active
 from services.validation import uid, optional_text
@@ -76,16 +76,6 @@ def trigger_sync():
 @dashboard.get("/sync-status")
 def sync_status():
     return jsonify(run=latest_sync())
-
-
-def format_amount(amount_minor, currency):
-    """Format common two-decimal currencies without converting money to floats."""
-    if currency in ("GBP", "EUR", "USD"):
-        sign = "−" if amount_minor < 0 else ""
-        amount_minor = abs(amount_minor)
-        return f"{sign}{currency} {amount_minor // 100:,}.{amount_minor % 100:02d}"
-    # Other currencies can have different decimal scales, so preserve their units.
-    return f"{currency} {amount_minor:,} minor units"
 
 
 def requested_account(options):
@@ -199,14 +189,11 @@ def transactions_page():
 
     # 3. Give the template plain display values; database work stays in this route.
     rows = []
-    today = datetime.now(timezone.utc).date()
     for number, transaction in enumerate(page.items, start=(page_number - 1) * 50 + 1):
         classification = classification_details(transaction)
-        transaction_date = transaction.transaction_time.astimezone(timezone.utc)
         rows.append({
             "number": number,
-            "date": transaction_date.strftime("%d %b %Y"),
-            "day": "Today" if transaction_date.date() == today else transaction_date.strftime("%A"),
+            **date_display(transaction.transaction_time),
             "counterparty": transaction.counterparty_name or "Unnamed payment",
             "reference": transaction.reference,
             "amount": format_amount(transaction.amount_minor, transaction.currency),
@@ -455,7 +442,7 @@ def income_streams():
     page = db.paginate(query, page=page_number, per_page=50, error_out=False)
     rows = [dict(source=payment.income.source_name or payment.counterparty_name or 'Unnamed source',
                  kind=names.get(payment.income.income_stream_id, 'No stream assigned'),
-                 date=payment.transaction_time.strftime('%d %b %Y'),
+                 date=date_display(payment.transaction_time)['date'],
                  amount=format_amount(payment.amount_minor, payment.currency), needs_review=payment.income.needs_review,
                  edit_url=url_for('dashboard.edit_income', account_uid=payment.account_uid,
                                   category_uid=payment.category_uid, feed_item_uid=payment.feed_item_uid,

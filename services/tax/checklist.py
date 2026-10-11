@@ -25,7 +25,8 @@ def add(step, label, reason, url):
         step['items'].append(dict(label=label, reason=reason, url=url))
 
 
-def guided_checklist(estimate, *, as_of=None):
+def guided_checklist(estimate, *, as_of=None, session=None):
+    session = session if session is not None else db.session
     rules = reviewed_rules()
     first = datetime.fromisoformat(rules['starts_on']).replace(tzinfo=ZoneInfo('Europe/London'))
     end = (datetime.fromisoformat(rules['ends_on']) + timedelta(days=1)).replace(tzinfo=ZoneInfo('Europe/London'))
@@ -60,7 +61,7 @@ def guided_checklist(estimate, *, as_of=None):
     if not estimate['rows']:
         add(forecasts, 'Create your first income stream', 'Add each job or business to start the estimate.',
             '/dashboard/income-streams?create=1')
-    payments = db.session.scalars(db.select(Transaction).where(
+    payments = session.scalars(db.select(Transaction).where(
         Transaction.transaction_time >= first, Transaction.transaction_time < end,
         Transaction.transaction_time <= now, Transaction.status == 'SETTLED').options(
         load_only(Transaction.amount_minor, Transaction.currency, Transaction.direction, Transaction.status,
@@ -94,7 +95,7 @@ def guided_checklist(estimate, *, as_of=None):
                 if payment.currency != 'GBP':
                     reasons.append('This receipt needs review because received-income planning supports GBP.')
         add(income, label, ' '.join(reasons), payment_link(payment, 'dashboard.edit_income'))
-    claims = db.session.scalars(db.select(ExpenseDeduction).where(
+    claims = session.scalars(db.select(ExpenseDeduction).where(
         ExpenseDeduction.is_tax_deductible.is_(True),
         db.or_(db.and_(ExpenseDeduction.recorded_time >= first, ExpenseDeduction.recorded_time < end),
                ExpenseDeduction.transaction.has(db.and_(Transaction.transaction_time >= first, Transaction.transaction_time < end)))

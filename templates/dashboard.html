@@ -70,7 +70,7 @@
             <div class="panel-heading">
                 <div>
                     <h2 id="table-heading">Transaction History</h2>
-                    <p>{{ "{:,}".format(page.total) }} saved transaction{{ '' if page.total == 1 else 's' }} · {{ (selected_account.name or 'Starling account') if selected_account else 'All accounts' }} · Dates in UTC</p>
+                    <p>{{ "{:,}".format(page.total) }} saved transaction{{ '' if page.total == 1 else 's' }} · {{ (selected_account.name or 'Starling account') if selected_account else 'All accounts' }} · Dates in Europe/London</p>
                 </div>
                 <div class="ledger-controls">
                     {% if current_user.is_authenticated %}

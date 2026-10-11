@@ -49,7 +49,7 @@ with sync_playwright() as playwright:
             sign_in('wrong-password')
             assert page.get_by_role('alert').inner_text() == 'Incorrect username or password.'
             sign_in('test-pass-123')
-            assert page.url.endswith('/dashboard')
+            assert page.url.endswith('/dashboard/overview')
             page.goto(origin + '/settings/password')
             assert page.get_by_role('heading', name='Change password', exact=True).is_visible()
             page.get_by_label('Current password', exact=True).fill('test-pass-123')

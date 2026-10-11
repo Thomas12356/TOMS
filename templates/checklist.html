@@ -1,10 +1,9 @@
-<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Checklist · TOMS</title><link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}"></head>
-<body><header class="site-header"><a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
-{% with navigation_page='checklist', navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}</header>
-<main class="checklist-page"><p><a href="{{ url_for('tax_export.page') }}">Export tax-year records</a></p>{% include 'test_data_notice.html' %}
+{% extends 'base.html' %}
+{% set navigation_page = 'checklist' %}
+{% block title %}Checklist · TOMS{% endblock %}
+{% block main_class %}checklist-page{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('tax_export.page') }}">Export tax-year records</a></p>
 <div class="page-heading"><p class="eyebrow">TOMS / NEXT STEPS</p><h1>Your checklist</h1></div>
 {% if error %}<p class="message" role="alert">{{ error }}</p><p><a href="{{ url_for('checklist.page') }}">Try again</a></p>
 {% elif checklist %}
@@ -20,4 +19,5 @@
 {% if step['items'] %}<ul class="checklist-records">{% for item in step['items'] %}<li><a href="{{ item.url }}">{{ item.label }}</a><p>{{ item.reason }}</p></li>{% endfor %}</ul>
 {% if step.count > step['items']|length %}<p class="secondary">Showing the first {{ step['items']|length }} of {{ step.count }}. Use the link below for the full records and return here after resolving them.</p>{% endif %}{% endif %}
 <p><a href="{{ step.url }}">{{ step.action }}</a></p></li>{% endfor %}</ol>
-{% endif %}</main></body></html>
+{% endif %}
+{% endblock %}

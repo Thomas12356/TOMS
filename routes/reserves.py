@@ -19,7 +19,7 @@ from services.validation import uid
 from services.web.activity import record_action
 from services.web.sessions import require_dashboard_login
 from services.web.test_data import activate_test_data
-from routes.dashboard import format_amount
+from services.web.presentation import format_amount
 from routes.helpers import query_values
 
 reserves = Blueprint('reserves', __name__, url_prefix='/dashboard')

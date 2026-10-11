@@ -9,7 +9,8 @@ from sqlalchemy.orm import load_only, selectinload
 from werkzeug.exceptions import BadRequest
 
 from models import Transaction, TransactionIncome
-from routes.dashboard import format_amount, requested_account, requested_page
+from services.web.presentation import format_amount
+from routes.dashboard import requested_account, requested_page
 from routes.helpers import query_values
 from services.database.connection import db
 from services.web.activity import record_action

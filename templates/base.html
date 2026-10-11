@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}TOMS{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <a class="skip-link" href="#main-content">Skip to content</a>
+    <header class="site-header">
+        <a class="brand" href="{{ url_for('overview.page') }}">TOMS<span>The Organised Money System</span></a>
+        {% with navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}
+    </header>
+    <main id="main-content" tabindex="-1" class="{% block main_class %}{% endblock %}">
+        {% include 'test_data_notice.html' %}
+        {% block content %}{% endblock %}
+    </main>
+    {% block footer %}{% endblock %}
+</body>
+</html>

@@ -22,7 +22,8 @@ from services.tax.mileage_rules import cached_status, reviewed_rules
 from services.transactions.classification import classification_details
 from services.validation import uid
 from routes.helpers import query_values
-from routes.dashboard import format_amount, database_error
+from services.web.presentation import format_amount
+from routes.dashboard import database_error
 from services.transactions.income_form import display_amount
 from services.transactions.shifts import LOCAL_TIME, journey_defaults, shift_label
 

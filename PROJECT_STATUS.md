@@ -37,14 +37,14 @@ do not infer deployment status or current database health from them.
 
 On 2026-10-11 the user explicitly authorized pushing to the current public
 repository after its visibility was checked. The verified remote is
-, owned by , with default branch
-. Push the completed work without rewriting remote history and verify the
-remote commit. All subsequent implementation belongs on a named  branch.
+`git@github.com:Thomas12356/TOMS.git`, owned by `Thomas12356`, with default branch
+`main`. Commit `0b3c2ca` was pushed and the remote commit matched the local HEAD.
+Subsequent implementation uses `codex/overview-navigation`.
 
 ## Current handoff
 
 The user authorized starting [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).
-Phases 0 and 1 are implemented locally:
+Phases 0 and 1 are implemented and published:
 
 - Pinned development tools, private Chromium libraries and setup/verification
   commands replace dependence on temporary tooling. Single-year and multi-year
@@ -68,10 +68,37 @@ isolation and concurrent stream edits. Ruff F, application Bandit and whitespace
 checks passed. All 16 browser scripts passed on the completed reliability changes;
 the two new scripts cover stale-edit/session recovery and first-owner setup.
 
-No schema migration, deployment, publication or live Starling calls were performed.
+No schema migration, deployment or live Starling calls were performed.
 A private backup was created; restore verification could not run because dedicated
 CREATEDB test credentials are absent. Arrange isolated restore verification before
 a later phase changes the working schema. Do not restore over the working database.
 
-Next implementation: Phase 2, shared presentation/base templates, grouped
-navigation and the owner overview. The user authorized public publication as recorded above.
+## Overview and navigation phase
+
+Phase 2 is implemented on `codex/overview-navigation`, based on the published
+reliability work. Successful login and the signed-in root URL lead to the owner
+overview; the existing ledger URL and API-key ledger access remain compatible.
+
+- Shared integer money formatting and Europe/London browser dates replace
+  route-to-route formatter imports and UTC ledger day labels.
+- Overview and checklist use a shared base template with a keyboard skip link.
+  Navigation groups income/work, planning and settings while retaining existing
+  URLs, sample controls, session activity and keyboard/mobile behaviour.
+- Overview reads one repeatable-read, sample-routed saved-data snapshot. It shows
+  the next record, planning readiness, received-income target, per-currency saved
+  earmarks/gap, all-year outstanding issued invoices and saved import freshness.
+  Unknown targets remain unavailable; stale invoice allocations do not reduce
+  outstanding totals. Earmarks do not assert available bank funds. Opening the
+  overview starts neither a bank call nor a rules check.
+
+Verification: 496 backend tests ran, 492 passed and four optional backup integration
+cases were skipped. The six overview regressions were rerun after adding the stale
+allocation assertion. All 17 browser scripts passed, including the new overview
+journey at 320, 390, 768 and 1280px. Mobile and desktop screenshots were inspected.
+Ruff F, application Bandit and whitespace checks passed. No schema migration,
+deployment or live bank calls were performed. Existing backup-test credential
+limitations remain unchanged.
+
+Next implementation: Phase 3, bounded ledger filters and a complete guided review.
+Use a new `codex/transaction-review` branch for that work. Full checklist/invoice
+queries still grow with saved records; measured optimization remains in Phase 7.

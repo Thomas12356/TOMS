@@ -4,7 +4,7 @@ from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest
 
-from routes.dashboard import format_amount
+from services.web.presentation import format_amount
 from routes.helpers import query_values
 from services.error_logging import log_failure
 from services.invoices.reconciliation import reconcile

@@ -21,6 +21,7 @@ from routes.reserves import reserves
 from routes.checklist import checklist
 from routes.tax_export import tax_export
 from routes.reconciliation import reconciliation
+from routes.overview import overview
 from services.web.sessions import login_manager, csrf, SESSION_LIFETIME, lock_owner_setup, validate_owner_credentials
 from flask_wtf.csrf import CSRFError
 from werkzeug.security import generate_password_hash
@@ -61,6 +62,7 @@ app.register_blueprint(reserves)
 app.register_blueprint(checklist)
 app.register_blueprint(tax_export)
 app.register_blueprint(reconciliation)
+app.register_blueprint(overview)
 app.register_blueprint(starling)
 app.register_blueprint(sync)
 app.register_blueprint(transactions)
@@ -115,6 +117,8 @@ def csrf_failure(error):
 
 @app.get("/")
 def index():
+    if request.authorization is None and session.get('_user_id'):
+        return redirect(url_for('overview.page'))
     return redirect(url_for("dashboard.transactions_page"))
 
 

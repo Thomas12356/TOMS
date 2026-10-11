@@ -39,6 +39,8 @@ services/
         auth.py             Checks API keys
         sessions.py         Browser sessions, CSRF and login attempt limits
         request_limits.py   Bounds incoming request bodies
+        presentation.py     Exact money formatting and Europe/London browser dates
+        overview.py         Saved-record readiness, earmarks, invoice totals and imports
     validation.py           Shared UUID, date, money, and text validation
     error_logging.py        Logs safe diagnostic details
 ```
@@ -72,6 +74,29 @@ Amounts are integer minor units: `1250` means £12.50 for GBP. `None` means unkn
 it is different from zero. Dates are converted to UTC. The app validates entered
 income amounts; annual income-tax and NI planning lives in `services/tax/`.
 Monthly cash-flow reports remain separate from those planning calculations.
+
+## Owner overview and shared pages
+
+Successful browser login and the signed-in root URL lead to
+`/dashboard/overview`. API-key ledger access remains at `/dashboard`; API keys
+cannot open the owner overview. `routes/overview.py` uses the same routed,
+repeatable-read business snapshot as the evidence export. The planning calculation,
+checklist queries, account earmarks, invoice settlements and saved import status
+all use that session. Opening the page starts no bank or rule-check request.
+
+The received-income target follows planning readiness; an incomplete target or
+gap is unavailable. Saved earmarks are not proof of available bank funds. Issued
+invoice outstanding amounts use the shared settlement rules across all years,
+excluding stale allocations and keeping currencies separate. They are never
+added to earnings. Full checklist and invoice queries still scale with stored
+records; measured optimization remains planned in Phase 7.
+
+`templates/base.html` shares the header, sample notice, stylesheet, skip link and
+navigation for overview/checklist pages. Other templates migrate incrementally.
+Navigation groups retain existing URLs and remain usable without JavaScript.
+Browser-facing ledger dates and Today labels use Europe/London; storage and API
+timestamps keep their existing UTC contracts. Shared money formatting remains
+integer-based, including unknown amounts and currencies with unknown scales.
 
 ## Where to make a change
 

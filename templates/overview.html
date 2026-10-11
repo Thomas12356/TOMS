@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% set navigation_page = 'overview' %}
+{% block title %}Overview · TOMS{% endblock %}
+{% block content %}
+<div class="page-heading"><p class="eyebrow">TOMS / OVERVIEW</p><h1>Your money overview</h1>
+<p class="description">England, Wales and Northern Ireland · 2026–27. Planning from your saved records.</p></div>
+{% if error %}
+<p class="message" role="alert">{{ error }}</p><p><a href="{{ url_for('overview.page') }}">Try again</a></p>
+{% elif result %}
+<section class="checklist-summary" aria-labelledby="next-heading"><h2 id="next-heading">Your next step</h2>
+{% set next = result.checks.next_step %}
+{% if next %}<p><a href="{{ next['items'][0].url }}">{{ next.title }}</a></p><p><strong>{{ next['items'][0].label }}</strong></p><p>{{ next['items'][0].reason }}</p>
+{% else %}<p>No issues found in saved records. Check that all income sources, work and deductions are included.</p>{% endif %}
+<p><a href="{{ url_for('checklist.page') }}">View your full checklist</a> · <a href="{{ url_for('reconciliation.page') }}">Check work and payments</a></p>
+</section>
+<div class="balance-cards">
+<section class="balance-card" aria-labelledby="readiness-heading"><h2 id="readiness-heading">Planning readiness</h2>
+<p>Annual forecast: <strong>{{ 'Available' if result.checks.annual_ready else 'Needs attention' }}</strong></p>
+<p>Received-income target: <strong>{{ 'Available' if result.checks.received_ready else 'Needs attention' }}</strong></p>
+<p><a href="{{ url_for('dashboard.tax_estimate') }}">Review the tax estimate</a></p></section>
+<section class="balance-card" aria-labelledby="reserve-heading"><h2 id="reserve-heading">Tax and NI earmarks</h2>
+<p>Received-income target: <strong>{{ format_amount(result.target, 'GBP') }}</strong></p>
+<p>GBP earmarked: <strong>{{ format_amount(result.earmarks.get('GBP', 0), 'GBP') }}</strong></p>
+<p>Remaining gap: <strong>{{ format_amount(result.gap, 'GBP') }}</strong></p>
+{% for currency, amount in result.earmarks.items() %}{% if currency != 'GBP' %}<p>{{ currency }} earmarked separately: {{ format_amount(amount, currency) }}</p>{% endif %}{% endfor %}
+<p class="secondary">Earmarks are your saved plan. Available account balances and affordability have not been checked here. The target depends on forecasts and actual logged withholding.</p>
+<p><a href="{{ url_for('dashboard.income_streams', _anchor='account-reserves') }}">Review account money and earmarks</a></p></section>
+<section class="balance-card" aria-labelledby="invoices-heading"><h2 id="invoices-heading">Outstanding invoices</h2>
+{% for currency, row in result.invoices.items() %}<p>{{ row.count }} issued invoice{{ '' if row.count == 1 else 's' }} · <strong>{{ format_amount(row.outstanding, currency) }}</strong></p>
+{% if row.review %}<p class="message">{{ row.review }} payment allocation{{ '' if row.review == 1 else 's' }} needing review. Outstanding amounts exclude stale allocations.</p>{% endif %}
+{% else %}<p>No outstanding issued invoices.</p>{% endfor %}
+<p class="secondary">All invoice years. Invoices and logged work are separate evidence; their totals are not added to income.</p>
+<p><a href="{{ url_for('invoices.page') }}">Open invoices</a></p></section>
+<section class="balance-card" aria-labelledby="import-heading"><h2 id="import-heading">Saved import freshness</h2>
+{% if result.last_success %}<p>Last successful full {{ 'sample import' if using_test_data else 'import' }}: <strong>{{ local_date(result.last_success).strftime('%d %b %Y, %H:%M %Z') }}</strong></p>
+{% else %}<p>No successful full {{ 'sample import' if using_test_data else 'import' }} recorded.</p>{% endif %}
+{% if result.import_status %}<p>Most recent import: {{ result.import_status | replace('_', ' ') | title }}</p>{% endif %}
+<p class="secondary">Saved status only. Opening this page does not refresh bank records or balances.</p>
+<p><a href="{{ url_for('dashboard.transactions_page') }}">Open transactions</a> · <a href="{{ url_for('system.page') }}">Check system health</a></p></section>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,6 +1,6 @@
 # TOMS implementation plan
 
-Created: 2026-10-11. Status: baseline and reliability work implemented; later
+Created: 2026-10-11. Status: baseline, reliability and overview work implemented; later
 phases remain planned. See PROJECT_STATUS.md for the current verification record.
 
 ## Objective and boundaries
@@ -227,7 +227,7 @@ application-factory migration waits until workflows are stable to reduce churn.
 
 - [x] Baseline and reproducible browser tooling
 - [x] Stream stale protection and interaction-based inactivity
-- [ ] Shared presentation, navigation and overview
+- [x] Shared presentation, navigation and overview
 - [ ] Filtered ledger and guided transaction review
 - [ ] Stream workspaces, staged setup and account money
 - [ ] Business defaults and reusable clients
@@ -254,3 +254,13 @@ A private pre-change backup was created, but restore verification could not run
 because dedicated CREATEDB credentials are not configured. Before a later phase
 changes the working schema, arrange a successful isolated restore test as required
 by DATA_STORAGE.md. This does not block the schema-free reliability fixes.
+
+Phase 2 completed on `codex/overview-navigation`: shared presentation helpers,
+Europe/London ledger dates, base templates for overview/checklist, grouped
+navigation and the signed-in owner overview. Saved business data is read through
+one repeatable-read routed session, reusing planning/checklist/settlement logic.
+The overview preserves unknowns, currencies, stale allocation treatment and
+separate evidence. It starts no bank or rule check. Validation: 492 backend passes,
+four optional backup skips, all 17 browser scripts, Ruff F, Bandit and whitespace.
+Further template migration is incremental. Next: Phase 3 on a separately named
+transaction-review branch.

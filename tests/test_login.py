@@ -75,7 +75,7 @@ class OwnerLoginTests(OwnerLoginFixture):
         with patch.dict(app.config, {"SESSION_COOKIE_SECURE": True}):
             response = self.sign_in()
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.headers["Location"], "/dashboard")
+        self.assertEqual(response.headers["Location"], "/dashboard/overview")
         cookie = response.headers["Set-Cookie"]
         for flag in ("Secure", "HttpOnly", "SameSite=Lax"):
             self.assertIn(flag, cookie)

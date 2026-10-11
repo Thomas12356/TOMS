@@ -89,7 +89,7 @@ def sign_in():
         session.permanent = True
         login_user(LoggedInOwner(token), remember=False)
         # A fixed destination avoids untrusted redirect URLs.
-        return redirect(url_for("dashboard.transactions_page"))
+        return redirect(url_for("overview.page"))
     return render_template("login.html", error=None, ready=True)
 
 

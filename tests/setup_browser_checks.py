@@ -72,7 +72,7 @@ with sync_playwright() as playwright:
             page.get_by_label('Password', exact=True).fill('synthetic-password-123')
             with page.expect_navigation():
                 page.get_by_role('button', name='Sign in', exact=True).click()
-            assert page.url.endswith('/dashboard')
+            assert page.url.endswith('/dashboard/overview')
             page.goto(origin + '/setup')
             assert page.url.endswith('/login')
             fixture.bank.assert_not_called()
