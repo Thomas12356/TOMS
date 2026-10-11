@@ -70,7 +70,8 @@ Keeping these separate lets bank updates preserve your manual choices.
 
 Amounts are integer minor units: `1250` means £12.50 for GBP. `None` means unknown;
 it is different from zero. Dates are converted to UTC. The app validates entered
-income amounts but does not yet calculate annual tax.
+income amounts; annual income-tax and NI planning lives in `services/tax/`.
+Monthly cash-flow reports remain separate from those planning calculations.
 
 ## Where to make a change
 
