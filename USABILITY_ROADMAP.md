@@ -13,7 +13,8 @@ is merged into main and deployed locally, including the existing transaction-rev
 and roadmap commits. The live implementation is pinned at `867e856`.
 Deployment and verification details are recorded in PROJECT_STATUS.md.
 
-The unified action home is implemented on `codex/task-home`: saved import,
+The unified action home from `codex/task-home` is merged and deployed locally at
+`0d3e6f3`: saved import,
 payment, invoice, income-setup and planning actions, with retained Home context
 after review. Staged income setup remains next. Saved cash balances need a
 separately designed persistence change and isolated restore verification first;

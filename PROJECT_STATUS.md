@@ -10,7 +10,7 @@ home is implemented; staged income workspaces are next. Budgeting/AI remain late
 scoped milestones. See the latest handoff
 below for deployment revision and verification evidence.
 
-Current development: `codex/task-home` adds a unified saved-record action inbox.
+Latest delivery: `codex/task-home` adds a unified saved-record action inbox.
 
 ## Implemented
 
@@ -177,3 +177,7 @@ performance limitation. Next work is staged income setup/workspaces, with this
 read cost to be addressed before broader financial-summary expansion. Live-only
 balances are not presented as saved cash or available spending money. No migration
 or live Starling verification was required.
+
+Publication completed on 11 October: `codex/task-home` was fast-forwarded into main
+and pushed to the verified public repository under the user's existing publication
+authorization.
