@@ -37,7 +37,7 @@
         </section>
         {% else %}
         <!-- GET filters the view. No page field means switching returns to page one. -->
-        <form class="account-selector" action="{{ url_for('dashboard.transactions_page') }}" method="get">
+        <form class="account-selector ledger-filters" action="{{ url_for('dashboard.transactions_page') }}" method="get">
             <label for="account">Account</label>
             <select id="account" name="account">
                 <option value="all" {{ 'selected' if not account_uid else '' }}>All accounts</option>
@@ -45,8 +45,14 @@
                 <option value="{{ account.account_uid }}" {{ 'selected' if account.account_uid == account_uid else '' }}>{{ account.name or 'Starling account' }} / {{ account.currency }}</option>
                 {% endfor %}
             </select>
-            <noscript><button type="submit">View account</button></noscript>
+            <label for="ledger-search">Payer or reference<input id="ledger-search" type="search" name="q" maxlength="200" value="{{ filter_options.get('q', '') }}"></label>
+            <label for="ledger-from">From (London date)<input id="ledger-from" type="date" name="from" value="{{ filter_options.get('from', '') }}"></label>
+            <label for="ledger-to">To (London date)<input id="ledger-to" type="date" name="to" value="{{ filter_options.get('to', '') }}"></label>
+            <label for="ledger-classification">Classification<select id="ledger-classification" name="classification"><option value="all">All classifications</option>{% for key, choice in classification_choices.items() %}<option value="{{ key }}"{{ ' selected' if filter_options.get('classification') == key else '' }}>{{ choice.label }}</option>{% endfor %}</select></label>
+            <label for="ledger-attention">Attention<select id="ledger-attention" name="attention">{% for key, label in attention_choices.items() %}<option value="{{ key }}"{{ ' selected' if filter_options.get('attention', 'all') == key else '' }}>{{ label }}</option>{% endfor %}</select></label>
+            <button type="submit">Apply filters</button><a href="{{ url_for('dashboard.transactions_page', account=account_uid) }}">Clear filters</a>
             <p class="secondary">Selecting an account reloads this page. All saved records are kept.</p>
+            <p class="secondary">Needs attention includes unconfirmed records, incomplete settled income and changed linked expenses. Pending and future receipts do not require settled-income details yet.</p>
         </form>
 
         <section class="balance-section" aria-labelledby="balance-heading">
@@ -74,7 +80,8 @@
                 </div>
                 <div class="ledger-controls">
                     {% if current_user.is_authenticated %}
-                    <button type="button" class="review-open sync-button" id="review-open" hidden>Review transactions</button>
+                    <a class="sync-button" id="review-open" href="{{ url_for('guided_review.start', **filter_options) }}">Review {{ review_count }} transaction{{ '' if review_count == 1 else 's' }}</a>
+                    <button type="button" class="review-open secondary-button" id="quick-review" hidden>Quick confirmation</button>
                     <div class="sync-controls" data-test-data="{{ 'true' if using_test_data else 'false' }}" data-sync-url="{{ url_for('dashboard.trigger_sync') }}" data-status-url="{{ url_for('dashboard.sync_status') }}" data-csrf="{{ csrf_token() }}">
                         <button type="button" id="sync-now" data-sync-now title="{{ 'Simulates a sync using sample data; no bank connection.' if using_test_data else 'Syncs transactions from your bank account provider.' }}" aria-description="{{ 'Simulates a sync using sample data; no bank connection.' if using_test_data else 'Syncs transactions from your bank account provider.' }}">{{ sync_icon() }}<span>Sync now</span></button>
                     </div>
@@ -117,6 +124,7 @@
                                 {% endif %}
                                 {% if row.deduction_url %}<a class="edit-income" href="{{ row.deduction_url }}">Expense details</a>{% endif %}
                                 <a class="edit-classification{{ ' is-manual' if row.origin == 'manual' else '' }}" href="{{ row.edit_url }}">Edit classification</a>
+                                {% if current_user.is_authenticated %}<a class="guided-review-link" href="{{ row.guided_url }}">Guided review</a>{% endif %}
                             </td>
                             <td role="cell" data-label="Amount" class="amount {{ 'incoming' if row.direction == 'IN' else 'outgoing' }}">
                                 {{ '+' if row.direction == 'IN' else '−' }}{{ row.amount }}
@@ -133,11 +141,13 @@
             {% else %}
             <div class="empty-state">
                 {% if page.total == 0 %}
-                <h3>No saved transactions</h3>
-                <p>Import your Starling transactions to see them on this page.</p>
+                {% if filter_options.get('q') or filter_options.get('from') or filter_options.get('to') or filter_options.get('classification', 'all') != 'all' or filter_options.get('attention', 'all') != 'all' %}
+                <h3>No matching transactions</h3><p>Change or clear the filters to browse more records.</p>
+                {% else %}<h3>No saved transactions</h3>
+                <p>Import your Starling transactions to see them on this page.</p>{% endif %}
                 {% else %}
                 <h3>No transactions on this page</h3>
-                <p><a href="{{ url_for('dashboard.transactions_page', account=account_uid) }}">Return to the first page</a> to browse your saved payments.</p>
+                <p><a href="{{ ledger_url(page=1) }}">Return to the first page</a> to browse your saved payments.</p>
                 {% endif %}
             </div>
             {% endif %}
@@ -147,10 +157,10 @@
                 <span>Page {{ page.page }} of {{ page.pages }}</span>
                 <div>
                     {% if page.has_prev %}
-                    <a href="{{ url_for('dashboard.transactions_page', account=account_uid, page=page.prev_num) }}" rel="prev">← Previous</a>
+                    <a href="{{ ledger_url(page=page.prev_num) }}" rel="prev">← Previous</a>
                     {% endif %}
                     {% if page.has_next %}
-                    <a href="{{ url_for('dashboard.transactions_page', account=account_uid, page=page.next_num) }}" rel="next">Next →</a>
+                    <a href="{{ ledger_url(page=page.next_num) }}" rel="next">Next →</a>
                     {% endif %}
                 </div>
             </nav>
@@ -160,7 +170,7 @@
     </main>
     {% if not error and current_user.is_authenticated %}
     <dialog id="transaction-review" class="review-dialog" aria-labelledby="review-heading"
-            data-url="{{ url_for('review.next_transaction', account=account_uid, page=page.page) }}" data-csrf="{{ csrf_token() }}">
+            data-url="{{ url_for('review.next_transaction', **filter_options) }}" data-csrf="{{ csrf_token() }}">
         <div class="review-heading">
             <div><p class="eyebrow">TRANSACTION REVIEW</p><h2 id="review-heading">Check transaction details</h2></div>
             <button type="button" id="review-close" aria-label="Close transaction review">×</button>

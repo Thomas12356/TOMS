@@ -26,6 +26,7 @@ from services.web.presentation import format_amount
 from routes.dashboard import database_error
 from services.transactions.income_form import display_amount
 from services.transactions.shifts import LOCAL_TIME, journey_defaults, shift_label
+from services.transactions.ledger import FILTERS, ledger_options
 
 
 deductions = Blueprint('deductions', __name__, url_prefix='/dashboard/deductions')
@@ -44,7 +45,12 @@ def page():
         return redirect(url_for('login.sign_in'))
     from services.tax.rules import start_rule_check
     start_rule_check(current_app.instance_path)
-    options = query_values({'expense', 'type', 'shift'})
+    options = query_values({'expense', 'type', 'shift', 'return_to'} | FILTERS, empty_ignored={'q', 'from', 'to'})
+    return_url = None
+    if options.get('return_to') == 'ledger':
+        return_url = url_for('dashboard.transactions_page', **ledger_options(options))
+    elif options.get('return_to') or set(options) & FILTERS:
+        raise BadRequest('Choose a valid expense return page.')
     deduction_type = options.get('type', 'expense' if options.get('expense') else '')
     if deduction_type not in ('', 'expense', 'mileage'):
         raise BadRequest('Choose Expense or Mileage.')
@@ -137,7 +143,7 @@ def page():
                     db.session.add(entry)
             record_action('deduction.' + action, values.get('entry_id', '') if 'mileage' in action else selected.feed_item_uid)
             db.session.commit()
-            return redirect(url_for('deductions.page'), code=303)
+            return redirect(return_url or url_for('deductions.page'), code=303)
     except (ValueError, BadRequest) as invalid:
         db.session.rollback()
         error = invalid.description if isinstance(invalid, BadRequest) else str(invalid)
@@ -169,7 +175,8 @@ def page():
         entry_id=values.get('entry_id') or str(uuid4()), today=datetime.now(LOCAL_TIME).date(), locations=LOCATIONS, vehicles=VEHICLES,
         rules=reviewed_rules(), status=cached_status(current_app.instance_path), format_amount=format_amount,
         expense_current=expense_current, expense_version=expense_version, mileage_version=mileage_version, allowance=mileage_allowances(journeys),
-        current_user=current_user), 400 if error else 200
+        current_user=current_user, return_url=return_url,
+        return_context=ledger_options(options) if return_url else {}), 400 if error else 200
 
 
 def linked_shift_id(form, stream):

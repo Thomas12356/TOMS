@@ -99,6 +99,26 @@ Ruff F, application Bandit and whitespace checks passed. No schema migration,
 deployment or live bank calls were performed. Existing backup-test credential
 limitations remain unchanged.
 
-Next implementation: Phase 3, bounded ledger filters and a complete guided review.
-Use a new `codex/transaction-review` branch for that work. Full checklist/invoice
-queries still grow with saved records; measured optimization remains in Phase 7.
+## Transaction review and deployment handoff
+
+Overview commit `bf012d6` was fast-forwarded into main and published to the
+user-authorized public repository.
+
+Phase 3 is implemented on `codex/transaction-review`: bounded payer/reference,
+London-date, classification and attention filters survive pagination and edits.
+Review is an explicit action. The guided owner journey covers classification,
+income or expense details, then checking and confirming the saved evidence;
+quick confirmation remains optional. Validation retains entries, concurrent
+changes reject stale confirmation, and the full journey works without JavaScript.
+Unknown amounts, separate currencies, claim eligibility and existing allocations
+retain their existing treatment.
+
+Verification: 512 backend tests ran, 508 passed and four optional backup tests
+were skipped. All 18 browser scripts passed; mobile screenshots were inspected.
+Ruff F, application Bandit and whitespace checks passed. Disposable 10,000-record
+ledger benchmarks measured approximately 0.067s for a matching filter, 0.034s
+for an empty attention filter and 0.019s for guided queue selection. These are
+local synthetic measurements, not production latency guarantees. No schema
+change or live Starling verification was performed. Transaction review has not
+been merged or deployed. Next implementation is Phase 4; measured optimization
+of full checklist/invoice queries remains in Phase 7.

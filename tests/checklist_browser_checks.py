@@ -73,6 +73,8 @@ with sync_playwright() as playwright:
             assert 'No issues found' in page.locator('#check-income').inner_text()
             assert 'Received-income target:' in page.locator('.checklist-summary').inner_text()
             click(page.locator('#check-review').get_by_role('link', name='Open transaction review', exact=True))
+            assert not page.locator('#transaction-review').is_visible()
+            page.locator('#quick-review').click()
             page.wait_for_function("() => document.querySelector('#transaction-review').open")
             for remaining in (1, 0):
                 with page.expect_response(lambda response: '/confirm' in response.url and response.request.method == 'POST') as confirmed:

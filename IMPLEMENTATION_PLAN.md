@@ -228,7 +228,7 @@ application-factory migration waits until workflows are stable to reduce churn.
 - [x] Baseline and reproducible browser tooling
 - [x] Stream stale protection and interaction-based inactivity
 - [x] Shared presentation, navigation and overview
-- [ ] Filtered ledger and guided transaction review
+- [x] Filtered ledger and guided transaction review
 - [ ] Stream workspaces, staged setup and account money
 - [ ] Business defaults and reusable clients
 - [ ] Durable imports and operational health
@@ -264,3 +264,11 @@ separate evidence. It starts no bank or rule check. Validation: 492 backend pass
 four optional backup skips, all 17 browser scripts, Ruff F, Bandit and whitespace.
 Further template migration is incremental. Next: Phase 3 on a separately named
 transaction-review branch.
+
+Phase 3 completed on `codex/transaction-review`: bounded persistent ledger
+filters, explicit review entry, guided classification/details/check/confirmation,
+retained validation input and stale evidence protection. All 18 browser scripts
+and 508 backend cases passed; four optional backup cases skipped. Ruff F, Bandit
+and whitespace passed. A disposable 10,000-record filtered ledger request took
+approximately 0.067s.
+Overview has been merged into main. See PROJECT_STATUS.md for publication history.

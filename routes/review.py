@@ -19,6 +19,8 @@ from services.transactions.classification import CLASSIFICATION_TYPES, classific
 from services.transactions.income import INCOME_TYPES, TAX_TREATMENTS, income_details
 from services.transactions.review import REVIEW_FIELDS, review_version
 from services.transactions.income_streams import STREAM_KINDS
+from services.transactions.ledger import FILTERS, ledger_options, filtered_transactions
+from services.web.presentation import local_date
 from services.web.sessions import require_dashboard_login
 from services.web.test_data import activate_test_data
 
@@ -47,12 +49,10 @@ def transaction_query():
 
 @review.get('/review')
 def next_transaction():
-    options = query_values({'account', 'page'})
+    options = ledger_options(query_values(FILTERS, empty_ignored={'q', 'from', 'to'}))
     account_uid = requested_account(options)
     page_number = requested_page(options)
-    query = transaction_query().where(Transaction.confirmed_at.is_(None))
-    if account_uid:
-        query = query.where(Transaction.account_uid == account_uid)
+    query = filtered_transactions(transaction_query(), options).where(Transaction.confirmed_at.is_(None))
     count = db.session.scalar(db.select(db.func.count()).select_from(query.subquery()))
     transaction = db.session.scalar(query.order_by(Transaction.transaction_time.desc(), Transaction.account_uid,
                                    Transaction.category_uid, Transaction.feed_item_uid).limit(1))
@@ -62,7 +62,7 @@ def next_transaction():
     details = [
         ['Payment', transaction.counterparty_name or 'Unnamed payment'],
         ['Reference', transaction.reference or 'No reference'],
-        ['Date (UTC)', transaction.transaction_time.astimezone(timezone.utc).strftime('%d %b %Y, %H:%M')],
+        ['Date (Europe/London)', local_date(transaction.transaction_time).strftime('%d %b %Y, %H:%M %Z')],
         ['Direction', 'Money in' if transaction.direction == 'IN' else 'Money out'],
         ['Amount', format_amount(transaction.amount_minor, transaction.currency)],
         ['Bank status', transaction.status.replace('_', ' ').title()],
@@ -86,7 +86,7 @@ def next_transaction():
     return jsonify(remaining=count, transaction={
         'details': details, 'version': review_version(transaction),
         'confirm_url': url_for('review.confirm_transaction', **key),
-        'edit_url': url_for('dashboard.edit_classification', **key, account=account_uid, page=page_number),
+        'edit_url': url_for('dashboard.edit_classification', **key, **{**options, 'account': account_uid, 'page': page_number}),
     })
 
 

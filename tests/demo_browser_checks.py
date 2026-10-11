@@ -53,8 +53,7 @@ with sync_playwright() as playwright:
                 if not page.get_by_role('switch', name='Test data').is_visible():
                     page.get_by_role('button', name='Toggle navigation').click()
             def close_review():
-                if page.locator('#transaction-review').count():
-                    page.wait_for_function("() => document.querySelector('#transaction-review').open")
+                if page.locator('#transaction-review').is_visible():
                     page.get_by_role('button', name='Close transaction review').click()
             page.goto(origin + '/dashboard/income-streams')
             page.wait_for_function("() => !document.querySelector('#account-balances').textContent.includes('Loading')")
@@ -90,7 +89,7 @@ with sync_playwright() as playwright:
             close_review()
             provider.assert_not_called()
             fixture.start_sync.assert_not_called()
-            page.get_by_role('button', name='Review transactions', exact=True).click()
+            page.get_by_role('button', name='Quick confirmation', exact=True).click()
             page.get_by_role('button', name='Confirm details', exact=True).click()
             page.wait_for_function("() => document.querySelector('#review-count').textContent.includes('6')")
             page.get_by_role('button', name='Close transaction review').click()

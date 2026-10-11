@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% set navigation_page = 'transactions' %}
+{% block title %}Review transaction · TOMS{% endblock %}
+{% block main_class %}classification-page{% endblock %}
+{% block content %}
+<div class="page-heading"><p class="eyebrow">TOMS / TRANSACTION REVIEW</p><h1>Review transaction</h1></div>
+{% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+{% if complete %}
+<h2>No transactions awaiting confirmation in this view</h2>
+<p>Confirmation records your review. Tax readiness still depends on complete income and deduction evidence.</p>
+{% elif record %}
+<nav class="review-steps" aria-label="Review steps">
+{% for key, label in [('classification', '1. Classify'), ('details', '2. Complete details'), ('check', '3. Check and confirm')] %}
+<a href="{{ step_url(key) }}"{% if step == key %} aria-current="step"{% endif %}>{{ label }}</a>
+{% endfor %}</nav>
+<section class="payment-summary"><h2>{{ record.counterparty_name or 'Unnamed payment' }}</h2>
+<p class="amount">{{ 'Received' if record.direction == 'IN' else 'Paid' }} {{ format_amount(record.amount_minor, record.currency) }}</p>
+<p>{{ record.reference or 'No reference' }} · {{ local_date(record.transaction_time).strftime('%d %b %Y, %H:%M %Z') }} · {{ record.status | replace('_', ' ') | title }}</p></section>
+{% if stale %}<p><a href="{{ step_url(step) }}">Reload the current saved details</a>. The retained form cannot overwrite the newer record.</p>{% endif %}
+{% macro token() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="version" value="{{ version }}">{% endmacro %}
+{% if step == 'classification' %}
+<form class="login-form classification-form" method="post">{{ token() }}
+<h2>Classify this payment</h2><p>Choose its purpose. Classification alone does not establish tax treatment.</p>
+<label for="review-type">Classification</label><select id="review-type" name="type">{% for key, choice in choices.items() %}<option value="{{ key }}"{{ ' selected' if values.type == key else '' }}>{{ choice.label }}</option>{% endfor %}</select>
+<label for="review-notes">Classification notes</label><textarea id="review-notes" name="notes" maxlength="2000" rows="3">{{ values.notes }}</textarea>
+<button name="action" value="classify">Save classification and continue</button></form>
+{% if record.income %}<form method="post" class="review-remove">{{ token() }}<p>Changing away from income requires removing its linked income details. This also makes invoice allocations using them need review.</p><button class="secondary-button" name="action" value="remove_income">Remove linked income details</button></form>{% endif %}
+{% if record.expense %}<form method="post" class="review-remove">{{ token() }}<p>Changing away from expense requires removing its linked expense claim.</p><button class="secondary-button" name="action" value="remove_expense">Remove linked expense details</button></form>{% endif %}
+{% elif step == 'details' %}
+{% if kind == 'income' %}
+<form class="login-form classification-form income-form" method="post">{{ token() }}
+<h2>Complete income details</h2><p>Enter evidence from the payslip or payment statement. Unknown amounts stay blank; withholding is never assumed.</p>
+{% if record.income and record.income.recorded_currency != record.currency %}<p class="message">Previously saved amounts were in {{ record.income.recorded_currency }}. Re-enter amounts in {{ record.currency }}; no conversion has been applied.</p>{% endif %}
+<label for="income-stream">Income stream (required for taxable receipts)</label><select id="income-stream" name="income_stream_id"><option value="">Not assigned</option>{% for stream in streams %}<option value="{{ stream.id }}"{{ ' selected' if values.income_stream_id == stream.id else '' }}>{{ stream.name }}{{ ' (archived)' if stream.archived else '' }}</option>{% endfor %}</select>
+<label for="tax-treatment">Tax treatment</label><select id="tax-treatment" name="tax_treatment">{% for key, label in treatments.items() %}<option value="{{ key }}"{{ ' selected' if values.tax_treatment == key else '' }}>{{ label }}</option>{% endfor %}</select>
+<details><summary>Income description when no stream is assigned</summary><label for="income-type">Income type</label><select id="income-type" name="income_type">{% for key, label in income_types.items() %}<option value="{{ key }}"{{ ' selected' if values.income_type == key else '' }}>{{ label }}</option>{% endfor %}</select></details>
+<label for="source-name">Income source (optional)</label><input id="source-name" name="source_name" maxlength="200" value="{{ values.source_name }}">
+{% set unit = record.currency if record.currency in ('GBP', 'EUR', 'USD') else record.currency ~ ' minor units' %}
+{% for key, label in [('gross', 'Gross income'), ('tax_deducted', 'Income tax deducted'), ('ni_deducted', 'Employee NI deducted (employment only)'), ('adjustment', 'Adjustment')] %}
+<label for="{{ key }}">{{ label }} ({{ unit }})</label><input id="{{ key }}" name="{{ key }}" maxlength="30" inputmode="decimal" value="{{ values.get(key, '') }}">{% endfor %}
+<label for="adjustment-notes">Explain any adjustment</label><textarea id="adjustment-notes" name="adjustment_notes" maxlength="2000" rows="3">{{ values.adjustment_notes }}</textarea>
+<p class="secondary">Gross income − tax − employee NI + adjustment must match the deposit when known. Do not include employer NI or deduct the same withholding twice.</p>
+<button name="action" value="details">Save income and check</button></form>
+{% elif kind == 'expense' %}
+{% if record.direction == 'OUT' and record.status == 'SETTLED' %}
+<form class="login-form classification-form" method="post">{{ token() }}<h2>Expense details</h2><p>Link a business or tracked expense, or continue without creating an expense claim.</p>
+{% if record.expense and record.expense.recorded_currency != record.currency %}<p class="message">Previously saved expense amounts were in {{ record.expense.recorded_currency }}. Re-enter amounts in {{ record.currency }}; no conversion has been applied.</p>{% endif %}
+<label for="expense-stream">Income stream</label><select id="expense-stream" name="stream_id"><option value="">Choose a stream</option>{% for stream in streams %}<option value="{{ stream.id }}"{{ ' selected' if values.stream_id == stream.id else '' }}>{{ stream.name }}{{ ' (archived)' if stream.archived else '' }}</option>{% endfor %}</select>
+<label for="expense-tax-status">Expense treatment</label><select id="expense-tax-status" name="tax_status"><option value="tracking"{{ ' selected' if values.tax_status == 'tracking' else '' }}>Tracking only</option><option value="deduction"{{ ' selected' if values.tax_status == 'deduction' else '' }}>Tax deduction</option></select>
+<label for="expense-amount">Expense amount ({{ record.currency if record.currency in ('GBP', 'EUR', 'USD') else record.currency ~ ' minor units' }})</label><input id="expense-amount" name="amount" value="{{ values.amount }}" maxlength="30" inputmode="decimal">
+<label for="expense-purpose">Expense purpose</label><textarea id="expense-purpose" name="purpose" maxlength="1000" rows="3">{{ values.purpose }}</textarea>
+<label for="expense-category">Category</label><select id="expense-category" name="category">{% for key, label in [('general', 'General'), ('vehicle_running', 'Vehicle running costs'), ('parking_tolls', 'Parking and tolls')] %}<option value="{{ key }}"{{ ' selected' if values.category == key else '' }}>{{ label }}</option>{% endfor %}</select>
+<label for="vehicle-key">Vehicle registration or label (running costs only)</label><input id="vehicle-key" name="vehicle_key" maxlength="40" value="{{ values.vehicle_key }}">
+<label for="expense-shift">Work shift (optional)</label><select id="expense-shift" name="shift_id"><option value="">No linked shift</option>{% for shift in shifts %}<option value="{{ shift.id }}"{{ ' selected' if values.shift_id == shift.id else '' }}>{{ shift_label(shift) }}</option>{% endfor %}</select>
+<label><input type="checkbox" name="eligible" value="1"{{ ' checked' if values.get('eligible') == '1' else '' }}> I checked that this is an eligible, unreimbursed tax expense (required for tax deductions)</label>
+<button name="action" value="details">Save expense and check</button></form>
+{% else %}<p>Expense claims can be linked after the outgoing payment settles. You can review the saved bank details now.</p>{% endif %}
+{% else %}<p>This classification has no income or expense details to complete.</p>{% endif %}
+<form method="post" class="review-remove">{{ token() }}<p class="secondary">You can pause details work and check the payment. Confirmation does not make incomplete tax evidence complete.</p><button class="secondary-button" name="action" value="skip">Continue to saved-details check</button></form>
+{% else %}
+<h2>Check the saved details</h2><p>These are the values confirmation will cover. To correct them, return to classification or details above.</p>
+<dl class="review-details"><dt>Classification</dt><dd>{{ choices[kind].label }}</dd><dt>Classification notes</dt><dd>{{ record.classification.notes if record.classification and record.classification.notes else 'None' }}</dd>
+<dt>Bank source</dt><dd>{{ record.source or 'Not specified' }}</dd><dt>Bank spending category</dt><dd>{{ record.spending_category or 'Not specified' }}</dd>
+<dt>Settlement date</dt><dd>{{ local_date(record.settlement_time).strftime('%d %b %Y, %H:%M %Z') if record.settlement_time else 'Not recorded' }}</dd>
+<dt>Original source amount</dt><dd>{{ format_amount(record.source_amount_minor, record.source_currency) if record.source_currency else 'Not recorded' }}</dd>
+{% if record.income %}{% set income = record.income %}
+<dt>Income stream</dt><dd>{{ income.income_stream.name if income.income_stream else 'Not assigned' }}</dd>
+<dt>Income type</dt><dd>{{ income_types[income.income_type] }}</dd><dt>Tax treatment</dt><dd>{{ treatments[income.tax_treatment] }}</dd><dt>Income source</dt><dd>{{ income.source_name or 'Not specified' }}</dd>
+{% for field, label in [('gross_minor', 'Gross income'), ('tax_deducted_minor', 'Tax deducted'), ('ni_deducted_minor', 'Employee NI deducted'), ('adjustment_minor', 'Adjustment')] %}<dt>{{ label }}</dt><dd>{{ format_amount(income[field], income.recorded_currency) }}</dd>{% endfor %}
+<dt>Adjustment notes</dt><dd>{{ income.adjustment_notes or 'None' }}</dd>{% endif %}
+{% if record.expense %}{% set expense = record.expense %}
+<dt>Expense stream</dt><dd>{{ stream_names.get(expense.income_stream_id, 'Not assigned') }}</dd><dt>Expense treatment</dt><dd>{{ 'Tax deduction' if expense.is_tax_deductible else 'Tracking only' }}</dd><dt>Expense amount</dt><dd>{{ format_amount(expense.amount_minor, expense.recorded_currency) }}</dd><dt>Expense purpose</dt><dd>{{ expense.purpose }}</dd><dt>Expense category</dt><dd>{{ expense.category | replace('_', ' ') | title }}</dd><dt>Vehicle</dt><dd>{{ expense.vehicle_key or 'None' }}</dd><dt>Linked work</dt><dd>{% for shift in shifts %}{% if shift.id == expense.shift_id %}{{ shift_label(shift) }}{% endif %}{% endfor %}{% if not expense.shift_id %}None{% endif %}</dd>
+<dt>Payment when expense was saved</dt><dd>{{ format_amount(expense.recorded_amount_minor, expense.recorded_currency) }} · {{ local_date(expense.recorded_time).strftime('%d %b %Y, %H:%M %Z') }}</dd>{% endif %}
+</dl>
+{% if not income_complete %}<p class="message">Income evidence is incomplete for received-income planning. Confirmation checks the payment; complete the income details before relying on its target.</p>{% endif %}
+{% if not expense_current %}<p class="message">The linked expense changed and is excluded from deductions. Review its details before relying on the estimate.</p>{% endif %}
+{% if record.status != 'SETTLED' %}<p class="message">This payment has not settled. Confirmation does not make it received income.</p>{% endif %}
+<form method="post" class="review-remove login-form">{{ token() }}<button name="action" value="confirm">Confirm these saved details and continue</button></form>
+{% endif %}
+{% endif %}
+<p><a href="{{ back_url or url_for('dashboard.transactions_page') }}">Back to transactions</a></p>
+{% endblock %}

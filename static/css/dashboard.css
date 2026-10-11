@@ -32,6 +32,19 @@ a {
 .skip-link { position: absolute; left: 16px; top: -100px; z-index: 100; padding: 12px; background: var(--surface); }
 .skip-link:focus { top: 16px; }
 
+.ledger-filters { flex-wrap: wrap; align-items: end; gap: 12px; }
+.ledger-filters label { display: grid; gap: 4px; max-width: 100%; }
+.ledger-filters input, .ledger-filters select { max-width: 100%; min-height: 40px; padding: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.ledger-filters p { flex-basis: 100%; margin: 0; }
+.review-steps { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.review-steps [aria-current] { font-weight: 700; }
+.review-remove { margin: 24px 0; }
+.review-remove button { min-height: 44px; }
+.guided-review-link { display: block; margin-top: 8px; }
+@media (max-width: 640px) {
+    .classification-cell .guided-review-link { grid-column: 1 / -1; grid-row: 6; min-height: 44px; display: inline-flex; align-items: center; margin-top: 0; }
+}
+
 a:focus-visible, .table-scroll:focus-visible {
     outline: 3px solid var(--accent);
     outline-offset: 4px;

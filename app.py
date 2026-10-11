@@ -22,6 +22,7 @@ from routes.checklist import checklist
 from routes.tax_export import tax_export
 from routes.reconciliation import reconciliation
 from routes.overview import overview
+from routes.guided_review import guided_review
 from services.web.sessions import login_manager, csrf, SESSION_LIFETIME, lock_owner_setup, validate_owner_credentials
 from flask_wtf.csrf import CSRFError
 from werkzeug.security import generate_password_hash
@@ -63,6 +64,7 @@ app.register_blueprint(checklist)
 app.register_blueprint(tax_export)
 app.register_blueprint(reconciliation)
 app.register_blueprint(overview)
+app.register_blueprint(guided_review)
 app.register_blueprint(starling)
 app.register_blueprint(sync)
 app.register_blueprint(transactions)

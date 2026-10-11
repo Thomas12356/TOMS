@@ -104,6 +104,8 @@ with sync_playwright() as playwright:
             assert 'GBP 300.00 tax' in page.locator('#account-balances').inner_text()
             # Confirm every sample through the existing real review popup.
             go('/dashboard?account=all')
+            assert not page.locator('#transaction-review').is_visible()
+            page.locator('#quick-review').click()
             page.wait_for_function("() => document.querySelector('#transaction-review').open")
             for _ in range(7):
                 with page.expect_response(lambda response: '/confirm' in response.url and response.request.method == 'POST') as confirmed:

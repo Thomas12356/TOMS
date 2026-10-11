@@ -25,6 +25,7 @@ from services.transactions.automatic_sync import latest_sync, start_dashboard_sy
 from services.transactions.classification import CLASSIFICATION_TYPES, classification_details, save_classification, clear_classification
 from services.web.sessions import require_dashboard_login
 from services.web.presentation import format_amount, date_display
+from services.transactions.ledger import FILTERS, ATTENTION, ledger_options, filtered_transactions
 from services.web.test_data import activate_test_data, ensure_sample_data, record_sample_sync, sample_balances
 from services.database.session import test_data_active
 from services.validation import uid, optional_text
@@ -164,7 +165,7 @@ def account_balances():
 @dashboard.get("")
 def transactions_page():
     # 1. Read the requested page and reject invalid input before accessing PostgreSQL.
-    options = query_values({"page", "account"})
+    options = ledger_options(query_values(FILTERS, empty_ignored={'q', 'from', 'to'}))
     account_uid = requested_account(options)
     page_number = requested_page(options)
 
@@ -183,9 +184,11 @@ def transactions_page():
         selectinload(Transaction.classification), selectinload(Transaction.income),
     ).order_by(Transaction.transaction_time.desc(), Transaction.account_uid,
                Transaction.category_uid, Transaction.feed_item_uid)
-    if account_uid:
-        query = query.where(Transaction.account_uid == account_uid)
+    query = filtered_transactions(query, options)
     page = db.paginate(query, page=page_number, per_page=50, error_out=False)
+    review_count = db.session.scalar(db.select(db.func.count()).select_from(
+        query.where(Transaction.confirmed_at.is_(None)).order_by(None).subquery())) if current_user.is_authenticated else 0
+    return_context = {**options, 'account': account_uid, 'page': page_number}
 
     # 3. Give the template plain display values; database work stays in this route.
     rows = []
@@ -204,20 +207,26 @@ def transactions_page():
             "origin": classification["origin"],
             "income_url": url_for("dashboard.edit_income", account_uid=transaction.account_uid,
                                   category_uid=transaction.category_uid, feed_item_uid=transaction.feed_item_uid,
-                                  account=account_uid, page=page_number) if classification["type"] == "income" else None,
+                                  **return_context) if classification["type"] == "income" else None,
             "income_status": "Needs review" if getattr(transaction, "income", None) and transaction.income.needs_review else
                              "Details saved" if getattr(transaction, "income", None) else "Details missing",
-            "deduction_url": url_for('deductions.page', expense=f'{transaction.account_uid}:{transaction.category_uid}:{transaction.feed_item_uid}') if classification['type'] == 'expense' else None,
+            "deduction_url": url_for('deductions.page', expense=f'{transaction.account_uid}:{transaction.category_uid}:{transaction.feed_item_uid}', return_to='ledger', **return_context) if classification['type'] == 'expense' else None,
             "confirm_url": url_for("review.confirm_transaction", account_uid=transaction.account_uid,
                                    category_uid=transaction.category_uid, feed_item_uid=transaction.feed_item_uid),
             "edit_url": url_for("dashboard.edit_classification", account_uid=transaction.account_uid,
                                 category_uid=transaction.category_uid, feed_item_uid=transaction.feed_item_uid,
-                                account=account_uid, page=page_number),
+                                **return_context),
+            "guided_url": url_for('guided_review.payment', account_uid=transaction.account_uid,
+                                  category_uid=transaction.category_uid, feed_item_uid=transaction.feed_item_uid,
+                                  **return_context),
         })
 
     return render_template("dashboard.html", page=page, rows=rows, error=None,
                            accounts=accounts, selected_account=selected_account, account_uid=account_uid,
-                           current_user=current_user)
+                           current_user=current_user, filter_options=return_context,
+                           attention_choices=ATTENTION, classification_choices=CLASSIFICATION_TYPES,
+                           review_count=review_count,
+                           ledger_url=lambda **changes: url_for('dashboard.transactions_page', **{**return_context, **changes}))
 
 
 @dashboard.route("/transactions/<uuid:account_uid>/<uuid:category_uid>/<uuid:feed_item_uid>/classification", methods=["GET", "POST"])
@@ -226,10 +235,10 @@ def edit_classification(account_uid, category_uid, feed_item_uid):
         return render_template("dashboard.html", error="Set SECRET_KEY before using dashboard editing forms.", page=None), 503
 
     # 1. Keep return navigation constrained to our dashboard, never arbitrary URLs.
-    options = query_values({"page", "account"})
+    options = ledger_options(query_values(FILTERS, empty_ignored={'q', 'from', 'to'}))
     selected_account = requested_account(options)
     page_number = requested_page(options)
-    back_url = url_for("dashboard.transactions_page", account=selected_account, page=page_number)
+    back_url = url_for("dashboard.transactions_page", **{**options, 'account': selected_account, 'page': page_number})
 
     # 2. Read the payment without its raw payload; lock the parent on saves.
     query = db.select(Transaction).where(
@@ -282,10 +291,11 @@ def edit_income(account_uid, category_uid, feed_item_uid):
     # Browser edits always require a session and CSRF; API edits have their own route.
     if request.authorization is not None or not current_user.is_authenticated:
         return redirect(url_for("login.sign_in"))
-    options = query_values({"page", "account", "return_to", "stream"})
+    raw_options = query_values(FILTERS | {'return_to', 'stream'}, empty_ignored={'q', 'from', 'to'})
+    options = {**raw_options, **ledger_options(raw_options)}
     account = requested_account(options)
     page = requested_page(options)
-    back_url = url_for("dashboard.transactions_page", account=account, page=page)
+    back_url = url_for("dashboard.transactions_page", **{**ledger_options(options), 'account': account, 'page': page})
     if options.get('return_to') == 'income-streams':
         stream = options.get('stream', 'all')
         if stream != 'all':

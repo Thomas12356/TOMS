@@ -39,7 +39,7 @@ def guided_checklist(estimate, *, as_of=None, session=None):
         '/dashboard?account=all', 'Open saved payments')
     review = group('review', 'Review saved payments',
         'Confirm the details you have checked. Unconfirmed spending does not block the tax forecast; unconfirmed income can block the received-income target.',
-        '/dashboard?account=all', 'Open transaction review')
+        '/dashboard?account=all&attention=unconfirmed', 'Open transaction review')
     deductions = group('deductions', 'Review changed tax deductions',
         'Check claims whose linked bank payment changed. Tracking-only expenses do not reduce the tax estimate.',
         '/dashboard/deductions', 'Review deductions')
@@ -73,7 +73,7 @@ def guided_checklist(estimate, *, as_of=None, session=None):
         label += ' · ' + payment.transaction_time.astimezone(ZoneInfo('Europe/London')).strftime('%d %b %Y')
         if payment.confirmed_at is None:
             add(review, label, 'Check this record, then open transaction review to confirm it.',
-                payment_link(payment, 'dashboard.edit_classification'))
+                payment_link(payment, 'guided_review.payment'))
         if payment.direction != 'IN' or classification_details(payment)['type'] != 'income' or check_income(payment, {}):
             continue
         record = payment.income

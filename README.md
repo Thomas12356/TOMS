@@ -1529,3 +1529,14 @@ through payroll. Transfers, non-taxable receipts and future work/payments are
 excluded from business comparisons. Currencies stay separate. Each evidence
 section shows the first 50 records with full counts; totals use all records.
 No migration is required.
+
+## Finding and reviewing transactions
+
+The ledger filters saved transactions by payer/reference, London date range,
+classification and attention state. Filters remain selected through pagination
+and edits. Choose **Review N transactions** for classification, applicable income
+or expense details, and a final check before confirmation. This journey works
+without JavaScript. **Quick confirmation** remains available as an optional
+shortcut; review dialogs no longer open automatically. Blank unknown amounts
+remain unknown. Confirmation records review and does not prove tax completeness
+or move money. Changed evidence requires reloading before confirmation.

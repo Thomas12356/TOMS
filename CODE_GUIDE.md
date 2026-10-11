@@ -580,3 +580,19 @@ derives separate work, receipt and invoice totals. It reuses invoice receipt
 validation, version checks, settlement and frozen work snapshots. Receipt budgets
 consider active allocations across all years. Changes happen only through the
 existing invoice forms, which retain CSRF, revision and budget checks.
+
+## Filtered ledger and guided review
+
+`services/transactions/ledger.py` validates bounded browser filters and builds
+parameterized literal search, Europe/London date and attention expressions.
+`routes/dashboard.py` and the optional JSON review queue share these filters.
+`routes/guided_review.py` supplies the owner-only, CSRF-protected classification,
+details and check steps using `templates/guided_review.html`.
+`services/transactions/guided_review.py` reuses income/expense validators and
+fingerprints payment, income, classification and expense evidence. Writes take
+the shared advisory lock and refresh the locked payment; stale forms retain
+entries without adopting a new version. Confirmation remains distinct from tax
+readiness. Existing edit forms preserve ledger return filters.
+
+Regression coverage is in `tests/test_ledger_filters.py`,
+`tests/test_guided_review.py` and `tests/guided_review_browser_checks.py`.

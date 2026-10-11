@@ -10,6 +10,8 @@ sys.path.insert(0, str(ROOT))
 from app import app
 from flask import render_template
 from playwright.sync_api import sync_playwright
+from services.transactions.ledger import ATTENTION
+from services.transactions.classification import CLASSIFICATION_TYPES
 
 urls = [f'/dashboard/transactions/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/00000000-0000-4000-8000-{i:012d}/confirm' for i in range(2)]
 rows = [dict(number=i + 1, date='05 Oct 2026', day='Today', counterparty='Example payment',
@@ -20,7 +22,7 @@ with app.test_request_context('/dashboard'):
     html = render_template('dashboard.html', rows=rows,
         page=SimpleNamespace(page=1, total=2, pages=1, has_prev=False, has_next=False),
         accounts=[], selected_account=None, account_uid=None, error=None,
-        current_user=SimpleNamespace(is_authenticated=True))
+        current_user=SimpleNamespace(is_authenticated=True), filter_options={'page': 1}, attention_choices=ATTENTION, classification_choices=CLASSIFICATION_TYPES, review_count=len(rows))
 
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
@@ -79,6 +81,8 @@ with sync_playwright() as playwright:
                 route.abort()
         page.route('**/*', respond)
         page.goto('http://toms.test/dashboard')
+        assert not page.locator('#transaction-review').is_visible()
+        page.locator('#quick-review').click()
         page.wait_for_function("() => document.querySelector('#transaction-review').open")
         assert page.locator('#review-details img, #review-details script').count() == 0
         assert not page.evaluate('Boolean(window.injected)')
@@ -87,11 +91,11 @@ with sync_playwright() as playwright:
         page.locator('#review-close').click()
         assert not page.locator('#transaction-review').is_visible()
         assert state['remaining'] == 2 and not state['posted']
-        page.locator('#review-open').click()
+        page.locator('#quick-review').click()
         page.wait_for_function("() => document.querySelector('#transaction-review').open")
         page.keyboard.press('Escape')
         assert not page.locator('#transaction-review').is_visible()
-        page.locator('#review-open').click()
+        page.locator('#quick-review').click()
         page.wait_for_function("() => document.querySelector('#transaction-review').open")
 
         state['mode'] = 'conflict'
@@ -132,7 +136,7 @@ with sync_playwright() as playwright:
 
         # A saved confirmation with a failed next fetch must not reconfirm the old item.
         state['mode'] = 'normal'
-        page.locator('#review-open').click()
+        page.locator('#quick-review').click()
         page.wait_for_function("() => document.querySelector('#transaction-review').open")
         state['fail_load'] = True
         page.locator('#review-confirm').click()
@@ -143,14 +147,16 @@ with sync_playwright() as playwright:
         state['fail_load'] = False
         page.locator('#review-retry').click()
         page.wait_for_function("() => !document.querySelector('#transaction-review').open")
-        assert not page.locator('#review-open').is_visible()
+        assert not page.locator('#quick-review').is_visible()
 
         # Empty and failed initial lists are handled without a usable stale confirmation.
         page.reload()
-        page.wait_for_function("() => document.querySelector('#review-open').hidden")
+        page.wait_for_function("() => document.querySelector('#quick-review').hidden")
         assert not page.locator('#transaction-review').is_visible()
         state['fail_load'] = True
         page.reload()
+        assert not page.locator('#transaction-review').is_visible()
+        page.locator('#quick-review').click()
         page.wait_for_function("() => document.querySelector('#transaction-review').open")
         assert page.locator('#review-retry').is_visible() and page.locator('#review-confirm').is_disabled()
         assert not errors, errors

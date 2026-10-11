@@ -5,11 +5,14 @@
 <header class="site-header"><a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
 {% with navigation_page='deductions', navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}</header>
 <main>{% include 'test_data_notice.html' %}
+{% if return_url %}<p><a href="{{ return_url }}">Back to filtered transactions</a></p>{% endif %}
 <div class="page-heading"><p class="eyebrow">TOMS / DEDUCTIONS</p><h1>Expenses and mileage</h1></div>
 <p class="secondary">Link expenses for tracking, or explicitly claim eligible expenses to reduce taxable earnings. They are not tax already paid, and an expense classification alone does not make a payment tax deductible.</p>
 <p><a href="{{ url_for('dashboard.tax_estimate') }}">View tax estimate</a> · <a href="{{ url_for('dashboard.income_streams') }}">Manage income streams</a></p>
 {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+{% macro ledger_context() %}{% if return_url %}<input type="hidden" name="return_to" value="ledger">{% for key, value in return_context.items() %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}{% endif %}{% endmacro %}
 <form method="get" class="login-form deduction-type-form" id="deduction-type-form">
+{{ ledger_context() }}
 <label for="deduction-type">Add an expense or mileage</label>
 {% if request.args.get('shift') %}<input type="hidden" name="shift" value="{{ request.args.get('shift') }}">{% endif %}
 <select id="deduction-type" name="type">
@@ -22,6 +25,7 @@
 {% if deduction_type == 'expense' %}
 <section class="deduction-section"><h2>Link an existing expense</h2>
 <form method="get" class="login-form">
+{{ ledger_context() }}
 <input type="hidden" name="type" value="expense">
 {% if values.shift_id %}<input type="hidden" name="shift" value="{{ values.shift_id }}">{% endif %}
 <label for="expense-payment">Existing payment · latest 200 settled expenses</label>

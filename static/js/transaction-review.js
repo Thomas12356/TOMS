@@ -2,7 +2,7 @@
 (() => {
     const dialog = document.getElementById('transaction-review');
     if (!dialog) return;
-    const opener = document.getElementById('review-open');
+    const opener = document.getElementById('quick-review');
     const confirm = document.getElementById('review-confirm');
     const retry = document.getElementById('review-retry');
     const error = document.getElementById('review-error');
@@ -21,6 +21,8 @@
             if (!response.ok) throw new Error('Unable to load transaction review. Try again.');
             const data = await response.json();
             if (number !== loadNumber) return;
+            const guided = document.getElementById('review-open');
+            if (guided) guided.textContent = `Review ${data.remaining} transaction${data.remaining === 1 ? '' : 's'}`;
             transaction = data.transaction;
             opener.hidden = !transaction;
             if (!transaction) {
@@ -98,5 +100,6 @@
             confirm.disabled = !transaction;
         }
     });
-    load(true).catch(showLoadError);
+    // Opening the ledger never interrupts the user with a dialog.
+    load(false).catch(() => { opener.hidden = false; });
 })();

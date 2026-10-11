@@ -977,3 +977,21 @@ checks were mocked. No schema migration, deployment or live Starling verificatio
 was performed. Optional backup integration remains unrun because isolated CREATEDB
 test credentials are not configured; prior historical backup results above do
 not replace current restore verification before future schema changes.
+
+## Transaction review verification — 2026-10-11
+
+On `codex/transaction-review`, PostgreSQL discovery ran 512 tests: 508 passed,
+four optional backup integrations skipped. All 18 browser scripts passed through
+`scripts/verify.py --postgres --browser` and the remaining browser rerun after
+updating a legacy test's manual quick-review caption. The guided script covers
+320/390/768/1280px, filtered navigation, retained invalid entries, stale evidence,
+expense eligibility, escaping and a JavaScript-disabled review journey. Mobile
+ledger/check screenshots were inspected. Ruff F, application Bandit and
+`git diff --check` passed. Bank traffic was mocked; no migration was applied.
+
+`scripts/benchmark.py --ledger` uses disposable schemas. At 10,000 synthetic
+records, matching ledger filtering measured 0.067s/7 queries, empty attention
+filtering 0.034s/5 queries and guided selection 0.019s/5 queries. These local
+measurements do not justify an index migration or establish production latency.
+
+No live Starling requests were made. Optional isolated backup verification remains skipped.

@@ -3,7 +3,7 @@ from urllib.parse import quote
 
 
 def payment_link(payment, endpoint):
-    suffix = 'income' if endpoint == 'dashboard.edit_income' else 'classification'
+    suffix = 'review' if endpoint == 'guided_review.payment' else 'income' if endpoint == 'dashboard.edit_income' else 'classification'
     identity = '/'.join(quote(str(value), safe='') for value in (payment.account_uid, payment.category_uid, payment.feed_item_uid))
     return f'/dashboard/transactions/{identity}/{suffix}'
 

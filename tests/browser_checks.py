@@ -13,6 +13,8 @@ sys.path.insert(0, str(ROOT))
 from app import app
 from flask import render_template
 from playwright.sync_api import sync_playwright
+from services.transactions.ledger import ATTENTION
+from services.transactions.classification import CLASSIFICATION_TYPES
 
 rows = [dict(number=i + 1, date='05 Oct 2026', day='Today',
              counterparty='Example payment with a longer merchant name',
@@ -26,7 +28,7 @@ account = SimpleNamespace(account_uid='11111111-1111-4111-8111-111111111111', na
 with app.test_request_context('/dashboard'):
     html = render_template('dashboard.html', rows=rows, page=pagination, error=None,
                            accounts=[account], selected_account=None, account_uid=None,
-                           current_user=SimpleNamespace(is_authenticated=True))
+                           current_user=SimpleNamespace(is_authenticated=True), filter_options={'page': 1}, attention_choices=ATTENTION, classification_choices=CLASSIFICATION_TYPES, review_count=len(rows))
 
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
@@ -120,12 +122,14 @@ with sync_playwright() as playwright:
             state['review_remaining'] = 3
             page.reload()
             dialog = page.locator('#transaction-review')
+            assert not dialog.is_visible()
+            page.locator('#quick-review').click()
             page.wait_for_function("() => document.querySelector('#transaction-review').open")
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
             page.keyboard.press('Escape')
             assert not dialog.is_visible() and state['review_remaining'] == 3
             assert page.locator('.is-unconfirmed').count() == 3
-            page.locator('#review-open').click()
+            page.locator('#quick-review').click()
             page.wait_for_function("() => document.querySelector('#transaction-review').open")
             for remaining in (2, 1, 0):
                 with page.expect_response(lambda response: response.url.endswith('/confirm')):
