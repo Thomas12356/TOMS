@@ -4,7 +4,7 @@
 !.env.example
 
 # Python virtual environments
-.venv/
+.venv
 .venv-tools/
 venv/
 env/
@@ -20,7 +20,7 @@ __pycache__/
 htmlcov/
 
 # Flask local data
-instance/
+instance
 *.log
 
 # Build artifacts
