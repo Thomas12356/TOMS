@@ -3,6 +3,34 @@
 Updated: 2026-10-11. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
+## Latest audit — calculations, legislation and remaining friction
+
+The requested audit is recorded in [CALCULATION_AUDIT.md](CALCULATION_AUDIT.md)
+on `codex/tax-calculation-legislation-audit`. Current HMRC income-tax, NI and both
+mileage publications passed the application validators in a temporary cache.
+Primary legislation confirms 2026–27 main earnings rates and the 55p mileage
+increase. Independent comparisons matched 20,802 income-tax inputs and 20,802
+Class 4 profit inputs; three new regression tests retain these comparisons and
+the official 11,000-mile example. No tested supported arithmetic discrepancy was
+found; this is not a complete tax-return or personal eligibility certification.
+
+Priorities informed by this audit: confirm the supported owner tax jurisdiction
+separately from journey location; record actual HMRC payment schedules/payments;
+then choose applicable excluded tax features from a confirmed owner profile.
+The current Scotland-journey blocker is conservative but cannot establish tax
+residence. It remains pending a versioned setting/migration design; do not change
+a real journey location to bypass it. Payments on account, trading allowance,
+personal reliefs and individual NI adjustments remain outside the current model.
+The five-task owner walkthrough still needs actual owner observations before
+broader matching automation or named preset management is prioritised.
+
+Validation: final full backend 556 tests, 552 passes / four optional backup
+integration skips; all 21 browser scripts passed; Ruff F, Bandit and whitespace
+checks passed. Bank calls were mocked; no live verification, working financial
+write, migration or deployment change. The prior live implementation remains
+`dda2744`. Publication is to the previously authorised public Thomas12356/TOMS
+repository on the named audit branch; main is unchanged by this audit.
+
 ## Latest delivery — focused system usability
 
 Review-informed stages 1–3 are implemented on `codex/focused-system-usability`:
