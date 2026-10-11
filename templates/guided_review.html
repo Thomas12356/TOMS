@@ -18,6 +18,9 @@
 <p>{{ record.reference or 'No reference' }} · {{ local_date(record.transaction_time).strftime('%d %b %Y, %H:%M %Z') }} · {{ record.status | replace('_', ' ') | title }}</p></section>
 {% if stale %}<p><a href="{{ step_url(step) }}">Reload the current saved details</a>. The retained form cannot overwrite the newer record.</p>{% endif %}
 {% macro token() %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="version" value="{{ version }}">{% endmacro %}
+{% if values.suggestion_preview %}<p class="message" role="status">{{ values.suggestion_preview }}</p>{% endif %}
+{% set suggestion = suggestions.get('classification') if step == 'classification' else (suggestions.get('source') if step == 'details' and kind == 'income' else none) %}
+{% if suggestion %}<aside class="checklist-summary" aria-label="Suggested choice"><h2>Suggested {{ 'classification' if step == 'classification' else 'income source' }}: {{ suggestion.label }}</h2><p>{{ suggestion.reason }}</p><p class="secondary">This is a suggestion, not proof. Existing saved choices and tax amounts are not overwritten.</p><form method="post">{{ token() }}<input type="hidden" name="suggestion_version" value="{{ suggestion.version }}"><button name="action" value="{{ 'preview_classification' if step == 'classification' else 'preview_source' }}">Use suggestion in form</button></form></aside>{% endif %}
 {% if step == 'classification' %}
 <form class="login-form classification-form" method="post">{{ token() }}
 <h2>Classify this payment</h2><p>Choose its purpose. Classification alone does not establish tax treatment.</p>

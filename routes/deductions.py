@@ -45,7 +45,7 @@ def page():
         return redirect(url_for('login.sign_in'))
     from services.tax.rules import start_rule_check
     start_rule_check(current_app.instance_path)
-    options = query_values({'expense', 'type', 'shift', 'return_to'} | FILTERS, empty_ignored={'q', 'from', 'to'})
+    options = query_values({'expense', 'type', 'shift', 'return_to', 'reuse'} | FILTERS, empty_ignored={'q', 'from', 'to'})
     return_url = None
     if options.get('return_to') == 'ledger':
         return_url = url_for('dashboard.transactions_page', **ledger_options(options))
@@ -56,6 +56,17 @@ def page():
         raise BadRequest('Choose Expense or Mileage.')
     selected, error, values = None, None, {}
     try:
+        if options.get('reuse'):
+            if deduction_type != 'mileage' or options.get('expense') or options.get('shift'):
+                raise ValueError('Reuse journey defaults for a new, unlinked mileage entry.')
+            if request.method == 'GET':
+                template = db.session.get(MileageEntry, uid(options['reuse']))
+                if template is None or template.income_stream.archived:
+                    raise ValueError('Choose a saved journey for an active income source.')
+                values = dict(action='save_mileage', stream_id=template.income_stream_id,
+                    location=template.location, vehicle_type=template.vehicle_type, vehicle_key=template.vehicle_key,
+                    purpose=template.purpose, start_postcode=template.start_postcode, end_postcode=template.end_postcode,
+                    reimbursed='')
         if options.get('shift'):
             linked_shift = db.session.get(IncomeShift, uid(options['shift']))
             if linked_shift is None:
@@ -175,7 +186,7 @@ def page():
         entry_id=values.get('entry_id') or str(uuid4()), today=datetime.now(LOCAL_TIME).date(), locations=LOCATIONS, vehicles=VEHICLES,
         rules=reviewed_rules(), status=cached_status(current_app.instance_path), format_amount=format_amount,
         expense_current=expense_current, expense_version=expense_version, mileage_version=mileage_version, allowance=mileage_allowances(journeys),
-        current_user=current_user, return_url=return_url,
+        current_user=current_user, return_url=return_url, reused=bool(options.get('reuse') and not error),
         return_context=ledger_options(options) if return_url else {}), 400 if error else 200
 
 

@@ -2,6 +2,7 @@
 
 import re
 import hmac
+from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, render_template, request, redirect, url_for, current_app, session
 from flask_login import current_user
@@ -9,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only, selectinload
 from werkzeug.exceptions import BadRequest, NotFound, Conflict
 
-from models import Account, Transaction, TransactionIncome, IncomeStream, IncomeShift, AccountReserve, ExpenseDeduction, MileageEntry
+from models import Account, Transaction, TransactionIncome, IncomeStream, IncomeShift, ExpenseDeduction, MileageEntry
 from services.transactions.shifts import attach_shift_totals
 from uuid import uuid4
 from services.transactions.income_streams import STREAM_KINDS, FORECAST_PERIODS, FORECAST_CURRENCIES, TAX_YEARS, active_days, annual_gross, holiday_amount, stream_id, stream_fields
@@ -121,6 +122,8 @@ def account_balances():
         raise BadRequest("This account is not available. Choose a saved account.")
     if test_data_active():
         payload = sample_balances(accounts, format_amount, combined=account_uid is None, include_minor=include_reserves)
+        if include_reserves:
+            payload.update(checked_at=datetime.now(timezone.utc).isoformat(), sample=True)
         return jsonify(balance_breakdown(payload, accounts, format_amount) if include_reserves else payload)
     balances = []
     totals = {}
@@ -152,6 +155,8 @@ def account_balances():
         balances.append(card)
     if account_uid:
         payload = dict(balances=balances)
+        if include_reserves:
+            payload.update(checked_at=datetime.now(timezone.utc).isoformat(), sample=False)
         return jsonify(balance_breakdown(payload, accounts, format_amount) if include_reserves else payload)
     combined = [{
         "name": "Total balance · All accounts" if len(totals) == 1 else f"Total balance · All {currency} accounts",
@@ -159,6 +164,8 @@ def account_balances():
         "error": "Total unavailable: one or more account balances could not be loaded." if total["unavailable"] else None,
     } for currency, total in sorted(totals.items())]
     payload = dict(balances=balances, totals=combined)
+    if include_reserves:
+        payload.update(checked_at=datetime.now(timezone.utc).isoformat(), sample=False)
     return jsonify(balance_breakdown(payload, accounts, format_amount) if include_reserves else payload)
 
 
@@ -478,14 +485,9 @@ def income_streams():
         expenses, journeys = expense_page.items, journey_page.items
         deduction_pages = max(expense_page.pages, journey_page.pages)
     from services.tax.records import expense_current
-    from services.tax.reserves import current_plan, received_split
-    estimate = current_plan()
-    reserve_target = received_split(estimate)
-    accounts = db.session.scalars(db.select(Account).order_by(Account.name, Account.account_uid)).all()
-    earmarks = {row.account_uid: row for row in db.session.scalars(db.select(AccountReserve))}
     return render_template('income_streams.html', streams=streams, view=view,
                            expenses=expenses, journeys=journeys, deduction_pages=deduction_pages, expense_current=expense_current,
-                           estimate=estimate, reserve_target=reserve_target, accounts=accounts, earmarks=earmarks, mileage_partners=partners, selected_stream=selected_id,
+                           mileage_partners=partners, selected_stream=selected_id,
                            counts=counts, stream_kinds=STREAM_KINDS, create_values=create_values, error=error,
                            forecast_periods=FORECAST_PERIODS, forecast_currencies=FORECAST_CURRENCIES,
                            tax_years=TAX_YEARS, active_days=active_days,

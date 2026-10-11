@@ -55,9 +55,10 @@ with sync_playwright() as playwright:
             def close_review():
                 if page.locator('#transaction-review').is_visible():
                     page.get_by_role('button', name='Close transaction review').click()
-            page.goto(origin + '/dashboard/income-streams')
-            page.wait_for_function("() => !document.querySelector('#account-balances').textContent.includes('Loading')")
-            provider.reset_mock()  # Initial real-mode account money read is intentional.
+            page.goto(origin + '/dashboard/account-money')
+            page.get_by_role('button', name='Refresh bank balances', exact=True).click()
+            page.wait_for_function("() => document.querySelector('#account-balances .balance-card') !== null")
+            provider.reset_mock()  # The explicit real-fixture balance refresh is intentional.
             open_navigation()
             switch = page.get_by_role('switch', name='Test data')
             assert switch.get_attribute('aria-checked') == 'false'

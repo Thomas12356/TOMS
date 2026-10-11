@@ -30,7 +30,9 @@ def page(stream_id):
     if request.authorization is not None or not current_user.is_authenticated:
         return redirect(url_for('login.sign_in'))
     stream_id = str(stream_id)
-    options = query_values({'edit', 'add'})
+    options = query_values({'edit', 'add', 'reuse'})
+    if options.get('edit') and options.get('reuse'):
+        raise BadRequest('Choose editing or reusable defaults, not both.')
     if options.get('add') not in (None, '1'):
         raise BadRequest('Choose a valid add-work action.')
     stream = db.session.get(IncomeStream, stream_id)
@@ -38,6 +40,12 @@ def page(stream_id):
         raise NotFound('Income stream not found.')
     selected, error, values = None, None, dict(payment_mode='total', unpaid_break_minutes='0')
     try:
+        if options.get('reuse') and request.method == 'GET':
+            template = db.session.get(IncomeShift, uid(options['reuse']))
+            if template is None or template.income_stream_id != stream.id or template.currency != stream.expected_gross_currency:
+                raise ValueError('Choose a saved work record in this source and currency.')
+            values.update(payment_mode=template.payment_mode, unpaid_break_minutes=template.unpaid_break_minutes,
+                          hourly_rate=display_amount(template.hourly_rate_minor, template.currency))
         if options.get('edit'):
             selected = db.session.get(IncomeShift, uid(options['edit']))
             if selected is None or selected.income_stream_id != stream.id:
@@ -103,4 +111,5 @@ def page(stream_id):
     return render_template('shifts.html', stream=stream, selected=selected, values=values, entries=entries, error=error,
         invoice_links=shift_invoice_links(stream.id), identity=selected.id if selected else values.get('shift_id') or str(uuid4()), version=shift_version(selected) if selected else '',
         format_amount=format_amount, shift_label=shift_label, total=sum(entry.gross_minor for entry in entries if stream.income_mode == 'shifts' or entry.is_overtime),
-        currency=stream.expected_gross_currency or 'GBP', current_user=current_user), 400 if error else 200
+        currency=stream.expected_gross_currency or 'GBP', current_user=current_user,
+        reused=bool(options.get('reuse') and not error)), 400 if error else 200

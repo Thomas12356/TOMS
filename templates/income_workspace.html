@@ -23,6 +23,7 @@
     <p class="secondary">Regular forecasts add only explicit overtime or additional work. Individual-shift forecasts use all entered work.</p>
     {% for shift in work %}<p>{{ shift_label(shift) }} · {{ format_amount(shift.gross_minor, shift.currency) }}{{ ' · Additional work' if shift.is_overtime else '' }}</p>{% else %}<p>No work entered yet.</p>{% endfor %}
     {% if stream.expected_gross_currency is not none %}<a class="secondary-button" href="{{ url_for('shifts.page', stream_id=stream.id) }}">Open work records</a>{% else %}<p class="secondary">Choose the income pattern and currency before entering work.</p>{% endif %}
+    {% if work and not stream.archived %}<a class="secondary-button" href="{{ url_for('shifts.page', stream_id=stream.id, reuse=work[0].id) }}">Use latest work defaults</a>{% endif %}
 </section>
 <section class="stream-manage" aria-labelledby="receipts-heading">
     <h2 id="receipts-heading">Saved bank receipts</h2>
@@ -38,5 +39,6 @@
     {% if not expenses and not journeys %}<p>No expenses or journeys assigned yet.</p>{% endif %}
     <a class="secondary-button" href="{{ url_for('dashboard.income_streams', view='deductions', stream=stream.id) }}">View expenses and mileage</a>
     <a class="secondary-button" href="{{ url_for('deductions.page') }}">Manage deductions</a>
+    {% if journeys and not stream.archived %}<a class="secondary-button" href="{{ url_for('deductions.page', type='mileage', reuse=journeys[0].id) }}">Use latest journey defaults</a>{% endif %}
 </section>
 {% endblock %}

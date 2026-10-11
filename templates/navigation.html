@@ -4,9 +4,10 @@
 <nav id="main-navigation" class="main-navigation" aria-label="Main navigation">
     {% if navigation_owner %}<a href="{{ url_for('overview.page') }}"{% if navigation_page == 'overview' %} aria-current="page"{% endif %}>Home</a>{% endif %}
     <a href="{{ url_for('dashboard.transactions_page') }}"{% if navigation_page == 'transactions' %} aria-current="page"{% endif %}>Transactions</a>
-    <details class="navigation-group{% if navigation_page in ['income-streams', 'deductions', 'reconciliation', 'invoices'] %} current-section{% endif %}" role="group" aria-label="Income and work">
+    <details class="navigation-group{% if navigation_page in ['income-streams', 'deductions', 'reconciliation', 'invoices', 'account-money'] %} current-section{% endif %}" role="group" aria-label="Income and work">
     <summary>Work &amp; income</summary><div class="navigation-menu">
     <a href="{{ url_for('dashboard.income_streams') }}"{% if navigation_page == 'income-streams' %} aria-current="page"{% endif %}>Income streams</a>
+    <a href="{{ url_for('reserves.page') }}"{% if navigation_page == 'account-money' %} aria-current="page"{% endif %}>Account money</a>
     <a href="{{ url_for('deductions.page') }}"{% if navigation_page == 'deductions' %} aria-current="page"{% endif %}>Deductions</a>
     {% if navigation_owner %}<a href="{{ url_for('reconciliation.page') }}"{% if navigation_page == 'reconciliation' %} aria-current="page"{% endif %}>Reconciliation</a>{% endif %}
     {% if navigation_owner %}<a href="{{ url_for('invoices.page') }}"{% if navigation_page == 'invoices' %} aria-current="page"{% endif %}>Invoices</a>{% endif %}
@@ -53,10 +54,10 @@
 <dialog id="income-notices-dialog" class="review-dialog stream-list-dialog" aria-labelledby="income-notices-heading" data-read-url="{{ url_for('reserves.acknowledge') }}" data-csrf="{{ csrf_token() }}">
     <button type="button" class="secondary-button" id="close-income-notices">Close</button>
     <h2 id="income-notices-heading">Income received</h2>
-    <p class="secondary">Suggestions use your annual forecasts and actual logged deductions. They change with your records and do not move money. Check the cumulative target and earmarks in Income streams.</p>
+    <p class="secondary">Suggestions use your annual forecasts and actual logged deductions. They change with your records and do not move money. Check the cumulative target and earmarks in Account money.</p>
     <div id="income-notices-list"></div>
     <p id="income-notices-error" class="message" role="alert" hidden></p>
-    <form method="get" action="{{ url_for('dashboard.income_streams', _anchor='account-reserves') }}">
+    <form method="get" action="{{ url_for('reserves.page', _anchor='account-reserves') }}">
         <button class="secondary-button">View account money and tax / NI earmarks</button>
     </form>
 </dialog>

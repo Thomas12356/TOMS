@@ -7,11 +7,18 @@
     {% set funds = namespace(tax=0, ni=0) %}
     {% for account in gbp_accounts %}{% set earmark = earmarks.get(account.account_uid) %}{% if earmark %}{% set funds.tax = funds.tax + earmark.tax_minor %}{% set funds.ni = funds.ni + earmark.ni_minor %}{% endif %}{% endfor %}
     <p>Currently earmarked across GBP accounts: <strong>{{ format_amount(funds.tax, 'GBP') }} tax + {{ format_amount(funds.ni, 'GBP') }} NI</strong>.</p>
+    <p class="secondary">Other currencies stay separate and do not reduce the GBP target. No currency conversion has been applied.</p>
     {% if reserve_target %}<p>Still to earmark against the combined target: <strong>{{ format_amount([0, reserve_target[0] + reserve_target[1] - funds.tax - funds.ni]|max, 'GBP') }}</strong>.</p>{% endif %}
     <p class="secondary">England, Wales and Northern Ireland · 2026–27. The suggestion uses your annual forecasts and only logged deductions. It is a cumulative planning target; compare it with your earmarks rather than adding it again. Direct HMRC payments are not tracked in this target.</p>
-    <div id="account-balances" class="balance-cards" data-url="{{ url_for('dashboard.account_balances', reserves=1) }}" data-show-accounts="true" aria-live="polite">Loading account balances…</div>
+    <h3>Live balances</h3>
+    <p class="secondary">Refresh explicitly to request bank balances. These values are not saved; opening this page makes no balance request. After earmarks excludes bills and other commitments, so it is not an available-to-spend figure.</p>
+    <button type="button" class="secondary-button" id="refresh-balances">Refresh bank balances</button>
+    <p id="balance-freshness" class="secondary" aria-live="polite">Balance freshness unavailable until refreshed.</p>
+    <noscript><p>Live balance refresh needs JavaScript. Saved earmarks can still be edited below.</p></noscript>
+    <div id="account-balances" class="balance-cards" data-url="{{ url_for('dashboard.account_balances', reserves=1) }}" data-manual="true" data-show-accounts="true" aria-live="polite">Bank balances have not been requested.</div>
     {% for account in accounts %}{% set earmark = earmarks.get(account.account_uid) %}
-    <details class="account-earmark"><summary>Manage earmarks · {{ account.name or account.currency ~ ' account' }}</summary>
+    <details class="account-earmark"><summary>Manage earmarks · {{ account.name or account.currency ~ ' account' }} · {{ format_amount((earmark.tax_minor + earmark.ni_minor) if earmark else 0, account.currency) }} earmarked</summary>
+        <p>Saved earmarks: {{ format_amount(earmark.tax_minor if earmark else 0, account.currency) }} tax · {{ format_amount(earmark.ni_minor if earmark else 0, account.currency) }} NI.</p>
         <form method="post" action="{{ url_for('reserves.save') }}" class="login-form" data-reserve-form>
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <input type="hidden" name="account" value="{{ account.account_uid }}">

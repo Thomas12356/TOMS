@@ -19,6 +19,23 @@ checks authentication before those functions run.
 
 ## Services by purpose
 
+Account money lives at `/dashboard/account-money` in `routes/reserves.py` and
+`templates/account_money.html`. Saved earmarks and planning targets share a
+database snapshot; bank balances are fetched only on explicit refresh and carry
+a response timestamp. They are not persisted or labelled available spending cash.
+
+Work and mileage forms accept a validated `reuse` record ID. They copy reusable
+rate/break or journey-description fields, leaving new dates, actual mileage,
+eligibility and reimbursement for fresh entry. They do not edit the old record.
+Source workspaces link to the latest saved templates.
+
+`services/transactions/suggestions.py` learns conservative proposals from
+consistent confirmed payments with the same account, currency, direction, payer
+and reference. Guided review checks both target and suggestion versions before
+placing a proposal in the form. Preview writes nothing; existing save actions
+remain required. See `tests/test_usability_workflows.py` and
+`tests/usability_workflows_browser_checks.py` for isolation and stale-history checks.
+
 ```text
 services/
     banking/                Starling integration

@@ -20,6 +20,7 @@ from services.transactions.income import INCOME_TYPES, TAX_TREATMENTS
 from services.transactions.ledger import FILTERS, ledger_options, filtered_transactions
 from services.transactions.review import REVIEW_FIELDS
 from services.transactions.shifts import shift_label
+from services.transactions.suggestions import payment_suggestions
 from services.web.presentation import format_amount, local_date
 from services.web.sessions import require_dashboard_login
 from services.web.test_data import activate_test_data
@@ -127,13 +128,23 @@ def payment(account_uid, category_uid, feed_item_uid):
                 raise Conflict('These saved details changed. Your entries are retained; reload the current record before saving or confirming.')
             if action == 'confirm' and step != 'check':
                 raise BadRequest('Open the saved-details check before confirming.')
-            next_step = apply_action(record, request.form)
-            db.session.commit()
-            if next_step == 'done':
-                if context.get('return_to') == 'home':
-                    return redirect(back_url(context), code=303)
-                return redirect(url_for('guided_review.start', **context), code=303)
-            return redirect(url_for('guided_review.payment', **key, **context, step=next_step), code=303)
+            if action in ('preview_classification', 'preview_source'):
+                proposal_kind = 'classification' if action == 'preview_classification' else 'source'
+                if step != ('classification' if proposal_kind == 'classification' else 'details'):
+                    raise BadRequest('Open the appropriate review step before using a suggestion.')
+                proposal = payment_suggestions(record).get(proposal_kind)
+                if proposal is None or not hmac.compare_digest(request.form.get('suggestion_version', '').encode(), proposal['version'].encode()):
+                    raise Conflict('This suggestion changed. Reload and review the current evidence.')
+                values['type' if proposal_kind == 'classification' else 'income_stream_id'] = proposal['value']
+                values['suggestion_preview'] = 'Suggestion placed in the form. Check it and save to change this payment.'
+            else:
+                next_step = apply_action(record, request.form)
+                db.session.commit()
+                if next_step == 'done':
+                    if context.get('return_to') == 'home':
+                        return redirect(back_url(context), code=303)
+                    return redirect(url_for('guided_review.start', **context), code=303)
+                return redirect(url_for('guided_review.payment', **key, **context, step=next_step), code=303)
         except (BadRequest, Conflict, ValueError) as invalid:
             db.session.rollback()
             error = invalid.description if isinstance(invalid, (BadRequest, Conflict)) else str(invalid)
@@ -149,7 +160,7 @@ def payment(account_uid, category_uid, feed_item_uid):
         if linked:
             shifts.insert(0, linked)
     return render(status=status, error=error, record=record, kind=kind, step=step, values=values,
-        version=saved_version, stale=stale, streams=streams, stream_names={stream.id: stream.name for stream in streams}, shifts=shifts, shift_label=shift_label,
+        version=saved_version, stale=stale, suggestions=payment_suggestions(record), streams=streams, stream_names={stream.id: stream.name for stream in streams}, shifts=shifts, shift_label=shift_label,
         treatments=TAX_TREATMENTS, income_types=INCOME_TYPES,
         choices={key: choice for key, choice in CLASSIFICATION_TYPES.items() if record.direction in choice['directions']},
         income_complete=check_income(record, {}) if kind == 'income' else True,

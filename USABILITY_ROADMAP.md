@@ -8,6 +8,14 @@ not measured results or delivery commitments.
 
 ## Starting point
 
+Delivery update: `codex/account-money-work-defaults-suggestions` completes the
+next three priorities. Account money separates saved earmarks, tax targets and
+explicitly refreshed balances. Work and journeys can reuse saved record defaults
+without copying new actuals or eligibility. Guided review offers explained,
+version-checked classification/source previews from consistent confirmed history;
+the owner must still save. No persistent bank-balance model or preset manager is
+implied by these changes. The next whole-system review follows publication.
+
 Delivery update, 11 October: compact navigation from `codex/compact-navigation`
 is merged into main and deployed locally, including the existing transaction-review
 and roadmap commits. The live implementation is pinned at `867e856`.

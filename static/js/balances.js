@@ -2,11 +2,22 @@
 async function loadBalances() {
     const container = document.getElementById("account-balances");
     if (!container) return;
+    const refresh = document.getElementById('refresh-balances');
+    const freshness = document.getElementById('balance-freshness');
+    if (refresh?.disabled) return;
+    if (refresh) refresh.disabled = true;
+    if (freshness) freshness.textContent = 'Requesting balances…';
 
     try {
         const response = await fetch(container.dataset.url, {credentials: "same-origin", cache: "no-store"});
         if (!response.ok) throw new Error("Balance request failed");
         const data = await response.json();
+        if (freshness) {
+            const checked = new Date(data.checked_at);
+            freshness.textContent = Number.isNaN(checked.getTime()) ? 'Balance response timestamp unavailable.' :
+                `${data.sample ? 'Example balances displayed' : 'Balance response received'}: ${checked.toLocaleString('en-GB', {timeZone: 'Europe/London'})} Europe/London. Refresh again when needed.`;
+            if (data.balances.some(balance => balance.error)) freshness.textContent += ' One or more balances are unavailable.';
+        }
         container.replaceChildren();
 
         const displayedBalances = container.dataset.showAccounts === 'true' ? data.balances : (data.totals ?? data.balances);
@@ -43,8 +54,13 @@ async function loadBalances() {
             container.append(card);
         }
     } catch (error) {
-        container.textContent = "Balances are unavailable. Reload the page to try again.";
+        container.textContent = refresh ? 'Balances are unavailable. Use Refresh bank balances to try again.' : "Balances are unavailable. Reload the page to try again.";
+        if (freshness) freshness.textContent = 'Latest refresh failed; bank balances are unavailable.';
+    } finally {
+        if (refresh) refresh.disabled = false;
     }
 }
 
-loadBalances();
+const balanceContainer = document.getElementById('account-balances');
+if (balanceContainer?.dataset.manual === 'true') document.getElementById('refresh-balances')?.addEventListener('click', loadBalances);
+else loadBalances();

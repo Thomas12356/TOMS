@@ -122,9 +122,8 @@
         </nav>{% endif %}
     </dialog>
     {% include 'stream_deductions_dialog.html' %}
-    {% include 'account_reserves.html' %}
+    <section id="account-reserves"><h2>Account money</h2><p>Balances and tax / NI earmarks now have their own page. <a href="{{ url_for('reserves.page') }}">Open Account money</a>.</p></section>
 </main>
 <script src="{{ url_for('static', filename='js/income-streams.js') }}" defer></script>
-<script src="{{ url_for('static', filename='js/balances.js') }}" defer></script>
 </body>
 </html>

@@ -1,12 +1,12 @@
 """Account earmarks and receipt notices, restricted to the signed-in owner."""
 import hmac
 
-from flask import Blueprint, jsonify, redirect, request, url_for
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest, Conflict
 
-from models import Account, AccountReserve, IncomeNoticeRead, Transaction
+from models import Account, AccountReserve, IncomeNoticeRead, Transaction, SyncRun
 from services.database.connection import db
 from services.error_logging import log_failure
 from services.database.session import test_data_active
@@ -14,7 +14,7 @@ from services.notifications.income import notices, notice_version
 from services.tax.deduction_forms import payment_key
 from services.tax.reserves import current_plan
 from services.transactions.classification import classification_details
-from services.transactions.income_form import parse_amount
+from services.transactions.income_form import parse_amount, display_amount
 from services.validation import uid
 from services.web.activity import record_action
 from services.web.sessions import require_dashboard_login
@@ -39,6 +39,8 @@ reserves.before_request(activate_test_data)
 def database_error(error):
     db.session.rollback()
     log_failure('reserves.database', error)
+    if request.endpoint == 'reserves.page':
+        return render_template('account_money.html', error='Account money is unavailable. Check PostgreSQL and database migrations.', current_user=current_user), 503
     return jsonify(error='Income notices and reserves are unavailable. Check database migrations.'), 503
 
 
@@ -46,6 +48,8 @@ def database_error(error):
 @reserves.errorhandler(Conflict)
 def invalid_request(error):
     db.session.rollback()
+    if request.endpoint == 'reserves.page':
+        return render_template('account_money.html', error=error.description, current_user=current_user), error.code
     return jsonify(error=error.description), error.code
 
 
@@ -58,6 +62,22 @@ def invalid_value(error):
 def check_form(fields):
     if set(request.form) - set(fields) or any(len(request.form.getlist(key)) != 1 for key in request.form):
         raise BadRequest('Supply each field once.')
+
+
+@reserves.get('/account-money')
+def page():
+    query_values(set())
+    from services.tax.export import export_session
+    from services.tax.reserves import received_split
+    with export_session() as saved:
+        estimate = current_plan(refresh_rules=False, session=saved)
+        accounts = saved.scalars(db.select(Account).order_by(Account.name, Account.account_uid)).all()
+        earmarks = {row.account_uid: row for row in saved.scalars(db.select(AccountReserve))}
+        last_import = saved.scalar(db.select(db.func.max(SyncRun.finished_at)).where(
+            SyncRun.status == 'completed', SyncRun.requested_options == {}))
+        return render_template('account_money.html', accounts=accounts, earmarks=earmarks,
+            reserve_target=received_split(estimate), last_import=last_import,
+            format_amount=format_amount, display_amount=display_amount, current_user=current_user)
 
 
 @reserves.get('/income-notifications')
@@ -104,7 +124,7 @@ def save():
     row = db.session.get(AccountReserve, identity, populate_existing=True)
     revision = str(row.revision) if row else '0'
     if request.form.get('version') != revision:
-        raise Conflict('These earmarks changed. Reload the income streams page before saving.')
+        raise Conflict('These earmarks changed. Reload Account money before saving.')
     tax = parse_amount(request.form.get('tax', ''), account.currency)
     ni = parse_amount(request.form.get('ni', ''), account.currency)
     if tax is None or ni is None or tax + ni > 2**63 - 1:
@@ -117,4 +137,4 @@ def save():
     row.tax_minor, row.ni_minor = tax, ni
     record_action('reserve.save', identity, sample=test_data_active())
     db.session.commit()
-    return redirect(url_for('dashboard.income_streams', _anchor='account-reserves'), code=303)
+    return redirect(url_for('reserves.page', _anchor='account-reserves'), code=303)

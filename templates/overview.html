@@ -24,7 +24,7 @@
 <p>Remaining gap: <strong>{{ format_amount(result.gap, 'GBP') }}</strong></p>
 {% for currency, amount in result.earmarks.items() %}{% if currency != 'GBP' %}<p>{{ currency }} earmarked separately: {{ format_amount(amount, currency) }}</p>{% endif %}{% endfor %}
 <p class="secondary">Earmarks are your saved plan. Available account balances and affordability have not been checked here. The target depends on forecasts and actual logged withholding.</p>
-<p><a href="{{ url_for('dashboard.income_streams', _anchor='account-reserves') }}">Review account money and earmarks</a></p></section>
+<p><a href="{{ url_for('reserves.page', _anchor='account-reserves') }}">Review account money and earmarks</a></p></section>
 <section class="balance-card" aria-labelledby="invoices-heading"><h2 id="invoices-heading">Outstanding invoices</h2>
 {% for currency, row in result.invoices.items() %}<p>{{ row.count }} issued invoice{{ '' if row.count == 1 else 's' }} · <strong>{{ format_amount(row.outstanding, currency) }}</strong></p>
 {% if row.review %}<p class="message">{{ row.review }} payment allocation{{ '' if row.review == 1 else 's' }} needing review. Outstanding amounts exclude stale allocations.</p>{% endif %}

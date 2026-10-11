@@ -65,10 +65,13 @@ with sync_playwright() as playwright:
             assert page.get_by_role('link', name='Open work records', exact=True).is_visible()
             assert 'not added together as extra income' in page.locator('main').inner_text()
             page.screenshot(path=f'/tmp/toms-source-workspace-{width}.png', full_page=True)
-            go()
+            go('/dashboard/account-money')
+            assert 'Bank balances have not been requested.' in page.locator('#account-balances').inner_text()
+            page.get_by_role('button', name='Refresh bank balances', exact=True).click()
             page.wait_for_function("() => document.querySelector('#account-balances').textContent.includes('After earmarks:')")
             assert 'GBP 2,450.75' in page.locator('#account-balances').inner_text()
             assert 'GBP 2,150.75' in page.locator('#account-balances').inner_text()
+            go()
             assert page.locator('#income-payments-dialog').is_hidden()
             page.get_by_role('link', name='Show all income', exact=True).click()
             page.locator('#income-payments-dialog').wait_for(state='visible')
@@ -115,11 +118,13 @@ with sync_playwright() as playwright:
             page.locator('#expense-eligibility input').check()
             submit(page.get_by_role('button', name='Save expense', exact=True))
             go()
+            go('/dashboard/account-money')
             details = page.locator('.account-earmark').first
             details.locator('summary').click()
             details.locator('[name=tax]').fill('300')
             details.locator('[name=ni]').fill('70')
             submit(details.get_by_role('button', name='Save earmarks', exact=True))
+            page.get_by_role('button', name='Refresh bank balances', exact=True).click()
             page.wait_for_function("() => document.querySelector('#account-balances').textContent.includes('GBP 2,080.75')")
             assert 'GBP 300.00 tax' in page.locator('#account-balances').inner_text()
             # Confirm every sample through the existing real review popup.
@@ -149,7 +154,7 @@ with sync_playwright() as playwright:
             page.keyboard.press('Escape')
             assert page.locator('#income-alert-bar').is_hidden()
             page.reload()
-            page.wait_for_function("() => document.querySelector('#account-balances').textContent.includes('After earmarks:')")
+            assert page.locator('#account-balances').count() == 0
             assert page.locator('#income-alert-bar').is_hidden()
             page.wait_for_function("() => document.querySelector('#income-notices-list').textContent.includes('All income notices are read.')")
             # Simulate a newly imported payment after the page is already open.

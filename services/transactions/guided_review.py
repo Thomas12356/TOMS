@@ -132,6 +132,7 @@ def apply_action(payment, form):
 
 
 FORM_FIELDS = {
+    'preview_classification': {'suggestion_version'}, 'preview_source': {'suggestion_version'},
     'classify': {'type', 'notes'}, 'details': set(FIELDS) | {'stream_id', 'amount', 'purpose', 'category',
         'vehicle_key', 'eligible', 'shift_id', 'tax_status'},
     'skip': set(), 'confirm': set(), 'remove_income': set(), 'remove_expense': set(),

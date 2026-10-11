@@ -1077,3 +1077,19 @@ The disposable overview benchmark now measured 0.117s/21 queries at 100 records,
 The filtered category measured 0.628s/21 at 10,000. These measurements show reduced
 duplicate reads and relationship batches, not a production latency guarantee;
 planning still processes the relevant stored evidence.
+
+## Account money, reusable defaults and suggestions — 2026-10-11
+
+Full verification with `scripts/verify.py --postgres --browser all` completed:
+544 backend tests, 540 passed and four optional backup integration tests skipped
+for unavailable isolated CREATEDB credentials. All 20 browser scripts passed.
+The 14 focused new regressions also passed after the final conservative source
+matching adjustment. Ruff F, Bandit and `git diff --check` passed.
+
+The new browser journey covers 320/390/768/1024/1280px, explicit balance refresh
+and failed-refresh recovery, earmark saving, reusable work/journey creation,
+classification/source preview followed by deliberate saving, sample isolation,
+and JavaScript-disabled entry. Suggestions are tested against conflicting,
+incomplete, archived, future, unconfirmed and cross-currency history, plus stale
+target/history versions and existing non-taxable choices. All bank traffic was
+mocked. No schema migration or live Starling verification was performed.

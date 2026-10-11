@@ -3,16 +3,35 @@
 Updated: 2026-10-11. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
+## Latest delivery — account money, defaults and suggestions
+
+Implemented on `codex/account-money-work-defaults-suggestions`:
+- Dedicated Account money page: saved earmarks, received-income tax/NI target and
+  gap, separate currencies, explicit live balance refresh and response freshness.
+  Opening the page makes no bank request. A failed refresh clears stale cash.
+- Reuse saved work rates/breaks and journey descriptions, with fresh dates,
+  mileage, eligibility and reimbursement. Existing work/history stays unchanged;
+  these are record templates, not a configurable preset manager.
+- Conservative classification/source suggestions from consistent confirmed
+  history. Explicit preview changes only the form; the owner must save through
+  existing validation. Amounts and tax treatment are not copied.
+
+Verification: 544 backend tests, 540 passes and four optional backup skips;
+all 20 browser scripts passed, including the new five-width workflow journey
+and JavaScript-disabled entry. Final focused regressions, Ruff F, Bandit,
+whitespace and outgoing secret-value checks passed. No migration or live bank
+verification was needed. Whole-system usability review follows publication.
+
 Latest usability work: [USABILITY_ROADMAP.md](USABILITY_ROADMAP.md) incorporates
 the user's supplied review and complaint about crowded navigation. Compact primary
 navigation and guided-review deployment are the first delivery. A unified task
-home and staged income workspaces are implemented. Account money and reusable
-defaults are next. Budgeting/AI remain later
+home and staged income workspaces are implemented. Account money, reusable
+saved-record defaults and explicit payment suggestions are implemented. Budgeting/AI remain later
 scoped milestones. See the latest handoff
 below for deployment revision and verification evidence.
 
-Latest delivery: `codex/home-performance-income-workspaces` speeds shared Home
-reads and adds staged source creation with separate evidence workspaces.
+Latest delivery: `codex/account-money-work-defaults-suggestions` separates money
+views, reuses work/journey defaults and offers deliberate payment suggestions.
 
 ## Implemented
 
