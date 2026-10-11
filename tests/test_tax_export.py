@@ -197,3 +197,29 @@ class ExportIsolationTests(unittest.TestCase):
                 writer.execute(text(f"UPDATE {self.real_schema}.income_streams SET name = 'CHANGED'"))
             session.expire_all()
             self.assertEqual(session.scalar(sample_support.db.select(IncomeStream)).name, 'REAL-INCOME-SENTINEL')
+
+    def test_package_keeps_calculation_and_evidence_consistent_during_concurrent_edit(self):
+        with self.admin.begin() as writer:
+            writer.execute(text(f"UPDATE {self.real_schema}.income_streams SET expected_gross_minor = 3000000, expected_gross_period = 'yearly', expected_gross_currency = 'GBP'"))
+            writer.execute(text(f"INSERT INTO {self.real_schema}.tax_profiles (tax_year, jurisdiction, confirmed_at) VALUES ('2026-27', 'england', now())"))
+
+        def calculate_then_edit(*args, **kwargs):
+            result = current_plan(*args, **kwargs)
+            with self.admin.begin() as writer:
+                writer.execute(text(f"UPDATE {self.real_schema}.income_streams SET name = 'EDITED-DURING-EXPORT', expected_gross_minor = 4000000"))
+                writer.execute(text(f"UPDATE {self.real_schema}.transactions SET amount_minor = 12345"))
+            return result
+
+        with export_session() as session:
+            with patch('services.tax.export.current_plan', side_effect=calculate_then_edit):
+                output, manifest = package(session)
+        evidence = manifest['records']
+        self.assertEqual(evidence['streams'][0]['name'], 'REAL-INCOME-SENTINEL')
+        self.assertEqual(evidence['streams'][0]['expected_gross_minor'], 3000000)
+        self.assertEqual(manifest['calculation']['gross_minor'], 3000000)
+        self.assertEqual(evidence['transactions'][0]['amount_minor'], 999)
+        self.assertNotIn('EDITED-DURING-EXPORT', ZipFile(output).read('report.json').decode())
+        self.assertEqual(json.loads(ZipFile(output).read('report.json'))['records'], evidence)
+        with self.admin.connect() as connection:
+            self.assertEqual(connection.scalar(text(f'SELECT amount_minor FROM {self.real_schema}.transactions')), 12345)
+        self.bank.assert_not_called()

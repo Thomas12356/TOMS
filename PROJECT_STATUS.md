@@ -3,6 +3,35 @@
 Updated: 2026-10-11. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
+## Latest review — failure recovery and evidence consistency
+
+Reviewed on `codex/failure-recovery-review`: transaction import orchestration and
+page commits, duplicate/stale owner submissions, invoice receipt budgets,
+reconciliation and tax evidence snapshots. No product defect was reproduced in
+the reviewed paths; this delivery adds regression evidence rather than changing
+application behaviour.
+
+Three additional checks prove abandoned running imports are recovered without
+duplicate transactions, later failed pages preserve earlier saved pages without
+advancing checkpoints, and a concurrent edit during export cannot mix new
+evidence with old calculations. The export test uses a separate committed writer
+in disposable schemas; import fixtures retain their rollback-only boundary.
+Existing checks cover simultaneous confirmations/sending records, stale invoice
+actions, cross-year allocation budgets, changed issued work, currencies and
+display limits. Bank traffic remains mocked.
+
+Full backend verification: 568 tests, 564 passes / four optional backup integration
+skips. Reliability, reconciliation, tax-export and invoice browser checks passed
+at four widths; Ruff F, application Bandit and whitespace checks passed.
+Credential provisioning and restore testing were excluded at the user's
+request. The interrupted provisioning attempt created no credential file or test
+server. The existing migration login's privileges remain unchanged. The live app
+continues to run implementation `b59f01b`; no deployment is needed for tests/docs.
+
+The five-task owner walkthrough remains the next usability input. Equal work and
+receipt totals still require individual matching evidence, allocation is explicit,
+and tax exports retain their documented issue-date selection for invoices.
+
 ## Latest delivery — tax jurisdiction and HMRC payment guidance
 
 Implemented on `codex/tax-jurisdiction-payment-guidance`:

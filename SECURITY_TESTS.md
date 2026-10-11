@@ -1154,3 +1154,18 @@ whitespace checks passed. A pre-migration private backup was made; a UTC-normali
 fingerprint comparison confirmed all existing real and sample rows unchanged by
 migration 026, with only migration history and the new empty tables added. This
 does not replace the separately credentialled backup restore integration checks.
+
+## Failure recovery follow-up — 2026-10-11
+
+Full PostgreSQL-backed suite: 568 tests, 564 passed and four optional backup
+integration checks skipped. Credential setup and restore verification were
+excluded by the user. No working database restore or live Starling call occurred.
+
+New regression checks cover an abandoned running import after a saved page,
+failure on a later page followed by a duplicate-safe retry, and a tax export whose
+source records change between calculation and evidence collection. The latter
+uses a separate committed writer in disposable schemas and checks actual ZIP
+evidence against the original calculation. Import checks use rollback-only
+fixtures; they simulate abandonment rather than killing the production service.
+Reliability, reconciliation, tax-export and invoice browser scripts passed at
+320, 390, 768 and 1280px. Ruff F, application Bandit and whitespace checks passed.

@@ -94,6 +94,53 @@ class PostgreSQLSyncTests(PostgreSQLTestCase):
         self.assertEqual(count, 0)
         self.assertIsNone(self.store.category(ACCOUNT, CATEGORY)["changes_through"])
 
+    def test_abandoned_run_retains_rows_and_next_run_recovers_without_duplicates(self):
+        item = normalize_feed_item(feed_item(), ACCOUNT, CATEGORY)
+        abandoned = str(uuid4())
+        account = dict(uid=ACCOUNT, category=CATEGORY, currency='GBP',
+                       opened=NOW - timedelta(days=30), raw={})
+        self.assertTrue(self.store.lock())
+        self.store.start_run(abandoned, {}, NOW)
+        self.store.save_account(account)
+        self.store.save_category(ACCOUNT, CATEGORY, None, 'main')
+        self.store.start_target(abandoned, ACCOUNT, CATEGORY, 'history', account['opened'], NOW)
+        self.store.save_page(abandoned, ACCOUNT, CATEGORY, [item])
+        # A terminated process loses its lock but never calls finish_run.
+        self.store.unlock()
+        self.assertEqual(self.store.report(abandoned)['status'], 'running')
+        self.assertIsNone(self.store.category(ACCOUNT, CATEGORY)['history_from'])
+        recovered = self.import_rows([item])
+        previous = self.store.report(abandoned)
+        self.assertEqual(previous['status'], 'failed')
+        self.assertEqual(previous['targets'][0]['status'], 'failed')
+        self.assertEqual(previous['pages_committed'], 1)
+        self.assertIn('interrupted', previous['error'])
+        self.assertEqual(recovered['rows_changed'], 0)
+        self.assertEqual(recovered['status'], 'completed')
+        self.assertEqual(self.store.category(ACCOUNT, CATEGORY)['changes_through'], NOW)
+        self.assertEqual(self.session.scalar(db.select(db.func.count()).select_from(Transaction)
+                         .where(Transaction.account_uid == ACCOUNT)), 1)
+
+    def test_later_database_failure_preserves_prior_page_and_retry_fills_gap(self):
+        first = normalize_feed_item(feed_item(), ACCOUNT, CATEGORY)
+        second = normalize_feed_item(feed_item(CURSOR), ACCOUNT, CATEGORY)
+        invalid = {**second, 'amount_minor': -1}
+        with patch('services.transactions.sync.history_pages', return_value=[[first], [invalid]]):
+            with self.assertRaises(SyncError) as failure:
+                run_sync(self.store, {}, now=NOW)
+        report = self.store.report(failure.exception.run_uid)
+        self.assertEqual(report['status'], 'failed')
+        self.assertEqual(report['pages_committed'], 1)
+        self.assertIsNotNone(self.session.get(Transaction, (ACCOUNT, CATEGORY, ITEM)))
+        self.assertIsNone(self.session.get(Transaction, (ACCOUNT, CATEGORY, CURSOR)))
+        self.assertIsNone(self.store.category(ACCOUNT, CATEGORY)['changes_through'])
+        self.assertIsNone(self.store._lock_connection)
+        recovered = self.import_rows([first, second])
+        self.assertEqual(recovered['rows_changed'], 1)
+        self.assertEqual(recovered['status'], 'completed')
+        self.assertEqual(self.session.scalar(db.select(db.func.count()).select_from(Transaction)
+                         .where(Transaction.account_uid == ACCOUNT)), 2)
+
     def test_incremental_updates_and_historical_query_does_not_advance_watermark(self):
         self.import_rows([normalize_feed_item(feed_item(), ACCOUNT, CATEGORY)])
         later = NOW + timedelta(hours=1)
