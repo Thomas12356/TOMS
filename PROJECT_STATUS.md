@@ -214,4 +214,8 @@ previews, owner access, stale settings return context and moved-claim/future-pay
 equivalence for shared reads. Affected backend forms also passed a focused
 67-test run. Mobile/desktop workspace screenshots were inspected. Ruff F, Bandit,
 whitespace and outgoing secret checks passed. Bank traffic was mocked; no working
-schema change was needed. Deployment details follow after publication.
+schema change was needed.
+
+Published on 11 October: the named branch was fast-forwarded into
+main and both remote revisions matched `7e98eb3`. Repository owner/remote/public
+visibility matched the user's existing publication authorization.

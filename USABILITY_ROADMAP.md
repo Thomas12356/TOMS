@@ -17,7 +17,8 @@ The unified action home from `codex/task-home` is merged and deployed locally at
 `0d3e6f3`: saved import,
 payment, invoice, income-setup and planning actions, with retained Home context
 after review. Staged income setup and source workspaces are now implemented on
-`codex/home-performance-income-workspaces`, with shared Home reads. Saved cash balances need a
+`codex/home-performance-income-workspaces`, merged and deployed locally at
+`7e98eb3`, with shared Home reads. Saved cash balances need a
 separately designed persistence change and isolated restore verification first;
 Home will not label live-only or unknown balances as available spending money.
 
