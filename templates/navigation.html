@@ -2,35 +2,40 @@
     <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
 </button>
 <nav id="main-navigation" class="main-navigation" aria-label="Main navigation">
-    {% if navigation_owner %}<a href="{{ url_for('overview.page') }}"{% if navigation_page == 'overview' %} aria-current="page"{% endif %}>Overview</a>{% endif %}
+    {% if navigation_owner %}<a href="{{ url_for('overview.page') }}"{% if navigation_page == 'overview' %} aria-current="page"{% endif %}>Home</a>{% endif %}
     <a href="{{ url_for('dashboard.transactions_page') }}"{% if navigation_page == 'transactions' %} aria-current="page"{% endif %}>Transactions</a>
-    <div class="navigation-group" role="group" aria-label="Income and work"><span class="navigation-group-label">Income / work</span>
+    <details class="navigation-group{% if navigation_page in ['income-streams', 'deductions', 'reconciliation', 'invoices'] %} current-section{% endif %}" role="group" aria-label="Income and work">
+    <summary>Work &amp; income</summary><div class="navigation-menu">
     <a href="{{ url_for('dashboard.income_streams') }}"{% if navigation_page == 'income-streams' %} aria-current="page"{% endif %}>Income streams</a>
     <a href="{{ url_for('deductions.page') }}"{% if navigation_page == 'deductions' %} aria-current="page"{% endif %}>Deductions</a>
     {% if navigation_owner %}<a href="{{ url_for('reconciliation.page') }}"{% if navigation_page == 'reconciliation' %} aria-current="page"{% endif %}>Reconciliation</a>{% endif %}
-    </div>
     {% if navigation_owner %}<a href="{{ url_for('invoices.page') }}"{% if navigation_page == 'invoices' %} aria-current="page"{% endif %}>Invoices</a>{% endif %}
-    <div class="navigation-group" role="group" aria-label="Planning"><span class="navigation-group-label">Planning</span>
+    </div></details>
+    <details class="navigation-group{% if navigation_page in ['tax-estimate', 'checklist'] %} current-section{% endif %}" role="group" aria-label="Planning">
+    <summary>Planning</summary><div class="navigation-menu">
     <a href="{{ url_for('dashboard.tax_estimate') }}"{% if navigation_page == 'tax-estimate' %} aria-current="page"{% endif %}>Tax estimate</a>
     {% if navigation_owner %}
     <a href="{{ url_for('checklist.page') }}"{% if navigation_page == 'checklist' %} aria-current="page"{% endif %}>Checklist</a>
-    {% endif %}</div>
-    <div class="navigation-group" role="group" aria-label="Settings"><span class="navigation-group-label">Settings</span>
+    {% endif %}</div></details>
+    <details class="navigation-group{% if navigation_page in ['tax-rules', 'system', 'settings'] %} current-section{% endif %}" role="group" aria-label="Settings">
+    <summary>Settings</summary><div class="navigation-menu">
     <a href="{{ url_for('dashboard.tax_rules') }}"{% if navigation_page == 'tax-rules' %} aria-current="page"{% endif %}>Tax rules</a>
     {% if navigation_owner %}
     <a href="{{ url_for('system.page') }}"{% if navigation_page == 'system' %} aria-current="page"{% endif %}>System</a>
     <a href="{{ url_for('login.change_password') }}"{% if navigation_page == 'settings' %} aria-current="page"{% endif %}>Password settings</a>
-    {% endif %}</div>
+    {% endif %}
+    {% if navigation_owner %}
+    <form class="logout-form" method="post" action="{{ url_for('login.sign_out') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit">Sign out</button>
+    </form>
+    {% endif %}</div></details>
     {% if navigation_owner %}
     <form class="test-data-form" method="post" action="{{ url_for('dashboard.switch_test_data') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" role="switch" aria-checked="{{ 'true' if using_test_data else 'false' }}" name="enabled" value="{{ '0' if using_test_data else '1' }}" title="Switch between real records and isolated sample data.">
             <span class="test-data-track" aria-hidden="true"><span></span></span><span>Test data</span>
         </button>
-    </form>
-    <form class="logout-form" method="post" action="{{ url_for('login.sign_out') }}">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit">Sign out</button>
     </form>
     {% endif %}
 </nav>

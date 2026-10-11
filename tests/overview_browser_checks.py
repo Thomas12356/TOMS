@@ -1,4 +1,4 @@
-"""Owner overview, local-only reads and grouped navigation at four widths."""
+"""Owner overview, local-only reads and compact navigation at five widths."""
 import logging
 from pathlib import Path
 import sys
@@ -17,7 +17,7 @@ from test_test_data import TestDataTests
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
-    for width in (320, 390, 768, 1280):
+    for width in (320, 390, 768, 1024, 1280):
         fixture = TestDataTests()
         try:
             fixture.setUp()
@@ -48,7 +48,7 @@ with sync_playwright() as playwright:
             assert not any('/balances' in url or url.endswith('/sync') for url in requests), requests
             page.goto(origin + '/dashboard/overview')
             # The browser retains its own dataset selection. Switch with its form.
-            if width <= 640:
+            if width <= 900:
                 page.get_by_role('button', name='Toggle navigation').click()
             with page.expect_navigation():
                 page.get_by_role('switch', name='Test data').click()
@@ -61,13 +61,48 @@ with sync_playwright() as playwright:
             assert 'sample' in page.locator('#import-heading').locator('..').inner_text()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
             page.screenshot(path=f'/tmp/toms-overview-{width}.png', full_page=True)
-            if width <= 640:
+            if width <= 900:
                 page.get_by_role('button', name='Toggle navigation').click()
             assert page.get_by_role('group', name='Income and work', exact=True).is_visible()
             assert page.get_by_role('group', name='Settings', exact=True).is_visible()
             nav = page.locator('#main-navigation')
-            nav.get_by_role('link', name='Overview', exact=True).focus()
-            if width <= 640:
+            work = nav.locator('details').filter(has=page.locator('summary', has_text='Work & income'))
+            settings = nav.locator('details').filter(has=page.locator('summary', has_text='Settings'))
+            assert work.get_attribute('open') is None
+            assert nav.get_by_role('link', name='Income streams', exact=True).is_hidden()
+            work.locator('summary').focus()
+            page.keyboard.press('Enter')
+            assert nav.get_by_role('link', name='Income streams', exact=True).is_visible()
+            nav.get_by_role('link', name='Income streams', exact=True).focus()
+            page.keyboard.press('Escape')
+            assert work.locator('summary').evaluate('(node) => node === document.activeElement')
+            assert work.get_attribute('open') is None
+            assert nav.is_visible()
+            work.locator('summary').click()
+            settings.locator('summary').click()
+            assert nav.get_by_role('button', name='Sign out', exact=True).is_visible()
+            nav.get_by_role('link', name='Income streams', exact=True).wait_for(state='hidden')
+            assert work.get_attribute('open') is None
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
+            if width in (390, 1024):
+                # Full-page capture temporarily resizes Chromium to 1px and
+                # correctly closes menus at the responsive breakpoint.
+                page.screenshot(path=f'/tmp/toms-compact-menu-{width}.png')
+                assert nav.get_by_role('button', name='Sign out', exact=True).is_visible()
+            page.locator('h1').click()
+            assert settings.get_attribute('open') is None
+            if width >= 1024:
+                # Existing income notices are a separate row in this header.
+                assert nav.bounding_box()['height'] <= 50
+                assert abs(nav.bounding_box()['y'] - page.locator('.brand').bounding_box()['y']) < 10
+            if width in (390, 1024, 1280):
+                if width <= 900:
+                    page.get_by_role('button', name='Toggle navigation').click()
+                page.screenshot(path=f'/tmp/toms-compact-nav-{width}.png', full_page=True)
+                if width <= 900:
+                    page.get_by_role('button', name='Toggle navigation').click()
+            nav.get_by_role('link', name='Home', exact=True).focus()
+            if width <= 900:
                 page.keyboard.press('Escape')
                 assert nav.is_hidden()
                 assert page.get_by_role('button', name='Toggle navigation').evaluate('(node) => node === document.activeElement')
@@ -85,7 +120,21 @@ with sync_playwright() as playwright:
             fixture.bank.assert_not_called()
             assert not errors, errors
             page.close()
+            # Native details remain usable with JavaScript disabled.
+            context = browser.new_context(java_script_enabled=False, viewport={'width': width, 'height': 900})
+            context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+            plain = context.new_page()
+            plain.goto(origin + '/dashboard/overview')
+            plain.locator('#main-navigation summary').filter(has_text='Work & income').click()
+            plain.locator('#main-navigation').get_by_role('link', name='Reconciliation', exact=True).click()
+            assert plain.url.endswith('/dashboard/reconciliation')
+            assert plain.locator('details.current-section summary').inner_text() == 'Work & income'
+            assert plain.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            context.close()
+            fixture.bank.assert_not_called()
+            fixture.start_sync.assert_not_called()
+            print(f'PASS {width}px: compact menus, keyboard, focus, sample switch, no-JavaScript navigation and overview')
         finally:
             fixture.doCleanups()
     browser.close()
-print('Overview: saved-only reads, incomplete/sample states, keyboard navigation and layouts passed at four widths.')
+    print('Overview: saved-only reads, incomplete/sample states, keyboard and no-JavaScript navigation passed at five widths.')

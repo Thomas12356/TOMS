@@ -102,6 +102,13 @@ with sync_playwright() as playwright:
             assert tip_box['x'] >= 0 and tip_box['x'] + tip_box['width'] <= width
             if width == 390:
                 page.screenshot(path='/tmp/toms-mobile-review.png', full_page=True)
+        elif width <= 900:
+            assert navigation.is_hidden()
+            page.locator("#navigation-toggle").click()
+            assert navigation.is_visible()
+            navigation.locator('a').first.focus()
+            page.keyboard.press("Escape")
+            assert navigation.is_hidden()
         else:
             assert navigation.is_visible()
             assert not page.locator('#navigation-toggle').is_visible()

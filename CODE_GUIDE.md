@@ -596,3 +596,14 @@ readiness. Existing edit forms preserve ledger return filters.
 
 Regression coverage is in `tests/test_ledger_filters.py`,
 `tests/test_guided_review.py` and `tests/guided_review_browser_checks.py`.
+
+## Compact navigation
+
+`templates/navigation.html` uses native details/summary sections for secondary
+links. `static/js/navigation.js` adds exclusive opening, outside-pointer closing,
+desktop focus-out closing and Escape with focus restoration. Stacked mobile
+sections close siblings after activation, avoiding layout movement during a tap.
+Below 900px the primary menu is collapsed only when JavaScript is available.
+Owner-only links, sample-mode forms, logout CSRF and session activity are retained.
+`tests/overview_browser_checks.py` covers five widths and no-JavaScript navigation;
+the other page journeys use the same section menus.

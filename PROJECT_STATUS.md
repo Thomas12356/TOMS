@@ -3,11 +3,11 @@
 Updated: 2026-10-11. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
-Latest planning update: [USABILITY_ROADMAP.md](USABILITY_ROADMAP.md) incorporates
-the user's supplied review and complaint about the crowded navigation. Compact
-primary navigation with expandable secondary links is the next implementation,
-followed by guided-review deployment and a unified task home. No navigation code
-was changed during this planning update. Budgeting/AI are later scoped milestones.
+Latest usability work: [USABILITY_ROADMAP.md](USABILITY_ROADMAP.md) incorporates
+the user's supplied review and complaint about crowded navigation. Compact primary
+navigation and guided-review deployment are the first delivery. A unified task
+home is next; budgeting/AI remain later scoped milestones. See the latest handoff
+below for deployment revision and verification evidence.
 
 ## Implemented
 

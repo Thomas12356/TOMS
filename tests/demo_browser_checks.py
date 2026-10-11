@@ -94,6 +94,7 @@ with sync_playwright() as playwright:
             page.wait_for_function("() => document.querySelector('#review-count').textContent.includes('6')")
             page.get_by_role('button', name='Close transaction review').click()
             open_navigation()
+            page.locator("#main-navigation summary").filter(has_text='Planning').click()
             with page.expect_navigation():
                 page.get_by_role('link', name='Tax estimate', exact=True).click()
             assert 'GBP 70,000.00' in page.locator('.tax-totals').inner_text()
@@ -105,6 +106,7 @@ with sync_playwright() as playwright:
             assert page.locator('.tax-readiness').get_by_role('link', name='Review records').first.is_visible()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
             open_navigation()
+            page.locator("#main-navigation summary").filter(has_text='Work & income').click()
             with page.expect_navigation():
                 page.get_by_role('link', name='Income streams', exact=True).click()
             page.get_by_role('link', name='Create a Stream', exact=True).click()
@@ -197,11 +199,13 @@ with sync_playwright() as playwright:
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.income_shifts') == 0
             open_navigation()
+            page.locator("#main-navigation summary").filter(has_text='Planning').click()
             with page.expect_navigation():
                 page.locator('#main-navigation').get_by_role('link',name='Tax estimate',exact=True).click()
             assert 'GBP 70,125.00' in page.locator('.tax-totals').inner_text()
 
             open_navigation()
+            page.locator("#main-navigation summary").filter(has_text='Work & income').click()
             with page.expect_navigation():
                 page.get_by_role('link', name='Deductions', exact=True).click()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
@@ -271,6 +275,7 @@ with sync_playwright() as playwright:
             assert partner_card.locator('[data-mileage-relationship]').input_value() == shift_stream_id
             page.keyboard.press('Escape')
             open_navigation()
+            page.locator("#main-navigation summary").filter(has_text='Work & income').click()
             with page.expect_navigation():
                 page.locator('#main-navigation').get_by_role('link', name='Deductions', exact=True).click()
             with page.expect_navigation():
@@ -294,6 +299,7 @@ with sync_playwright() as playwright:
             with page.expect_navigation():
                 partner_card.get_by_role('button', name='Save changes', exact=True).click()
             open_navigation()
+            page.locator("#main-navigation summary").filter(has_text='Work & income').click()
             with page.expect_navigation():
                 page.locator('#main-navigation').get_by_role('link', name='Deductions', exact=True).click()
             assert 'calculated mileage relief GBP 5,500.00' in page.locator('main').inner_text()
@@ -318,6 +324,7 @@ with sync_playwright() as playwright:
             assert 'Demo employer' not in page.locator('main').inner_text()
             fixture.enterContext(patch('routes.system.backup_inventory', return_value=dict(rows=[], count=0, total_bytes=0, error=None)))
             open_navigation()
+            page.locator("#main-navigation summary").filter(has_text='Settings').click()
             with page.expect_navigation():
                 page.get_by_role('link', name='System', exact=True).click()
             assert page.get_by_role('heading', name='System management', exact=True).is_visible()

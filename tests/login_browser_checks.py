@@ -71,8 +71,9 @@ with sync_playwright() as playwright:
             assert page.get_by_role('alert').inner_text() == 'Incorrect username or password.'
             sign_in('updated-pass-123')
             page.goto(origin + '/settings/password')
-            if width <= 640:
+            if width <= 900:
                 page.get_by_role('button', name='Toggle navigation').click()
+            page.locator('#main-navigation summary').filter(has_text='Settings').click()
             with page.expect_navigation():
                 page.get_by_role('button', name='Sign out', exact=True).click()
             assert page.url.endswith('/login')

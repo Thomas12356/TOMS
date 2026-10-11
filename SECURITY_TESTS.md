@@ -995,3 +995,24 @@ filtering 0.034s/5 queries and guided selection 0.019s/5 queries. These local
 measurements do not justify an index migration or establish production latency.
 
 No live Starling requests were made. Optional isolated backup verification remains skipped.
+
+## Compact navigation verification — 2026-10-11
+
+The complete PostgreSQL suite ran 512 tests: 508 passed, four optional backup
+integration cases skipped. Ten checklist regressions passed after the explanatory
+review copy changed. All 18 browser scripts passed across the focused runs;
+affected navigation/sample/logout journeys were rerun after the final menu
+activation change. Overview checks now cover 320/390/768/1024/1280px, native
+JavaScript-disabled menus, keyboard activation/Escape/focus, sibling closing,
+outside-pointer closing, current sections and sample switching. Inspected closed
+header and open-menu screenshots. Existing System/tax assertions now check the
+current link's text content even while its section is collapsed.
+
+Checks found and corrected mobile focus-out movement during menu activation and
+filter controls covered by the fixed footer during automatic scrolling. Ledger
+controls now reserve scroll margin above that footer. Full-page screenshot capture
+temporarily resizes Chromium and closes desktop menus at the responsive breakpoint;
+open-menu captures use the unchanged viewport instead.
+
+Ruff F, application Bandit and whitespace checks passed. Bank traffic was mocked,
+and no schema migration or working financial-record write was required.

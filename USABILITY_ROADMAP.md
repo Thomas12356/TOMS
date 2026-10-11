@@ -8,6 +8,11 @@ not measured results or delivery commitments.
 
 ## Starting point
 
+Delivery update, 11 October: compact navigation is implemented on
+`codex/compact-navigation`, which includes the existing transaction-review and
+roadmap commits. Its first delivery combines navigation and guided review locally.
+Deployment and verification details are recorded in PROJECT_STATUS.md.
+
 The owner overview and grouped navigation are live locally. Filtered ledger and
 guided transaction review are implemented and published on
 `codex/transaction-review`, but are not merged or deployed. Reconciliation,

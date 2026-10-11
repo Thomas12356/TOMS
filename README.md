@@ -1532,6 +1532,11 @@ No migration is required.
 
 ## Finding and reviewing transactions
 
+The compact navigation shows Home, Transactions, Work & income, Planning and
+Settings. Expand a section for its related pages; Settings also contains sign
+out. Mobile uses one menu button. The section menus work without JavaScript,
+and the test-data switch remains visible in navigation.
+
 The ledger filters saved transactions by payer/reference, London date range,
 classification and attention state. Filters remain selected through pagination
 and edits. Choose **Review N transactions** for classification, applicable income

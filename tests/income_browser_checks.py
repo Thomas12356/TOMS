@@ -90,8 +90,9 @@ with sync_playwright() as playwright:
         assert page.get_by_role('button', name='Save changes', exact=True).is_visible()
         assert page.get_by_role('button', name='Archive', exact=True).is_visible()
         page.keyboard.press('Escape')
-        if width < 640:
+        if width <= 900:
             page.get_by_role('button', name='Toggle navigation').click()
+        page.locator("#main-navigation summary").filter(has_text="Work & income").click()
         assert page.get_by_role('link', name='Income streams', exact=True).is_visible()
         page.get_by_role('link', name='Show income', exact=True).click()
         page.get_by_role('link', name='Edit income details').wait_for(state='visible')

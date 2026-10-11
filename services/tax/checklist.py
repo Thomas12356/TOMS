@@ -72,7 +72,7 @@ def guided_checklist(estimate, *, as_of=None, session=None):
         label = payment.counterparty_name or 'Unnamed payment'
         label += ' · ' + payment.transaction_time.astimezone(ZoneInfo('Europe/London')).strftime('%d %b %Y')
         if payment.confirmed_at is None:
-            add(review, label, 'Check this record, then open transaction review to confirm it.',
+            add(review, label, 'Review the classification and details, then check and confirm this payment.',
                 payment_link(payment, 'guided_review.payment'))
         if payment.direction != 'IN' or classification_details(payment)['type'] != 'income' or check_income(payment, {}):
             continue

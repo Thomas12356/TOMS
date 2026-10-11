@@ -5,8 +5,9 @@ Delivery priorities were revised against the user's supplied usability review on
 comes first, then deployment of guided review and a unified task home. Existing
 phase safeguards below still apply; budgeting and AI need their own scoped design.
 
-Created: 2026-10-11. Status: baseline, reliability and overview work implemented; later
-phases remain planned. See PROJECT_STATUS.md for the current verification record.
+Created: 2026-10-11. Status: baseline, reliability, overview and guided transaction
+review implemented; compact navigation follows the revised roadmap. Later phases
+remain planned. See PROJECT_STATUS.md for the current verification record.
 
 ## Objective and boundaries
 

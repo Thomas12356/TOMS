@@ -46,7 +46,7 @@ with sync_playwright() as playwright:
             assert page.get_by_role('heading', name='System management', exact=True).is_visible()
             if width <= 640:
                 page.get_by_role('button', name='Toggle navigation').click()
-            assert page.locator('nav a[aria-current=page]').inner_text() == 'System'
+            assert page.locator('nav a[aria-current=page]').text_content() == 'System'
             if width <= 640:
                 page.get_by_role('button', name='Toggle navigation').click()
             if state == 'records':
