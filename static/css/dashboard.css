@@ -1431,6 +1431,9 @@ td.amount {
 .account-earmark { padding: 12px 0; border-bottom: 1px solid var(--border); }
 .account-earmark summary { cursor: pointer; min-height: 44px; padding: 10px 0; }
 .account-earmark .login-form { max-width: 520px; }
+.tax-profile-form { max-width: 560px; }
+.tax-profile-form select { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--border); color: var(--text); background: var(--surface); font: inherit; }
+.tax-profile-form select:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .balance-breakdown { font-size: 14px; line-height: 1.6; }
 .income-alert-bar { flex-basis: 100%; grid-column: 1 / -1; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 4px 0; color: #f5f0e5; font-size: 13px; line-height: 1.5; }
 .income-alert-bar[hidden] { display: none; }

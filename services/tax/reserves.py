@@ -9,6 +9,7 @@ from services.tax import ni_rules, rules as tax_rule_service
 from services.tax.estimate import estimate_streams, rounded_minor
 from services.tax import records as tax_record_service
 from services.tax.rules import cached_status, reviewed_rules
+from services.tax.profile import current_profile
 from services.transactions.shifts import attach_shift_totals
 
 
@@ -22,11 +23,16 @@ def current_plan(*, refresh_rules=True, session=None, payments=None, as_of=None)
     attach_shift_totals(streams, session=session)
     records = tax_record_service.tax_records(rules, session=session, payments=payments, as_of=as_of)
     records.setdefault('issues', [])
+    profile = current_profile(session)
+    if not profile['supported']:
+        records['issues'].append(profile['message'])
     if cached_status(current_app.instance_path).get('status') == 'needs_review':
         records['issues'].append('Income-tax rules changed and need review.')
     if ni_rules.cached_status(current_app.instance_path).get('status') == 'needs_review':
         records['issues'].append('National Insurance rules changed and need review.')
-    return estimate_streams(streams, rules, **records)
+    estimate = estimate_streams(streams, rules, supported_jurisdiction=profile['supported'], **records)
+    estimate['tax_profile'] = profile
+    return estimate
 
 
 def split_reserve(tax_minor, ni_minor, credits_minor):

@@ -215,7 +215,7 @@ class DeductionFormsTests(DeductionOwnerCase):
         with patch('routes.deductions.cached_status',return_value={'status':'needs_review'}):
             self.assertEqual(self.mileage().status_code,400)
         self.assertEqual(self.mileage(location='scotland').status_code,303)
-        self.assertTrue(any('Scottish' in issue for issue in tax_records(income_rules())['issues']))
+        self.assertFalse(any('Scottish' in issue for issue in tax_records(income_rules())['issues']))
 
     def test_database_rejects_negative_allowance_inputs(self):
         entry=MileageEntry(id=str(uuid4()),income_stream_id=self.stream,journey_date=date(2026,4,10),location='england',

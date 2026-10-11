@@ -3,6 +3,39 @@
 Updated: 2026-10-11. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
+## Latest delivery — tax jurisdiction and HMRC payment guidance
+
+Implemented on `codex/tax-jurisdiction-payment-guidance`:
+
+- Owner-confirmed 2026–27 tax profile, independent of journey locations. England,
+  Wales and Northern Ireland enable supported estimates; missing/unconfirmed,
+  Scottish and other profiles withhold calculated totals and reserve targets.
+- Owner-only, CSRF-protected saves, fresh confirmation, revision checks and safe
+  stale-form recovery. First inserts and sample seeding share a dataset-specific
+  lock. Real and sample settings remain separate; only initial synthetic sample
+  data assumes England. The real owner's jurisdiction has not been inferred.
+- Scotland journeys retain UK mileage relief with a supported profile. The same
+  profile gate applies to estimates, account targets, notices, Home/checklist and
+  evidence exports. Exports preserve the profile summary in the financial snapshot.
+- Consistent payment guidance beside tax/account targets and in exported reports:
+  payments on account are excluded and direct HMRC payments are not subtracted.
+  An official statement link explains how to check actual amounts/dates due.
+  Actual payment tracking remains outside this release.
+- Migration 026 adds the profile table. A private pre-migration backup was made;
+  fingerprints verified existing real/sample data unchanged. This additive upgrade
+  preserves sample edits. No live Starling calls were performed.
+
+Validation: 565 backend tests, 561 passes / four optional backup integration skips;
+all 22 browser scripts passed, including the new five-width workflow (390px without
+JavaScript). Nine new backend regressions cover scope, preserved numbers, Scottish
+travel, initial/update stale saves, auth/CSRF, safe errors, migration defaults and
+sample isolation. Ruff F, Bandit and whitespace checks passed. Optional backup
+restore integration remains unrun because it needs separate CREATEDB credentials.
+
+The owner walkthrough is still
+pending; its sample-profile guidance has been updated. Further navigation changes,
+presets and matching automation await those observations.
+
 ## Latest audit — calculations, legislation and remaining friction
 
 The requested audit is recorded in [CALCULATION_AUDIT.md](CALCULATION_AUDIT.md)

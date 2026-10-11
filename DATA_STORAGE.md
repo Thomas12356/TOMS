@@ -9,7 +9,7 @@ backup nor restore imports the web application, starts jobs or calls Starling.
 
 | Location | Contents | Backup approach |
 | --- | --- | --- |
-| PostgreSQL `toms` schema | Accounts, transactions, classifications, income details, streams, shifts, mileage, expenses, sync history, owner password hash, sessions, setup state and migration history | Database bundle below |
+| PostgreSQL `toms` schema | Accounts, transactions, classifications, income details, streams, shifts, mileage, expenses, annual tax profile, sync history, owner password hash, sessions, setup state and migration history | Database bundle below |
 | PostgreSQL `toms_demo` schema | Separate sample records, including your edits in test mode | Included in the same bundle |
 | `.env` | Runtime database credentials, bank/API credentials and application settings | Separate encrypted configuration copy |
 | `.env.migrations` | Maintenance database credentials | Separate encrypted configuration copy |
@@ -21,6 +21,14 @@ A database archive does not contain `.env`, application code, PostgreSQL server
 configuration or role passwords. Any separately stored attachments would need
 file backups too. Backups contain private financial data and password/session
 hashes. They are compressed, **not encrypted**. Protect them like the database.
+
+The annual tax profile is a business setting: real and sample profiles live in
+their respective schemas and are included in the existing table-discovery backup
+and fingerprint process. Missing profiles are unconfirmed. Migration 026 adds its
+table without rebuilding existing samples; other schema-changing migrations may
+still rebuild sample tables. Tax evidence exports include the selected profile's
+explicit jurisdiction, confirmation time and revision with the calculation,
+using the same read-only snapshot as the financial evidence.
 
 ## Requirements
 

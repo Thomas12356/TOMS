@@ -11,6 +11,7 @@
         {% include 'test_data_notice.html' %}
     <div class="page-heading"><p class="eyebrow">TOMS / TAX</p><h1>Tax estimate</h1></div>
     <p>{{ rules.jurisdiction }} · {{ rules.tax_year }} · 6 April 2026 – 5 April 2027</p>
+    <p>Tax profile: <strong>{{ estimate.tax_profile.label }}</strong> · <a href="{{ url_for('tax_profile.page') }}">{{ 'Confirm tax jurisdiction' if estimate.tax_profile.jurisdiction == 'unknown' else 'Update tax profile' }}</a></p>
     <p class="secondary">A whole-year income tax and self-employed National Insurance forecast from your income sources. Combined earnings set the bands. Only PAYE / CIS tax actually logged on payments is credited; eligible logged expenses and mileage reduce taxable earnings.</p>
     <p><a href="{{ url_for('checklist.page') }}">Open your guided checklist</a> · <a href="{{ url_for('tax_export.page') }}">Export tax-year records</a> · <a href="{{ url_for('dashboard.income_streams') }}">Manage income and deductions</a> · <a href="{{ url_for('dashboard.tax_rules') }}">Check tax rules</a></p>
     {% if not status or status.status != 'verified' %}<p class="tax-note">Using reviewed rules from {{ rules.reviewed_on }}. {{ status.message if status else 'No current matching official-source check is available.' }} Check Tax rules for the latest verification.</p>{% else %}<p class="secondary">Official figures last matched: {{ status.verified_at }}.</p>{% endif %}
@@ -35,7 +36,8 @@
     </section>
     {% endif %}
     <section class="planning-next" aria-label="Next planning action"><h2>Your next step</h2>
-    {% if estimate.blockers %}<a href="{{ url_for('dashboard.income_streams') }}">Complete income forecasts</a>
+    {% if not estimate.tax_profile.supported %}<a href="{{ url_for('tax_profile.page') }}">Review tax profile</a>
+    {% elif estimate.blockers %}<a href="{{ url_for('dashboard.income_streams') }}">Complete income forecasts</a>
     {% elif estimate.received_issues %}<a href="{{ url_for('guided_review.start', attention='needs_review') }}">Review saved payments</a>
     {% else %}<a href="{{ url_for('reserves.page') }}">Compare the target with your earmarks</a>{% endif %}</section>
     {% if estimate.calculation %}
@@ -44,7 +46,8 @@
         <p class="received-reserve"><strong>{{ format_amount(estimate.received_reserve_minor, 'GBP') if estimate.received_reserve_minor is not none else 'Needs review' }}</strong></p>
         <p>Based on {{ format_amount(estimate.received_gross_minor or 0, 'GBP') }} confirmed gross self-employed / CIS income received in this tax year.</p>
         <p class="secondary">The annual business income-tax and NI charge is allocated in proportion to gross business income received, then actual business tax deductions are subtracted once. Employment forecasts still determine the income-tax bands. This is a cumulative savings target, not a bill or an additional payment each time you visit.</p>
-        <p class="secondary">Money you have already saved and payments made directly to HMRC are not tracked. Future payroll deductions are not assumed. Update forecasts as your work changes.</p>
+        <p class="secondary">Compare this target with your <a href="{{ url_for('reserves.page') }}">saved earmarks on Account money</a>. Future payroll deductions are not assumed. Update forecasts as your work changes.</p>
+        {% include 'hmrc_payment_guidance.html' %}
     </section>
     <section class="tax-totals" aria-label="Annual tax forecast">
         <div><span>Combined gross income</span><strong>{{ format_amount(estimate.gross_minor, 'GBP') }}</strong></div>

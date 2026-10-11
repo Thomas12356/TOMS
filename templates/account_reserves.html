@@ -10,6 +10,7 @@
     <p class="secondary">Other currencies stay separate and do not reduce the GBP target. No currency conversion has been applied.</p>
     {% if reserve_target %}<p>Still to earmark against the combined target: <strong>{{ format_amount([0, reserve_target[0] + reserve_target[1] - funds.tax - funds.ni]|max, 'GBP') }}</strong>.</p>{% endif %}
     <p class="secondary">England, Wales and Northern Ireland · 2026–27. The suggestion uses your annual forecasts and only logged deductions. It is a cumulative planning target; compare it with your earmarks rather than adding it again. Direct HMRC payments are not tracked in this target.</p>
+    {% include 'hmrc_payment_guidance.html' %}
     <h3>Live balances</h3>
     <p class="secondary">Refresh explicitly to request bank balances. These values are not saved; opening this page makes no balance request. After earmarks excludes bills and other commitments, so it is not an available-to-spend figure.</p>
     <button type="button" class="secondary-button" id="refresh-balances">Refresh bank balances</button>

@@ -13,6 +13,22 @@ class BaseModel(db.Model):
         return {column.name: getattr(self, column.name) for column in self.__table__.columns}
 
 
+class TaxProfile(BaseModel):
+    __tablename__ = 'tax_profiles'
+    __table_args__ = (
+        db.CheckConstraint("tax_year = '2026-27'"),
+        db.CheckConstraint("jurisdiction IN ('unknown', 'england', 'wales', 'northern_ireland', 'scotland', 'other')"),
+        db.CheckConstraint('revision > 0'),
+        db.CheckConstraint("(jurisdiction = 'unknown') = (confirmed_at IS NULL)"),
+        {'schema': 'toms'},
+    )
+
+    tax_year = db.Column(db.Text, primary_key=True)
+    jurisdiction = db.Column(db.Text, nullable=False, server_default='unknown')
+    revision = db.Column(db.BigInteger, nullable=False, server_default='1')
+    confirmed_at = db.Column(db.DateTime(timezone=True))
+
+
 class Account(BaseModel):
     __tablename__ = "accounts"
 

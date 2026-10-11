@@ -91,8 +91,6 @@ def tax_records(rules, *, as_of=None, session=None, payments=None):
                     deductions[key] += amount
             except ValueError as invalid:
                 issues.append(str(invalid))
-        if any(entry.location == 'scotland' for entry in journeys):
-            issues.append('Scottish income-tax rates are not supported. UK mileage is recorded, but this England/Wales/NI estimate cannot confirm Scottish tax.')
     return dict(credits=dict(credits), deductions=dict(deductions), issues=list(dict.fromkeys(issues)),
                 received=dict(received), ni_paid=dict(ni_paid), attention=list(attention.values()),
                 received_issues=list(dict.fromkeys(received_issues)))

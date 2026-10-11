@@ -685,3 +685,31 @@ Only the requested settings form is rendered on the source index; normal GET
 navigation is the fallback when its dialog is not already present. A bounded
 `workspace=1` context returns settings saves to that source. Existing routes,
 stale-version protection and sample routing remain in use.
+
+## Annual tax jurisdiction and payment guidance
+
+`models.TaxProfile` / migration 026 store the selected jurisdiction, confirmation
+time and revision for 2026–27. Missing rows mean unconfirmed. `tax_profiles` is in
+`DATA_TABLES`, so sample choices are independent of the real owner setting and
+participate in existing database backups. This additive migration preserves
+sample edits when it is the only pending migration.
+
+`routes/tax_profile.py` serves the owner-only, CSRF-protected form. Saves and sample
+seeding share a dataset-specific advisory lock, protecting the initial insert.
+The submitted revision is checked under a row lock; conflicts require a fresh
+page and never quietly replace the user's version. Activity logs record the year
+and action without submitted personal values.
+
+`services/tax/profile.py` resolves the supported scope. `current_plan` reads it
+through the caller's session, and `estimate_streams` suppresses calculated totals
+and reserve targets for unknown/unsupported jurisdictions. All consumers use the
+same gate: estimate, account targets, notices, Home/checklist and evidence export.
+The export includes only the explicit profile summary, within the financial
+snapshot. Mileage location no longer infers residence; UK mileage rules remain
+independent. A confirmed EWNI profile can include Scottish business travel.
+
+`templates/hmrc_payment_guidance.html` supplies the same explanation and official
+statement link beside planning/account targets and in the exported report. It
+does not calculate payments on account or record HMRC payments. The profile form
+is linked from the estimate and adds no permanent top-level navigation item.
+Tests: `test_tax_profile.py` and `tax_profile_browser_checks.py`.

@@ -4,6 +4,11 @@ Use sample mode for this walkthrough so practice edits stay in sample records.
 Login/password settings remain real. This is a guide for observing actual use;
 the automated and expert checks do not measure owner hesitation or comprehension.
 
+Sample mode has its own annual tax profile. Its initial synthetic profile is
+England; edits stay in sample data. If a profile needs confirmation, follow the
+Tax estimate's profile link before comparing targets. A trip into Scotland must
+not require changing an otherwise supported tax profile.
+
 1. From Home, find the next payment needing attention. Follow guided review,
    check its classification and details, then confirm. Can you distinguish a
    suggested choice, saved evidence and confirmation without help?

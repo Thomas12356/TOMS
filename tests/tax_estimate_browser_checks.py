@@ -29,7 +29,9 @@ with sync_playwright() as playwright:
     browser = playwright.chromium.launch(headless=True)
     for state, streams in states.items():
         with app.test_request_context('/dashboard/tax-estimate'):
-            html = render_template('tax_estimate.html', estimate=estimate_streams(streams, rules, credits={streams[0].id: 600000} if state == 'cis' else {streams[0].id: 100000} if state == 'received' else {}, received={streams[0].id: 1500000} if state == 'received' else {}), rules=rules,
+            estimate = estimate_streams(streams, rules, credits={streams[0].id: 600000} if state == 'cis' else {streams[0].id: 100000} if state == 'received' else {}, received={streams[0].id: 1500000} if state == 'received' else {})
+            estimate['tax_profile'] = dict(label='England', supported=True)
+            html = render_template('tax_estimate.html', estimate=estimate, rules=rules,
                                    status=None, format_amount=format_amount, rounded_minor=rounded_minor,
                                    stream_kinds=STREAM_KINDS,
                                    current_user=SimpleNamespace(is_authenticated=True))

@@ -5,6 +5,14 @@ This audits supported 2026–27 England/Wales/Northern Ireland earnings planning
 It is not certification of a complete tax return or an individual tax assessment.
 Working financial records and live bank traffic were not used or changed.
 
+Follow-up implementation on `codex/tax-jurisdiction-payment-guidance`: the
+journey-location blocker described below has been replaced by an explicit annual
+tax profile. Unknown, Scottish and other unsupported profiles withhold estimates;
+confirmed EWNI profiles allow UK mileage regardless of journey location. Shared
+guidance now sits beside targets and in exported reports, linking to HMRC's actual
+statement/payment information. Actual HMRC payment tracking and other excluded
+tax features remain outstanding. See PROJECT_STATUS.md for validation/deployment.
+
 ## Five-task walkthrough
 
 [USABILITY_WALKTHROUGH.md](USABILITY_WALKTHROUGH.md) asks the owner to practise:

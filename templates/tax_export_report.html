@@ -4,6 +4,8 @@
 <p><strong>{{ 'SAMPLE DATA ONLY' if manifest.sample_data else 'Saved owner records' }}</strong><br><small>Generated {{ manifest.generated_at }}</small></p>
 <p>England, Wales and Northern Ireland. Planning evidence, not a completed tax return. Forecasts and bank receipts are separate; adding them together would count income twice.</p>
 {% set plan=manifest.calculation %}
+<p>Saved tax profile for {{ manifest.tax_year }}: <strong>{{ plan.tax_profile.label }}</strong>. {{ plan.tax_profile.message }}</p>
+{% include 'hmrc_payment_guidance.html' %}
 {% if plan.blockers or plan.received_issues %}<div class="warning"><h2>Needs attention</h2>
 {% if plan.blockers %}<h3>Annual forecast</h3><ul>{% for warning in plan.blockers %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}
 {% if plan.received_issues %}<h3>Received-income target</h3><ul>{% for warning in plan.received_issues %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}</div>{% endif %}

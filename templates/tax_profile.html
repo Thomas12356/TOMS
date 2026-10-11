@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% set navigation_page = 'tax-estimate' %}
+{% block title %}Tax profile · TOMS{% endblock %}
+{% block main_class %}tax-estimate{% endblock %}
+{% block content %}
+<div class="page-heading"><p class="eyebrow">TOMS / PLANNING</p><h1>Tax profile</h1></div>
+<p><a href="{{ url_for('dashboard.tax_estimate') }}">Back to tax estimate</a></p>
+{% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+{% if profile %}
+<section class="tax-note"><h2>Your tax jurisdiction for {{ profile.tax_year }}</h2>
+<p>Confirm which income-tax jurisdiction applies to you for 6 April 2026 to 5 April 2027. TOMS supports earnings estimates for England, Wales and Northern Ireland.</p>
+<p>A journey or workplace location does not establish your tax jurisdiction. If you moved during the year or have more than one home, check <a href="https://www.gov.uk/scottish-income-tax/who-pays" target="_blank" rel="noopener noreferrer">HMRC's tax-status guidance</a> before confirming.</p>
+<p>Saved profile: <strong>{{ profile.label }}</strong>. {{ 'This jurisdiction is supported.' if profile.supported else profile.message }}</p>
+{% if stale %}<p>Your attempted choice has not been saved. The saved profile above is current.</p><a href="{{ url_for('tax_profile.page') }}">Reload current profile</a>
+{% else %}<form method="post" class="login-form tax-profile-form">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="version" value="{{ version }}">
+<label for="tax-jurisdiction">Tax jurisdiction</label>
+<select id="tax-jurisdiction" name="jurisdiction">{% for key,label in choices.items() %}<option value="{{ key }}" {{ 'selected' if selected == key else '' }}>{{ label }}</option>{% endfor %}</select>
+<label class="eligibility"><input type="checkbox" name="confirmed" value="1"> I confirm this jurisdiction applies to me for 2026–27.</label>
+<p class="secondary">Choose Not confirmed if unsure; confirmation is then unnecessary. Scotland and Other can be saved, but their tax estimates are unavailable. You can update this profile when your circumstances change.</p>
+<button type="submit">Save tax profile</button></form>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

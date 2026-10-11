@@ -1130,3 +1130,27 @@ and their limits are recorded in USABILITY_REVIEW.md. This is not owner research
 No schema migration, working financial-record writes or live bank verification
 was performed; bank traffic was mocked. The mileage calculation still reads full
 annual evidence, independently of the bounded display records.
+
+## Annual tax profile regression checks
+
+Run `PYTHONPATH=tests RUN_POSTGRES_TESTS=1 .venv/bin/python -m unittest test_tax_profile -q`
+for disposable-schema checks of profile confirmation, supported/unsupported
+targets, Scottish travel, stale first/update saves, owner/CSRF boundaries, safe
+database errors, snapshot exports and real/sample isolation. These fixtures use
+the real migration SQL as well as ORM-created tables. Existing rollback fixtures
+explicitly assume England for financial examples; their profile changes roll back.
+
+Run `.venv/bin/python scripts/verify.py --postgres --browser tax_profile_browser_checks`
+for a real-request Chromium workflow at 320/390/768/1024/1280px (390px without
+JavaScript). It checks unchanged supported figures, validation recovery, stale
+tabs, unsupported targets, HMRC links and sample isolation. No bank calls are
+permitted. The existing estimate, export and account browser checks also cover
+the shared guidance and calculations.
+
+Release evidence (11 October 2026): 565 backend tests, 561 passed / four optional
+backup integration skips; all 22 browser scripts passed. The new form and planning
+page were checked again after wording/layout refinements. Ruff F, Bandit and
+whitespace checks passed. A pre-migration private backup was made; a UTC-normalised
+fingerprint comparison confirmed all existing real and sample rows unchanged by
+migration 026, with only migration history and the new empty tables added. This
+does not replace the separately credentialled backup restore integration checks.

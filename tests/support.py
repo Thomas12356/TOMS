@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from flask import g
 
 from app import app
-from models import Account, Category, Transaction
+from models import Account, Category, Transaction, TaxProfile
 from services.database.connection import db
 
 
@@ -59,6 +59,14 @@ class PostgreSQLTestCase(ApiTestCase):
         # Application commits release savepoints; the outer transaction always rolls back.
         self.session = Session(bind=self.connection, join_transaction_mode="create_savepoint")
         self.addCleanup(self.session.close)
+        # Existing planning fixtures explicitly assume England. This is rolled
+        # back with all other fixture data; production profiles are never inferred.
+        profile = self.session.get(TaxProfile, '2026-27')
+        if profile is None:
+            profile = TaxProfile(tax_year='2026-27', revision=1)
+            self.session.add(profile)
+        profile.jurisdiction, profile.confirmed_at = 'england', datetime.now(timezone.utc)
+        self.session.flush()
         # db.paginate calls the scoped session; other routes use its methods directly.
         session_proxy = Mock(return_value=self.session, wraps=self.session)
         # Nested app contexts must not close the rollback-only fixture session.

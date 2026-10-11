@@ -23,6 +23,7 @@ from routes.tax_export import tax_export
 from routes.reconciliation import reconciliation
 from routes.overview import overview
 from routes.guided_review import guided_review
+from routes.tax_profile import tax_profile
 from services.web.sessions import login_manager, csrf, SESSION_LIFETIME, lock_owner_setup, validate_owner_credentials
 from flask_wtf.csrf import CSRFError
 from werkzeug.security import generate_password_hash
@@ -56,6 +57,7 @@ app.config.update(
 # context processor eagerly loads sessions, even while rendering database errors.
 login_manager.init_app(app, add_context_processor=False)
 csrf.init_app(app)
+app.register_blueprint(tax_profile)
 app.register_blueprint(login)
 app.register_blueprint(system)
 app.register_blueprint(invoices)
@@ -150,7 +152,8 @@ def db_upgrade():
         try:
             with engine.begin() as connection:
                 applied = upgrade_database(connection)
-                prepare_demo_schema(connection, rebuild=bool(applied))
+                # 026 only adds an independent table: preserve existing sample edits.
+                prepare_demo_schema(connection, rebuild=any(name != '026_tax_profile.sql' for name in applied))
                 connection.exec_driver_sql("REVOKE ALL ON TABLE toms.schema_migrations FROM PUBLIC, toms_app")
         finally:
             engine.dispose()

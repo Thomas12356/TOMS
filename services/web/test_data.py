@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from flask import g, request, session
 from flask_login import current_user
 
-from models import Account, Category, IncomeStream, IncomeShift, Transaction, TransactionIncome, SyncRun, AccountReserve, ExpenseDeduction
+from models import Account, Category, IncomeStream, IncomeShift, Transaction, TransactionIncome, SyncRun, AccountReserve, ExpenseDeduction, TaxProfile
 from services.database.connection import db
 from services.database.session import test_data_active
 
@@ -25,6 +25,11 @@ def ensure_sample_data():
     if not test_data_active():
         raise RuntimeError('Sample data requires an authenticated test-mode request.')
     db.session.execute(db.select(db.func.pg_advisory_xact_lock(6075157141257144334)))
+    from services.tax.profile import lock_profile
+    lock_profile()
+    if db.session.get(TaxProfile, '2026-27') is None:
+        db.session.add(TaxProfile(tax_year='2026-27', jurisdiction='england', revision=1,
+                                 confirmed_at=datetime.now(timezone.utc)))
     if db.session.get(Account, sample_id(1)) is not None:
         db.session.commit()
         return

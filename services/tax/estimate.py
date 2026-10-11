@@ -33,7 +33,7 @@ def income_tax(gross_minor, rules):
 
 
 def estimate_streams(streams, rules, credits=None, deductions=None, issues=None, *, received=None,
-                     ni_paid=None, attention=None, received_issues=None):
+                     ni_paid=None, attention=None, received_issues=None, supported_jurisdiction=True):
     """Gross forecasts choose bands; only current, logged records supply credits."""
     credits, deductions = credits or {}, deductions or {}
     received, ni_paid = received or {}, ni_paid or {}
@@ -63,7 +63,7 @@ def estimate_streams(streams, rules, credits=None, deductions=None, issues=None,
     if not rows:
         blockers.append('Create an income stream to start your estimate.')
         return result
-    if any(row['gross_minor'] is None or row['stream'].expected_gross_currency != rules['currency'] for row in rows):
+    if not supported_jurisdiction or any(row['gross_minor'] is None or row['stream'].expected_gross_currency != rules['currency'] for row in rows):
         return result
     gross = sum(row['gross_minor'] for row in rows)
     profit = sum(row['profit_minor'] for row in rows)
