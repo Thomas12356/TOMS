@@ -32,9 +32,14 @@ travel, initial/update stale saves, auth/CSRF, safe errors, migration defaults a
 sample isolation. Ruff F, Bandit and whitespace checks passed. Optional backup
 restore integration remains unrun because it needs separate CREATEDB credentials.
 
-The owner walkthrough is still
-pending; its sample-profile guidance has been updated. Further navigation changes,
-presets and matching automation await those observations.
+Published implementation `b59f01bfa9dd9d481d463c2a561a6ec0dadf735c` to the authorised
+public `Thomas12356/TOMS` repository on `codex/tax-jurisdiction-payment-guidance`;
+main remains unchanged. Outgoing content/history passed the secret scan. The owner must confirm the real tax profile once before estimates resume.
+
+The owner walkthrough is still pending; its sample-profile guidance has been
+updated. Further navigation changes, presets and matching automation await those
+observations. Earlier audit/delivery sections below are historical snapshots;
+the tax-jurisdiction issue described in the audit is resolved by this release.
 
 ## Latest audit — calculations, legislation and remaining friction
 
