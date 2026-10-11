@@ -7,10 +7,10 @@
 {% if error %}
 <p class="message" role="alert">{{ error }}</p><p><a href="{{ url_for('overview.page') }}">Try again</a></p>
 {% elif result %}
-<section class="checklist-summary" aria-labelledby="next-heading"><h2 id="next-heading">Your next step</h2>
-{% set next = result.checks.next_step %}
-{% if next %}<p><a href="{{ next['items'][0].url }}">{{ next.title }}</a></p><p><strong>{{ next['items'][0].label }}</strong></p><p>{{ next['items'][0].reason }}</p>
-{% else %}<p>No issues found in saved records. Check that all income sources, work and deductions are included.</p>{% endif %}
+<section class="checklist-summary" aria-labelledby="next-heading"><h2 id="next-heading">{{ 'Your next step' if result.inbox.selected == 'all' else 'Next action in this category' }}</h2>
+{% set next = result.inbox['items'][0] if result.inbox['items'] else none %}
+{% if next %}<p><a href="{{ next.url }}">{{ next.title }}</a></p><p><strong>{{ next.label }}</strong></p><p>{{ next.reason }}</p>
+{% else %}<p>{{ 'No actions in this category.' if result.inbox.selected != 'all' else 'No actions found in saved records. Check that all income sources, work and deductions are included.' }}</p>{% endif %}
 <p><a href="{{ url_for('checklist.page') }}">View your full checklist</a> · <a href="{{ url_for('reconciliation.page') }}">Check work and payments</a></p>
 </section>
 <div class="balance-cards">
@@ -38,5 +38,19 @@
 <p class="secondary">Saved status only. Opening this page does not refresh bank records or balances.</p>
 <p><a href="{{ url_for('dashboard.transactions_page') }}">Open transactions</a> · <a href="{{ url_for('system.page') }}">Check system health</a></p></section>
 </div>
+<section id="home-actions" class="home-actions" aria-labelledby="actions-heading">
+<h2 id="actions-heading">Needs attention <span class="secondary">({{ result.inbox.total }} actions)</span></h2>
+<p class="secondary">Saved evidence only. A payment appears once even when several details need review. Payments and invoice evidence cover all saved years; planning covers 2026–27.</p>
+<form method="get" action="{{ url_for('overview.page', _anchor='home-actions') }}" class="home-action-filter"><label for="home-task-filter">Action category</label>
+<select id="home-task-filter" name="tasks">{% for key,label in task_filters.items() %}<option value="{{ key }}"{% if key == result.inbox.selected %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+<button type="submit" class="secondary-button">Show actions</button></form>
+<div class="home-action-counts">{% for group in result.inbox.categories %}<a href="{{ url_for('overview.page', tasks=group.key, _anchor='home-actions') }}">{{ group.title }} <strong>{{ group.count }}</strong></a>{% endfor %}</div>
+<ol class="home-action-list">{% for item in result.inbox['items'] %}<li class="home-action">
+<p class="eyebrow">{{ item.category }}</p><h3>{{ item.title }}</h3><p><strong>{{ item.label }}</strong></p><p>{{ item.reason }}</p>
+<a href="{{ item.url }}">{{ item.action }}</a></li>{% else %}<li>{{ 'No actions in this category.' if result.inbox.selected != 'all' else 'No actions found in saved records.' }}</li>{% endfor %}</ol>
+{% if result.inbox.selected_count > result.inbox['items']|length %}<p class="secondary">Showing {{ result.inbox['items']|length }} of {{ result.inbox.selected_count }} actions in this view. Choose a category or open its full records below.</p>{% endif %}
+<p class="home-action-sources">{% for group in result.inbox.categories %}{% if group.count %}<a href="{{ group.url }}">{{ group.action }}</a>{% endif %}{% endfor %}</p>
+<p class="secondary">Actions update when the underlying records are corrected. Confirmation alone does not establish tax completeness, payment matching or available spending money.</p>
+</section>
 {% endif %}
 {% endblock %}

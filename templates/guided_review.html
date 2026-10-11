@@ -78,5 +78,5 @@
 <form method="post" class="review-remove login-form">{{ token() }}<button name="action" value="confirm">Confirm these saved details and continue</button></form>
 {% endif %}
 {% endif %}
-<p><a href="{{ back_url or url_for('dashboard.transactions_page') }}">Back to transactions</a></p>
+<p><a href="{{ back_url or url_for('dashboard.transactions_page') }}">{{ back_label or 'Back to transactions' }}</a></p>
 {% endblock %}

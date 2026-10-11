@@ -6,8 +6,11 @@ Stable working instructions are in [AGENTS.md](AGENTS.md).
 Latest usability work: [USABILITY_ROADMAP.md](USABILITY_ROADMAP.md) incorporates
 the user's supplied review and complaint about crowded navigation. Compact primary
 navigation and guided-review deployment are the first delivery. A unified task
-home is next; budgeting/AI remain later scoped milestones. See the latest handoff
+home is implemented; staged income workspaces are next. Budgeting/AI remain later
+scoped milestones. See the latest handoff
 below for deployment revision and verification evidence.
+
+Current development: `codex/task-home` adds a unified saved-record action inbox.
 
 ## Implemented
 
@@ -149,3 +152,28 @@ rerun after the final activation change. Ten checklist tests passed after copy
 updates. Ruff F, application Bandit and whitespace checks passed. Open/closed
 menu screenshots were inspected. No schema or financial-record changes were
 needed for deployment. Next: unified task home, then staged income workspaces.
+
+## Unified Home actions
+
+Implemented on `codex/task-home`: failed or stale full-import status, deduplicated
+payment actions across saved years, changed/overdue invoice evidence, income
+setup and one planning-warning summary. Home previews six actions and a category
+shows twenty, with exact counts and links to complete source records. Financial
+summaries appear before the detailed action list. Review started from Home returns
+to its same category instead of entering the wider ledger queue. Corrections clear
+derived actions; confirmation alone does not clear stale or incomplete evidence.
+
+Fixed two less obvious issues: stale-allocation totals now count allocations,
+rather than invoices; and partial-import success cannot hide a failed full import.
+Changed invoice work uses the same comparison as reconciliation and preserves
+issued snapshots. No missing-pay or missing-mileage requirements are inferred from
+uninvoiced work. Home remains a saved, repeatable-read view that makes no bank call.
+
+Backend verification: 524 tests, 520 passed and four optional backup tests skipped.
+All 19 browser scripts passed; latest evidence is in SECURITY_TESTS.md.
+At 10,000 disposable transactions, Home measured 2.294s/122 queries and a filtered
+category 2.330s/122 queries. Shared planning/checklist scanning remains a measured
+performance limitation. Next work is staged income setup/workspaces, with this
+read cost to be addressed before broader financial-summary expansion. Live-only
+balances are not presented as saved cash or available spending money. No migration
+or live Starling verification was required.

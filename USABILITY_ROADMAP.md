@@ -13,6 +13,12 @@ is merged into main and deployed locally, including the existing transaction-rev
 and roadmap commits. The live implementation is pinned at `867e856`.
 Deployment and verification details are recorded in PROJECT_STATUS.md.
 
+The unified action home is implemented on `codex/task-home`: saved import,
+payment, invoice, income-setup and planning actions, with retained Home context
+after review. Staged income setup remains next. Saved cash balances need a
+separately designed persistence change and isolated restore verification first;
+Home will not label live-only or unknown balances as available spending money.
+
 The owner overview, compact navigation, filtered ledger and guided transaction
 review are live locally. Reconciliation,
 tax-year evidence exports, reserve targets and earmarks already exist. Improve

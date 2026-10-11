@@ -16,6 +16,14 @@ from services.transactions.review import REVIEW_FIELDS
 LIMIT = 50
 
 
+def invoice_work_changes(invoices, shifts):
+    """Compare current work with active invoice snapshots without changing either."""
+    links = {item.shift_id: (invoice, item) for invoice in invoices
+             for item in invoice.items if item.active and item.shift_id}
+    return [dict(shift=shift, invoice=links[shift.id][0]) for shift in shifts
+            if shift.id in links and shift_source_version(shift) != links[shift.id][1].source_version]
+
+
 def reconcile(session, *, stream_id=None, as_of=None):
     rules = reviewed_rules()
     now = as_of or datetime.now(timezone.utc)
@@ -61,7 +69,8 @@ def reconcile(session, *, stream_id=None, as_of=None):
         return summaries.setdefault(key, dict(stream=stream, currency=currency, work_minor=0, received_minor=0,
             unbilled_minor=0, unbilled_count=0, review_count=0, unallocated_minor=0, discrepancy_minor=None))
 
-    unbilled, receipt_rows, review_rows, changed_work = [], [], [], []
+    unbilled, receipt_rows, review_rows = [], [], []
+    changed_work = invoice_work_changes(invoices, shifts)
     unassigned_count = 0
     for shift in shifts:
         row = group(selected[shift.income_stream_id], shift.currency)
@@ -70,8 +79,6 @@ def reconcile(session, *, stream_id=None, as_of=None):
             row['unbilled_minor'] += shift.gross_minor
             row['unbilled_count'] += 1
             unbilled.append(shift)
-        elif shift_source_version(shift) != shift_links[shift.id][1].source_version:
-            changed_work.append(dict(shift=shift, invoice=shift_links[shift.id][0]))
     for transaction in receipts:
         if classification_details(transaction)['type'] != 'income':
             continue

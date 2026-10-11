@@ -1015,4 +1015,34 @@ temporarily resizes Chromium and closes desktop menus at the responsive breakpoi
 open-menu captures use the unchanged viewport instead.
 
 Ruff F, application Bandit and whitespace checks passed. Bank traffic was mocked,
-and no schema migration or working financial-record write was required.
+and no schema migration or working financial-record write was required. ## Home action inbox verification — 2026-10-11
+
+PostgreSQL discovery ran 524 tests: 520 passed, four optional backup integration
+tests skipped. Twelve new Home regressions use a disposable schema with rollback
+sessions. They cover exact unique payment counts, corrected-record removal,
+old-year/pending/future/non-taxable records, stale expenses despite confirmation,
+failed/full/partial import precedence, freshness and future clock values, bounded
+lists, escaped hostile labels, query validation before reads, safe Home return
+context, multiple stale allocations and changed invoice work without snapshot
+changes. Uninvoiced payroll work does not generate assumed missing pay or mileage.
+
+The full browser runner passed all 19 scripts, including the new Home journey at
+320/390/768/1024/1280px. That journey selects a category, opens the exact payment,
+confirms a transfer, returns to the same Home category and verifies action removal
+and real/sample isolation. It also checks a JavaScript-disabled empty category,
+44px form controls, overflow, browser errors and absence of balance/sync requests.
+Mobile and desktop screenshots were inspected. Ruff F, application Bandit and
+whitespace checks are included in the runner.
+
+The twelve Home regressions and Home browser journey were rerun after bounding
+unusually long counterparty labels. Counts and exact record links remain intact;
+the Home label is shortened rather than displaying an unbounded imported name.
+
+The disposable `scripts/benchmark.py --overview` run measured Home at
+0.161s/27 queries for 100 records, 0.257s/32 queries for 1,000 and
+2.294s/122 queries for 10,000. The filtered Home category measured
+2.330s/122 queries at 10,000. These synthetic measurements identify a remaining
+shared planning/checklist scan cost; they are not production latency guarantees.
+No schema migration, live Starling calls or working financial-record writes were
+performed. Backup restore integration remains skipped for missing isolated
+CREATEDB credentials; a future balance-persistence migration still requires it.

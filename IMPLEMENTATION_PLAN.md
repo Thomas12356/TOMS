@@ -278,3 +278,12 @@ and 508 backend cases passed; four optional backup cases skipped. Ruff F, Bandit
 and whitespace passed. A disposable 10,000-record filtered ledger request took
 approximately 0.067s.
 Overview has been merged into main. See PROJECT_STATUS.md for publication history.
+
+The revised roadmap's unified task home is implemented on `codex/task-home`:
+deduplicated payment actions, full-import failure/freshness checks, invoice evidence
+actions and income/planning follow-ups. Exact category counts accompany bounded
+previews; Home review returns to its category. Financial summaries precede the
+detailed list. A multi-allocation overview counting bug was corrected. Saved cash
+balances remain deferred because balances are currently fetched live rather than
+persisted. The measured 10,000-record Home path still scales with shared planning
+reads; optimize that measured cost before expanding the summary into budgeting.

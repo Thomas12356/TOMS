@@ -23,6 +23,7 @@ from services.transactions.shifts import shift_label
 from services.web.presentation import format_amount, local_date
 from services.web.sessions import require_dashboard_login
 from services.web.test_data import activate_test_data
+from services.web.tasks import TASK_FILTERS
 
 guided_review = Blueprint('guided_review', __name__, url_prefix='/dashboard')
 guided_review.before_request(require_dashboard_login)
@@ -45,7 +46,19 @@ def query():
 
 
 def options():
-    return ledger_options(query_values(FILTERS | {'step'}, empty_ignored={'q', 'from', 'to'}))
+    values = query_values(FILTERS | {'step', 'return_to', 'tasks'}, empty_ignored={'q', 'from', 'to'})
+    context = ledger_options(values)
+    if 'return_to' in values or 'tasks' in values:
+        if values.get('return_to') != 'home' or values.get('tasks', 'all') not in TASK_FILTERS or context:
+            raise BadRequest('Choose Home with a valid action category, or ledger filters.')
+        context = {'return_to': 'home', 'tasks': values.get('tasks', 'all')}
+    return context
+
+
+def back_url(context):
+    if context.get('return_to') == 'home':
+        return url_for('overview.page', tasks=context['tasks'], _anchor='home-actions')
+    return url_for('dashboard.transactions_page', **context)
 
 
 def render(error=None, status=200, **values):
@@ -77,7 +90,8 @@ def start():
     if payment:
         return redirect(url_for('guided_review.payment', account_uid=payment.account_uid,
             category_uid=payment.category_uid, feed_item_uid=payment.feed_item_uid, **context))
-    return render(complete=True, back_url=url_for('dashboard.transactions_page', **context))
+    return render(complete=True, back_url=back_url(context),
+                  back_label='Back to Home' if context.get('return_to') == 'home' else 'Back to transactions')
 
 
 @guided_review.route('/transactions/<uuid:account_uid>/<uuid:category_uid>/<uuid:feed_item_uid>/review', methods=['GET', 'POST'])
@@ -116,6 +130,8 @@ def payment(account_uid, category_uid, feed_item_uid):
             next_step = apply_action(record, request.form)
             db.session.commit()
             if next_step == 'done':
+                if context.get('return_to') == 'home':
+                    return redirect(back_url(context), code=303)
                 return redirect(url_for('guided_review.start', **context), code=303)
             return redirect(url_for('guided_review.payment', **key, **context, step=next_step), code=303)
         except (BadRequest, Conflict, ValueError) as invalid:
@@ -138,5 +154,5 @@ def payment(account_uid, category_uid, feed_item_uid):
         choices={key: choice for key, choice in CLASSIFICATION_TYPES.items() if record.direction in choice['directions']},
         income_complete=check_income(record, {}) if kind == 'income' else True,
         expense_current=expense_current(record.expense) if record.expense else True,
-        back_url=url_for('dashboard.transactions_page', **context),
+        back_url=back_url(context), back_label='Back to Home' if context.get('return_to') == 'home' else 'Back to transactions',
         step_url=lambda value: url_for('guided_review.payment', **key, **context, step=value))

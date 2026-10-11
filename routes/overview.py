@@ -11,6 +11,7 @@ from services.web.overview import saved_overview
 from services.web.presentation import format_amount, local_date
 from services.web.sessions import require_dashboard_login
 from services.web.test_data import activate_test_data
+from services.web.tasks import TASK_FILTERS
 
 overview = Blueprint('overview', __name__, url_prefix='/dashboard/overview')
 overview.before_request(require_dashboard_login)
@@ -27,7 +28,7 @@ overview.before_request(activate_test_data)
 
 def render(result=None, error=None, status=200):
     return render_template('overview.html', result=result, error=error, current_user=current_user,
-                           format_amount=format_amount, local_date=local_date), status
+                           format_amount=format_amount, local_date=local_date, task_filters=TASK_FILTERS), status
 
 
 @overview.errorhandler(SQLAlchemyError)
@@ -43,6 +44,9 @@ def bad_request(error):
 
 @overview.get('')
 def page():
-    query_values(set())
+    options = query_values({'tasks'})
+    task_filter = options.get('tasks', 'all')
+    if task_filter not in TASK_FILTERS:
+        raise BadRequest('Choose a valid action category.')
     with export_session() as session:
-        return render(saved_overview(session))
+        return render(saved_overview(session, task_filter=task_filter))

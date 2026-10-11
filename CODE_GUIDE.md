@@ -607,3 +607,26 @@ Below 900px the primary menu is collapsed only when JavaScript is available.
 Owner-only links, sample-mode forms, logout CSRF and session activity are retained.
 `tests/overview_browser_checks.py` covers five widths and no-JavaScript navigation;
 the other page journeys use the same section menus.
+
+## Home action inbox
+
+`services/web/tasks.py` assembles bounded saved-record actions. Payment selection
+uses the same attention predicate as the ledger, with one item per payment across
+all saved years. Import actions consider the latest attempt and latest full
+attempt; unknown/full-history freshness is separate from a successful partial
+import. The advisory age is 24 hours, and a run still marked running after one
+hour prompts checking progress without declaring worker failure.
+
+`services/web/overview.py` supplies one repeatable-read snapshot, reuses invoice
+settlement and counts individual stale allocations. Its changed-work comparison
+shares `invoice_work_changes` with reconciliation. One invoice action combines
+overdue, stale allocation and changed-work reasons; cancelled invoices are omitted.
+No uninvoiced-work or missing-mileage obligations are inferred. Planning warnings
+are one summary action, explicitly acknowledging overlap with record actions.
+
+`routes/overview.py` validates `tasks` before any snapshot read. Default Home shows
+six actions; a category shows twenty with exact complete counts and source links.
+The existing guided review accepts only a bounded `return_to=home` and known task
+category, preserving context through errors and returning there after confirmation.
+Arbitrary return URLs and mixed Home/ledger contexts are rejected. Coverage is in
+`tests/test_home_tasks.py` and `tests/home_tasks_browser_checks.py`.

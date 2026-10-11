@@ -23,7 +23,9 @@ from test_test_data import TestDataTests
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--multi-year', action='store_true', help='Put half the added receipts in the prior year.')
-    parser.add_argument('--ledger', action='store_true', help='Measure filtered ledger and guided selection instead of notices/reconciliation.')
+    paths_group = parser.add_mutually_exclusive_group()
+    paths_group.add_argument('--ledger', action='store_true', help='Measure filtered ledger and guided selection instead of notices/reconciliation.')
+    paths_group.add_argument('--overview', action='store_true', help='Measure Home and its filtered action list.')
     args = parser.parse_args()
     if os.environ.get('RUN_POSTGRES_TESTS') != '1':
         parser.error('Set RUN_POSTGRES_TESTS=1 to enable disposable database fixtures.')
@@ -44,7 +46,8 @@ def main():
                         source='FASTER_PAYMENTS_IN', counterparty_name='Synthetic benchmark', raw_payload={}))
                 db.session.commit()
                 db.session.remove()
-            paths = ('/dashboard?q=Synthetic+benchmark&classification=income&attention=unconfirmed',
+            paths = ('/dashboard/overview', '/dashboard/overview?tasks=payments') if args.overview else (
+                     '/dashboard?q=Synthetic+benchmark&classification=income&attention=unconfirmed',
                      '/dashboard?q=no-match&attention=needs_review&from=2026-04-06&to=2027-04-05',
                      '/dashboard/review/start?q=Synthetic+benchmark&attention=unconfirmed') if args.ledger else (
                          '/dashboard/income-notifications', '/dashboard/reconciliation')

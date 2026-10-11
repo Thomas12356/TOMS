@@ -152,6 +152,18 @@ a:focus-visible, .table-scroll:focus-visible {
 }
 .navigation-menu .logout-form { margin: 4px 0 0; padding: 4px 0 0; border: 0; border-top: 1px solid #59645b; }
 
+.home-actions { margin: 24px 0; }
+.home-action-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 18px 0; }
+.home-action-filter select { max-width: 100%; padding: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+.home-action-filter button { min-height: 44px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 3px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.home-action-filter :is(button, select):focus-visible { outline: 3px solid var(--highlight); outline-offset: 3px; }
+.home-action-counts, .home-action-sources { display: flex; flex-wrap: wrap; gap: 10px 18px; margin: 16px 0; }
+.home-action-counts a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.home-action-list { padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; }
+.home-action { padding: 16px; border: 1px solid var(--border); background: var(--surface); overflow-wrap: anywhere; }
+.home-action h3 { margin: 6px 0; font-size: 16px; }
+.home-action p { margin: 8px 0; }
+
 .site-header nav a, .site-header nav button {
     display: inline-flex;
     align-items: center;

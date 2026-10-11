@@ -1545,3 +1545,11 @@ without JavaScript. **Quick confirmation** remains available as an optional
 shortcut; review dialogs no longer open automatically. Blank unknown amounts
 remain unknown. Confirmation records review and does not prove tax completeness
 or move money. Changed evidence requires reloading before confirmation.
+
+Home groups saved-record actions for imports, payments, invoice evidence, income
+setup and planning explanations. Multiple problems on one payment produce one
+payment action. Review started from Home returns to the same category; corrected
+records leave the list after refresh. Home previews six actions, with up to twenty
+in a selected category and links to full records. Financial summaries appear
+before the detailed list. Partial success cannot clear a failed full import.
+Opening Home makes no bank request.
