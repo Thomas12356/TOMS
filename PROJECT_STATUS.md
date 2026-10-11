@@ -34,6 +34,13 @@ source return context, then put unresolved planning/matching actions first.
 This is an expert review, not measured user research. No working financial data
 changed. Future implementation should start on a new appropriately named branch.
 
+Next-step decision: the user asked to use the whole-system review to guide delivery.
+IMPLEMENTATION_PLAN.md now specifies scope, named branches and acceptance checks:
+focus attention/source setup, simplify daily entry/history, then prioritize
+unresolved review/planning/matching actions. Owner observation follows before
+new feature expansion. This update changes planning only; no new interface or
+financial behaviour has been implemented or deployed by it.
+
 Latest usability work: [USABILITY_ROADMAP.md](USABILITY_ROADMAP.md) incorporates
 the user's supplied review and complaint about crowded navigation. Compact primary
 navigation and guided-review deployment are the first delivery. A unified task

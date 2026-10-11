@@ -8,6 +8,14 @@ not measured results or delivery commitments.
 
 ## Starting point
 
+Decision update: the user requested that the whole-system review govern next
+steps. The concrete sequence and acceptance checks are now in
+[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md#next-delivery-sequence): focused
+attention and source setup first, daily entry/history second, action-first
+review/planning/matching third, then owner observation before expanding features.
+Earlier sections retain the historical rationale; their ordering does not override
+this sequence.
+
 Delivery update: `codex/account-money-work-defaults-suggestions` completes the
 next three priorities. Account money separates saved earmarks, tax targets and
 explicitly refreshed balances. Work and journeys can reuse saved record defaults

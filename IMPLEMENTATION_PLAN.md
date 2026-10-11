@@ -1,13 +1,105 @@
 # TOMS implementation plan
 
-Delivery priorities were revised against the user's supplied usability review on
-11 October 2026. See [USABILITY_ROADMAP.md](USABILITY_ROADMAP.md): compact navigation
-comes first, then deployment of guided review and a unified task home. Existing
-phase safeguards below still apply; budgeting and AI need their own scoped design.
+Delivery priorities now follow the post-publication
+[whole-system usability review](USABILITY_REVIEW.md). Navigation, guided review,
+task Home, source workspaces, Account money, reusable defaults and explicit
+suggestions are implemented. The next work reduces distraction and effort in
+existing journeys. Existing engineering safeguards below still apply.
 
-Created: 2026-10-11. Status: baseline, reliability, overview and guided transaction
-review implemented; compact navigation follows the revised roadmap. Later phases
-remain planned. See PROJECT_STATUS.md for the current verification record.
+Created and revised: 2026-10-11. The next delivery sequence below takes precedence
+over the historical phase ordering. See PROJECT_STATUS.md for verified delivery.
+
+## Next delivery sequence
+
+### 1. Focus attention and source setup
+
+Branch: `codex/focused-attention-source-setup`.
+
+Start here because the review found repeated notices and competing actions on
+most screens; improving this benefits every subsequent workflow without changing
+the financial model or requiring a migration.
+
+- Keep Home as the main task destination. Replace the large global income banner
+  with a compact count/control, retaining notice details, acknowledgement and
+  readable failure/retry states. Unresolved financial warnings stay visible where
+  they affect a decision; do not silently dismiss them.
+- Keep the sample-mode identity and separation warning visible. Move secondary
+  explanation into an accessible disclosure with a usable HTML fallback.
+- Standardize job/business labels as “Income sources” and matching as “Work and
+  payment matching”; distinguish the optional payment description from a source.
+  Update related headings, buttons and back links together, retaining URLs.
+- Give name/type source creation a focused view with one primary continuation.
+  Keep full configuration available as a secondary path and preserve invalid
+  entries, unknown forecasts and the return to the new source workspace.
+
+Acceptance: compare real and sample screenshots at 390px and 1280px with the
+review baseline. The main task starts higher on mobile, mode identity remains
+obvious, and notice count/details/errors remain reachable. Creation presents one
+primary continuation and retains input on failure. Verify keyboard, no-JavaScript,
+owner-only access, CSRF, sample isolation and existing notice acknowledgements.
+
+### 2. Make daily work and mileage entry shorter
+
+Branch: `codex/work-mileage-entry-history`.
+
+- Separate entry from history and group journey/vehicle fields. Keep eligibility
+  visible before saving; show concise explanations beside the fields they affect.
+- Carry validated source context through work, expense and journey entry, reuse,
+  errors and saving. Return to the same source workspace rather than the global
+  list. Preserve existing filtered-ledger return behaviour when that is the origin.
+- Add source/date filtering and bounded history pagination. Financial calculations,
+  allowances and consistency checks must still use complete relevant evidence;
+  a display page is never the calculation input.
+- Keep saved-record reuse. Do not introduce preset tables until repeated owner
+  workflows demonstrate that record templates are insufficient.
+
+Acceptance: create work, reuse a journey, correct an invalid field and return to
+the same source on mobile and without JavaScript. Confirm dates, actual miles,
+reimbursement and eligibility are checked afresh, old records unchanged, stale
+writes rejected and calculated results identical across display pages/filters.
+Use a large disposable history to verify bounded displayed records/query work.
+
+### 3. Make review, planning and matching action-first
+
+Branch: `codex/action-first-review-planning` (split further if needed).
+
+- Promote guided review on ledger records needing attention; group expert editing
+  and secondary metadata into accessible disclosures. Keep quick confirmation's
+  distinct meaning and existing direct-edit capabilities clear.
+- Start planning with readiness, the applicable target and one exact next action.
+  Move calculation/source breakdowns into accessible details while keeping unknown
+  amounts, unsupported scope and material warnings prominent.
+- Put unresolved receipts/invoices first in matching; collapse clear summaries
+  without concealing evidence. Retain explicit allocations and the warning that
+  equal totals do not prove work was paid.
+
+Acceptance: mixed pending, future, settled and incomplete ledger fixtures remain
+correct. All six planning states retain identical totals and warnings. Matching
+still rejects stale/over-budget allocation and never adds duplicate income.
+Compare mobile task position and visible competing actions before/after; do not
+treat lower page height alone as evidence of improved usability.
+
+### 4. Validate with the owner before expanding features
+
+Observe source creation, payment review, work/journey entry, earmarking and invoice
+matching. Record where the owner hesitates, loses context or needs an explanation;
+use that evidence to revise priorities. This is not yet completed user research.
+
+Later: readable backup/recovery guidance in System, named presets if justified,
+and a separately designed balance-persistence change. Persisted balances require
+private backup and isolated restore verification before migration. Budgeting, AI,
+broader automatic rules and available-to-spend claims need separate scope/design.
+
+### Verification and publication for each delivery
+
+Run affected backend/browser journeys while implementing, then the full PostgreSQL
+and browser verifier before publishing each completed delivery. Include 320, 390,
+768, 1024 and 1280px where affected, keyboard, JavaScript-disabled, retained-error,
+stale-record and real/sample checks. Run Ruff F for Python changes, Bandit and
+`git diff --check`; scan outgoing content/history for secrets. Report optional
+backup skips separately and do not describe them as passes. Update handoff with
+actual evidence, commit on the named branch and use the existing authorized
+publication process. Check local deployment health after a deployed change.
 
 ## Objective and boundaries
 
