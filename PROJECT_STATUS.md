@@ -20,7 +20,19 @@ Verification: 544 backend tests, 540 passes and four optional backup skips;
 all 20 browser scripts passed, including the new five-width workflow journey
 and JavaScript-disabled entry. Final focused regressions, Ruff F, Bandit,
 whitespace and outgoing secret-value checks passed. No migration or live bank
-verification was needed. Whole-system usability review follows publication.
+verification was needed.
+
+Implementation `aeedef95d0353263545d77ff21577c8677305f75` was pushed to the named
+branch and fast-forwarded to public main.
+
+The post-publication [whole-system usability review](USABILITY_REVIEW.md) checked
+14 pages at mobile/desktop widths, with all 28 visits returning 200, no overflow
+or browser errors, and inspected synthetic screenshots. Remaining priorities:
+reduce repeated attention, standardize visible source/matching terminology,
+focus source creation, shorten mileage entry with bounded history and preserve
+source return context, then put unresolved planning/matching actions first.
+This is an expert review, not measured user research. No working financial data
+changed. Future implementation should start on a new appropriately named branch.
 
 Latest usability work: [USABILITY_ROADMAP.md](USABILITY_ROADMAP.md) incorporates
 the user's supplied review and complaint about crowded navigation. Compact primary

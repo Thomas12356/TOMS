@@ -1093,3 +1093,9 @@ and JavaScript-disabled entry. Suggestions are tested against conflicting,
 incomplete, archived, future, unconfirmed and cross-currency history, plus stale
 target/history versions and existing non-taxable choices. All bank traffic was
 mocked. No schema migration or live Starling verification was performed.
+
+Post-publication expert walkthrough of implementation `aeedef9`: 14 pages at
+390px and 1280px (28 successful visits), no horizontal overflow or JavaScript
+errors. Synthetic screenshots and selected regression screenshots were inspected.
+The fixture used disposable schemas and made no bank request. Review findings
+are in USABILITY_REVIEW.md; this is not a user study.

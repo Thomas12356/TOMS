@@ -14,7 +14,11 @@ explicitly refreshed balances. Work and journeys can reuse saved record defaults
 without copying new actuals or eligibility. Guided review offers explained,
 version-checked classification/source previews from consistent confirmed history;
 the owner must still save. No persistent bank-balance model or preset manager is
-implied by these changes. The next whole-system review follows publication.
+implied by these changes. Implementation `aeedef9` is merged, pushed and deployed
+locally. [USABILITY_REVIEW.md](USABILITY_REVIEW.md) records the completed
+post-publication walkthrough and supersedes earlier next-step priorities: reduce
+duplicate attention and inconsistent labels, simplify daily entry and source
+return context, then restructure planning/matching around unresolved actions.
 
 Delivery update, 11 October: compact navigation from `codex/compact-navigation`
 is merged into main and deployed locally, including the existing transaction-review
@@ -34,7 +38,7 @@ The owner overview, compact navigation, filtered ledger and guided transaction
 review are live locally. Reconciliation,
 tax-year evidence exports, reserve targets and earmarks already exist. Improve
 their discoverability rather than rebuild them. The latest recorded verification
-is 526 backend passes, four optional backup skips and all 19 browser scripts.
+is 540 backend passes, four optional backup skips and all 20 browser scripts.
 
 The overview does not yet establish available-to-spend cash. Annual tax targets,
 recorded earmarks and bank balances have different meanings. Never use the
