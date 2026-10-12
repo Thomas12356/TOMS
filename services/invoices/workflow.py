@@ -265,6 +265,19 @@ def allocate(invoice, key, cash, tax, ni):
         .with_for_update(of=Transaction).execution_options(populate_existing=True))
     if not receipt_valid(transaction, invoice):
         raise ValueError('Choose confirmed, settled income in this currency assigned to this stream. Complete its income details first.')
+    validate_allocation(invoice, transaction, cash, tax, ni)
+    payment = InvoicePayment(id=str(uuid4()), invoice_id=invoice.id, account_uid=key[0], category_uid=key[1],
+        feed_item_uid=key[2], cash_minor=cash, tax_minor=tax, ni_minor=ni, payment_version=payment_version(transaction),
+        payment_label=((transaction.counterparty_name or 'Unnamed payment') + ' · ' + (transaction.reference or 'No reference'))[:300], active=True)
+    db.session.add(payment)
+    invoice.revision += 1
+    return payment
+
+
+def validate_allocation(invoice, transaction, cash, tax, ni):
+    """Shared read-only preview validation; allocate additionally locks records."""
+    if invoice.state != 'issued' or not receipt_valid(transaction, invoice):
+        raise ValueError('Choose an issued invoice for this confirmed income source and currency.')
     amounts = (cash, tax, ni)
     if any(type(value) is not int or not 0 <= value <= MAX_MINOR for value in amounts) or not 0 < sum(amounts) <= MAX_MINOR:
         raise ValueError('Allocate a positive amount using actual cash and logged deductions.')
@@ -276,12 +289,7 @@ def allocate(invoice, key, cash, tax, ni):
         raise Conflict('Remove this invoice’s stale payment allocations before adding another.')
     if sum(amounts) > summary['outstanding']:
         raise ValueError('This allocation exceeds the invoice’s outstanding balance.')
-    payment = InvoicePayment(id=str(uuid4()), invoice_id=invoice.id, account_uid=key[0], category_uid=key[1],
-        feed_item_uid=key[2], cash_minor=cash, tax_minor=tax, ni_minor=ni, payment_version=payment_version(transaction),
-        payment_label=((transaction.counterparty_name or 'Unnamed payment') + ' · ' + (transaction.reference or 'No reference'))[:300], active=True)
-    db.session.add(payment)
-    invoice.revision += 1
-    return payment
+    return summary
 
 
 def remove_payment(invoice, identity):

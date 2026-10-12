@@ -1,5 +1,21 @@
 # Security checks — 6 October 2026
 
+## Guided receipt matching — 12 October 2026
+
+`test_receipt_matching.py` covers read-only previews, signed/expired/tampered
+confirmation, CSRF/owner protection, duplicate submits, invoice/payment changes,
+real/sample preview binding, separate partial cash/withholding budgets,
+inconsistent gross, wrong currency/source, escaped suggestions and no-store.
+Final backend: 583 tests, 579 passed / four optional backup restore skips.
+Reconciliation, invoice, Home task and reliability browser scripts passed;
+matching works at 320/390/768/1280px, with the 390px flow also run without
+JavaScript. Ruff F, application Bandit and whitespace checks passed.
+Earlier browser runs had intermittent invoice-estimate/Home navigation failures;
+all-width reruns passed without application fixes for those assertions. Invoice
+checks now save synthetic sample HTML on estimate failure for diagnosis. This is
+not evidence that the intermittent failures are permanently resolved.
+No live bank traffic or working financial writes were used in verification.
+
 ## Repeatable verification tooling (2026-10-11)
 
 Use the project's application interpreter and separately pinned development tools:

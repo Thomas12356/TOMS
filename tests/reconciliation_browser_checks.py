@@ -32,7 +32,7 @@ with sync_playwright() as playwright:
             fixture.addCleanup(worker.join,5)
             fixture.addCleanup(server.shutdown)
             origin = f'http://127.0.0.1:{server.server_port}'
-            page = browser.new_page(viewport={'width':width,'height':900})
+            page = browser.new_page(viewport={'width':width,'height':900}, java_script_enabled=width != 390)
             cookie = fixture.client.get_cookie('session')
             page.context.add_cookies([dict(name='session',value=cookie.value,url=origin)])
             errors = []
@@ -55,12 +55,28 @@ with sync_playwright() as playwright:
             assert page.get_by_role('heading',name='Invoices needing attention (1)').is_visible()
             click(page.locator('#reconciliation-invoices').get_by_role('link').first)
             click(page.get_by_role('button',name='Issue invoice',exact=True))
-            page.locator('.invoice-payment-form > summary').click()
-            page.locator('#invoice-payment').select_option('|'.join((sample_id(1),sample_id(11),sample_id(31))))
-            page.locator('#invoice-cash').fill('200')
-            page.locator('#invoice-tax').fill('0')
-            page.locator('#invoice-ni').fill('0')
-            click(page.get_by_role('button',name='Allocate payment',exact=True))
+            invoice_url = page.url
+            page.goto(origin+'/dashboard/reconciliation?stream='+sample_id(21))
+            click(page.get_by_role('link',name='Match this payment',exact=True))
+            assert page.get_by_role('heading',name='Match this payment',exact=True).is_visible()
+            assert 'Same income source and currency' in page.locator('main').inner_text()
+            page.get_by_text('Choose this invoice',exact=True).click()
+            page.locator('input[name=cash]').fill('200')
+            page.locator('input[name=tax]').fill('0')
+            page.locator('input[name=ni]').fill('0')
+            click(page.get_by_role('button',name='Preview match',exact=True))
+            assert page.get_by_role('heading',name='Check this match').is_visible()
+            with fixture.admin.connect() as connection:
+                assert connection.execute(text(f'SELECT count(*) FROM {fixture.demo_schema}.invoice_payments')).scalar()==0
+            if width == 390:
+                page.screenshot(path='/tmp/toms-receipt-match-preview.png',full_page=True)
+            click(page.get_by_role('button',name='Confirm match',exact=True))
+            if 'Payment matched.' not in page.locator('main').inner_text():
+                Path('/tmp/toms-receipt-match-browser-failure.html').write_text(page.content())
+                raise AssertionError(f'Match confirmation failed at {width}px, URL {page.url}; see temporary sample HTML')
+            assert 'Remaining to match' in page.locator('main').inner_text()
+            page.goto(invoice_url)
+            layout()
             assert 'Paid' in page.locator('.invoice-totals').inner_text()
             page.goto(origin+'/dashboard/reconciliation?stream='+sample_id(21))
             layout()
@@ -69,9 +85,11 @@ with sync_playwright() as playwright:
             assert page.get_by_role('heading',name='Invoices needing attention (0)').is_visible()
             assert page.get_by_role('heading',name='Receipts available for allocation (1)').is_visible()
             assert fixture.bank.call_count==0
+            with fixture.admin.connect() as connection:
+                assert connection.execute(text(f'SELECT count(*) FROM {fixture.real_schema}.invoice_payments')).scalar()==0
             assert not errors, errors
             page.close()
-            print(f'PASS {width}px: responsive layout, sample isolation, source filter, invoice allocation and refreshed balances')
+            print(f'PASS {width}px: sample isolation, explained matching, read-only preview, confirmation and remaining budgets')
         finally:
             fixture.doCleanups()
     browser.close()

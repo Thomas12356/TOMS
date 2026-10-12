@@ -3,6 +3,34 @@
 Updated: 2026-10-12. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
+## Latest delivery — guided receipt matching
+
+Implemented on `codex/guided-receipt-matching`. Available receipts now lead to
+one payment screen with explained same-source/currency invoice suggestions,
+reference/amount/date evidence, invoice search and compact expandable choices.
+The owner enters actual cash/deductions, previews the resulting outstanding
+balance and confirms on the same screen. A partial match leaves separate cash,
+tax and NI budgets available for the next invoice. No-invoice and decide-later
+paths leave the receipt unmatched without recording an invoice payment/status.
+
+Preview is read-only. Confirmation requires a signed 15-minute preview tied to
+the payment, invoice revision and real/sample mode; it locks records and reuses
+the established allocation validation. Changed receipts/invoices, stale or
+excessive allocations, wrong source/currency, inconsistent gross/deductions,
+tampered/expired previews and repeat confirmation are rejected. No tax rules,
+income totals, issued snapshots, bank traffic or database schema are changed.
+
+Validation: 583 backend tests, 579 passed / four optional backup restore skips.
+Matching, invoices, Home tasks and reliability browser scripts passed all tested
+widths; matching also passed with JavaScript disabled at 390px. Ruff F, Bandit
+and whitespace checks passed. Earlier browser runs had intermittent assertions
+in invoice estimates, Home navigation and matching confirmation; final reruns
+passed, with sample-only diagnostic capture added. Their cause is not established.
+Publication/deployment are recorded after completion. No credentials or backup
+restore checks were added.
+The owner walkthrough remains outstanding: automated checks establish behaviour
+and responsive layout, not whether the owner finds the flow clearer.
+
 ## Latest delivery — bounded financial evidence loading
 
 Completed requested steps 2–5 on `codex/bounded-financial-reads`: Home loading,

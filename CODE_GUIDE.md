@@ -716,4 +716,20 @@ Tests: `test_tax_profile.py` and `tax_profile_browser_checks.py`.
 
 ## Bounded evidence reads
 
-Home (`services/web/overview.py`) shares compact payment evidence from `services/tax/payment_evidence.py` between planning and checklist review. Invoice evidence is processed in batches; only 20 priority actions are retained, with full counts and separate currency totals. Reconciliation streams payments/work and batches invoices, retains numeric allocation budgets and compact links, caps detail sections at 50 and repeated invoice choices at five while exposing complete counts. Tax evidence `package(..., include_records=False)` streams allowlisted table rows and ZIP content using the caller’s snapshot. The compatibility default retains records for small internal inspections; browser downloads explicitly disable it.
+Home (`services/web/overview.py`) shares compact payment evidence from `services/tax/payment_evidence.py` between planning and checklist review. Invoice evidence is processed in batches; only 20 priority actions are retained, with full counts and separate currency totals. Reconciliation streams payments/work and batches invoices, retains numeric allocation budgets and compact links, and caps detail sections at 50. Receipt actions open guided matching rather than repeating invoice choices on the summary. Tax evidence `package(..., include_records=False)` streams allowlisted table rows and ZIP content using the caller’s snapshot. The compatibility default retains records for small internal inspections; browser downloads explicitly disable it.
+
+## Guided receipt matching
+
+`routes/reconciliation.py:match_payment` is owner-only and CSRF protected. GET
+loads one receipt; `services/invoices/matching.py` streams eligible invoice
+evidence and retains 20 ranked choices, with literal escaped search and explicit
+reference/amount/date explanations. Suggestions never write allocations.
+Preview reuses `workflow.validate_allocation`; confirmation accepts only a
+15-minute signed preview bound to receipt identity/version, invoice revision and
+real/sample mode. It locks the invoice and receipt, revalidates actual budgets
+through `workflow.allocate`, then records the existing invoice.allocate activity.
+`templates/receipt_match.html` uses native forms/details without JavaScript.
+Matching several invoices proceeds through partial matches and remaining cash,
+tax and NI budgets; leaving a payment unmatched creates no status or record.
+Regression tests are in `test_receipt_matching.py`; the reconciliation browser
+script covers responsive preview/confirmation and real/sample write isolation.

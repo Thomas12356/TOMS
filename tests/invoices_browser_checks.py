@@ -117,7 +117,10 @@ with sync_playwright() as playwright:
                 page.locator('#shift-total').fill(amount)
                 page.locator('#shift-notes').fill(note)
                 click(page.get_by_role('button',name='Add work',exact=True))
-            assert 'GBP 71,000.00' in page.request.get(origin+'/dashboard/tax-estimate').text()
+            estimate_response = page.request.get(origin+'/dashboard/tax-estimate')
+            if estimate_response.status != 200 or 'GBP 71,000.00' not in estimate_response.text():
+                Path('/tmp/toms-invoice-browser-estimate.html').write_text(estimate_response.text())
+                raise AssertionError(f'Expected completed CIS work in sample estimate at {width}px; status {estimate_response.status}; see temporary sample HTML')
             page.goto(origin+'/dashboard/invoices/new?stream='+sample_id(23))
             for box in page.locator('[name=shift_id]').all(): box.check()
             page.locator('#invoice-client').fill('CIS client with a longer readable name')

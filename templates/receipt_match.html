@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Match this payment · TOMS</title><link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}"></head>
+<body><header class="site-header"><a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>{% with navigation_page='reconciliation', navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}</header>
+<main class="invoice-page">{% include 'test_data_notice.html' %}
+<div class="page-heading"><p class="eyebrow">TOMS / PAYMENT MATCHING</p><h1>Match this payment</h1></div>
+{% for category,message in get_flashed_messages(with_categories=true) %}<p class="message" role="status">{{ message }}</p>{% endfor %}
+{% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+<section class="invoice-section" aria-labelledby="receipt-heading"><h2 id="receipt-heading">{{ payment.counterparty_name or 'Unnamed payment' }}</h2>
+<p>{{ payment_date }} · {{ payment.reference or 'No reference' }}{% if context.source %} · {{ context.source.name }}{% endif %}</p>
+<p>Bank amount: <strong>{{ format_amount(payment.amount_minor,payment.currency) }}</strong></p>
+{% if context.available %}<p>Remaining to match: <strong>{{ format_amount(context.available.cash + context.available.tax + context.available.ni,payment.currency) }}</strong><br>Cash {{ format_amount(context.available.cash,payment.currency) }} · Recorded tax deductions {{ format_amount(context.available.tax,payment.currency) }} · Recorded NI deductions {{ format_amount(context.available.ni,payment.currency) }}</p>{% endif %}
+</section>
+{% if preview %}
+<section class="invoice-section" aria-labelledby="preview-heading"><h2 id="preview-heading">Check this match</h2>
+<p>This matches <strong>{{ format_amount(preview.total,payment.currency) }}</strong> against <strong>{{ preview.invoice.number }} · {{ preview.invoice.client_name }}</strong>, leaving <strong>{{ format_amount(preview.remaining,payment.currency) }}</strong> outstanding on the invoice.</p>
+<p>Cash {{ format_amount(preview.amounts[0],payment.currency) }} · Tax {{ format_amount(preview.amounts[1],payment.currency) }} · NI {{ format_amount(preview.amounts[2],payment.currency) }}</p>
+<form method="post" class="login-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="preview" value="{{ preview.token }}"><button name="action" value="confirm">Confirm match</button></form>
+<p><a href="{{ request.path }}">Change this match</a></p></section>
+{% elif context.eligible and context.available.cash + context.available.tax + context.available.ni > 0 %}
+<section class="invoice-section" aria-labelledby="choose-heading"><h2 id="choose-heading">Choose an invoice</h2>
+<p>Suggestions use saved evidence. Check the invoice and payment belong together before confirming.</p>
+<form method="get" class="system-filter"><label for="match-search">Find by invoice number, client or reference</label><input id="match-search" name="q" maxlength="100" value="{{ search }}"><button>Find invoices</button></form>
+{% for row in context.rows %}<article class="checklist-step"><h3>{{ row.invoice.number }} · {{ row.invoice.client_name }}</h3>
+<p>{{ row.invoice.issue_date.strftime('%d %b %Y') }} · {{ format_amount(row.summary.outstanding,payment.currency) }} outstanding{% if row.invoice.reference %} · {{ row.invoice.reference }}{% endif %}</p>
+<ul>{% for reason in row.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+<details{% if values.invoice == row.invoice.id %} open{% endif %}><summary>Choose this invoice</summary>
+<form method="post" class="login-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="invoice" value="{{ row.invoice.id }}">
+<label for="cash-{{ row.invoice.id }}">Cash to match</label><input id="cash-{{ row.invoice.id }}" name="cash" inputmode="decimal" value="{{ values.cash if values.invoice == row.invoice.id else display_amount(context.available.cash,payment.currency) }}" required>
+<details{% if values.invoice == row.invoice.id or context.available.cash + context.available.tax + context.available.ni > row.summary.outstanding %} open{% endif %}><summary>Recorded deductions / partial payment</summary><p>For a partial payment or a payment covering several invoices, enter the cash and recorded deductions that belong to this invoice. Match the remainder afterward.</p>
+<label for="tax-{{ row.invoice.id }}">Tax deductions to match</label><input id="tax-{{ row.invoice.id }}" name="tax" inputmode="decimal" value="{{ values.tax if values.invoice == row.invoice.id else display_amount(context.available.tax,payment.currency) }}" required>
+<label for="ni-{{ row.invoice.id }}">NI deductions to match</label><input id="ni-{{ row.invoice.id }}" name="ni" inputmode="decimal" value="{{ values.ni if values.invoice == row.invoice.id else display_amount(context.available.ni,payment.currency) }}" required></details>
+<button name="action" value="preview">Preview match</button></form></details>
+<p><a href="{{ url_for('invoices.detail',identity=row.invoice.id) }}">View invoice and history</a></p></article>{% else %}<p>No eligible outstanding invoices found. Try another search, or check draft invoices and allocations needing review.</p>{% endfor %}
+<p class="secondary">Showing up to 20 relevant invoices. Search to find an older invoice.</p></section>
+{% elif context.eligible %}<p class="message">This payment has no remaining cash or recorded deductions to match.</p>
+{% else %}<p>Review and confirm this payment’s income details before matching it. It must be settled income with a source and complete recorded deductions.</p><p><a href="{{ payment_link(payment,'dashboard.edit_income') }}">Review payment details</a></p>{% endif %}
+<details class="planning-detail"><summary>No invoice needed</summary><p>Payroll and some other income may have no invoice. You can leave this receipt unmatched: confirmed income still contributes to the estimate according to its saved details. No allocation or “paid” status is recorded by leaving this page.</p><p><a href="{{ url_for('reconciliation.page') }}">Continue without matching</a></p></details>
+<p><a href="{{ url_for('reconciliation.page') }}">Decide later</a></p>
+<details class="planning-detail"><summary>Show calculation and history</summary><p>Matching links existing evidence. It does not add income, change the bank receipt, move money or change an issued invoice. Cash and recorded deductions have separate budgets. Changed payment evidence must be reviewed before matching again.</p><p><a href="{{ payment_link(payment,'dashboard.edit_income') }}">Payment income details</a> · <a href="{{ url_for('invoices.page') }}">Invoice allocation history</a></p></details>
+</main></body></html>
