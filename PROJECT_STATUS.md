@@ -26,10 +26,10 @@ widths; matching also passed with JavaScript disabled at 390px. Ruff F, Bandit
 and whitespace checks passed. Earlier browser runs had intermittent assertions
 in invoice estimates, Home navigation and matching confirmation; final reruns
 passed, with sample-only diagnostic capture added. Their cause is not established.
-Publication/deployment are recorded after completion. No credentials or backup
-restore checks were added.
-The owner walkthrough remains outstanding: automated checks establish behaviour
-and responsive layout, not whether the owner finds the flow clearer.
+Published implementation `c3b76ff` on `codex/guided-receipt-matching` after
+verifying the public Thomas12356/TOMS remote and scanning outgoing content/history
+for secrets.
+The owner walkthrough remains outstanding.
 
 ## Latest delivery — bounded financial evidence loading
 
