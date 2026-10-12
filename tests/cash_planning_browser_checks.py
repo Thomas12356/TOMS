@@ -69,14 +69,12 @@ with sync_playwright() as playwright:
             click(page.get_by_role('button',name='Record payment',exact=True))
             assert 'GBP 250.00 outstanding' in page.locator('main').inner_text()
             click(page.get_by_role('link',name='Return to bills and cash planning',exact=True))
-            forms=page.locator('form').filter(has=page.locator('input[name=action][value=balance]'))
-            for index in range(forms.count()):
-                form=forms.nth(index)
-                form.locator('input[name=amount]').fill('1000')
-                click(form.get_by_role('button',name='Save observed balance',exact=True))
+            form=page.locator('.cash-review-form')
+            for field in form.locator('input[name^=amount_]').all():
+                field.fill('1000')
             page.locator('[name=confirm]').check()
-            click(page.get_by_role('button',name='Confirm planning coverage',exact=True))
-            assert 'Coverage confirmed for these records today.' in page.locator('main').inner_text()
+            click(page.get_by_role('button',name='Save balances and review',exact=True))
+            assert 'Coverage is confirmed for the saved records today.' in page.locator('main').inner_text()
             if 'GBP 1,600.00 after recorded commitments' not in page.locator('main').inner_text():
                 Path('/tmp/toms-cash-budget-browser-failure.html').write_text(page.content())
                 raise AssertionError('Expected sample cash budget; see temporary sample HTML')
@@ -86,8 +84,13 @@ with sync_playwright() as playwright:
             click(page.get_by_role('button',name='Void incorrect payment',exact=True))
             assert 'Voided' in page.locator('main').inner_text()
             assert 'GBP 300.00 outstanding' in page.locator('main').inner_text()
-            click(page.get_by_role('link',name='Return to bills and cash planning',exact=True))
-            assert 'Confirm planning coverage' in page.locator('main').inner_text()
+            click(page.get_by_role('link',name='Update balances and finish your cash review',exact=True))
+            assert page.url.endswith('#balance-review')
+            assert 'Next: check 2 account balances' in page.locator('main').inner_text()
+            assert 'Check balance after payment or correction' in page.locator('main').inner_text()
+            page.locator('[name=confirm]').check()
+            click(page.get_by_role('button',name='Save balances and review',exact=True))
+            assert 'Update balances after recording or correcting a payment.' in page.locator('main').inner_text()
             with fixture.admin.connect() as connection:
                 assert connection.execute(text(f'SELECT count(*) FROM {fixture.real_schema}.cash_commitments')).scalar()==0
                 assert connection.execute(text(f'SELECT count(*) FROM {fixture.demo_schema}.cash_payments')).scalar()==1

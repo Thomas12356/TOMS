@@ -182,6 +182,42 @@ def save_balance(form):
     balance.revision += 1
 
 
+def save_review(form):
+    """Save reviewed observations and optional coverage in one atomic write."""
+    lock_writes()
+    before = snapshot(db.session)
+    if before['fingerprint'] != form.get('fingerprint'):
+        raise Conflict('Planning records changed. Reload and check them before saving this review.')
+    allowed = {'action', 'fingerprint', 'confirm', 'csrf_token'}
+    for account in before['accounts']:
+        allowed.update(f'{field}_{account.account_uid}' for field in ('amount', 'version', 'observed'))
+    if set(form) - allowed or any(len(form.getlist(key)) != 1 for key in form):
+        raise ValueError('Supply each review field once, for the accounts shown.')
+    if form.get('confirm') not in (None, '1'):
+        raise ValueError('Confirm coverage using the review checkbox.')
+    changed = []
+    for account in before['accounts']:
+        identity = account.account_uid
+        value = form.get(f'amount_{identity}', '').strip()
+        if not value:
+            continue  # Retain the observation and its age, never silently refresh it.
+        save_balance(dict(account=identity, amount=value,
+            version=form.get(f'version_{identity}'), observed_at=form.get(f'observed_{identity}')))
+        changed.append(identity)
+    if not changed and form.get('confirm') != '1':
+        raise ValueError('Enter an updated balance or confirm that you reviewed all commitments.')
+    db.session.flush()
+    if form.get('confirm') == '1':
+        fingerprint = snapshot(db.session)['fingerprint']
+        coverage = db.session.get(CashCoverage, 1)
+        if coverage is None:
+            coverage = CashCoverage(id=1)
+            db.session.add(coverage)
+        coverage.fingerprint = fingerprint
+        coverage.confirmed_at = datetime.now(timezone.utc)
+    return changed
+
+
 def snapshot(session, *, as_of=None, tax_target=None, tax_year='2026-27'):
     now = as_of or datetime.now(timezone.utc)
     today = now.astimezone(LOCAL_TIME).date()
@@ -217,18 +253,26 @@ def snapshot(session, *, as_of=None, tax_target=None, tax_year='2026-27'):
             tax_paid=direct_tax_paid if currency=='GBP' else 0,
             tax_target=max(0,tax_target-direct_tax_paid) if currency=='GBP' and tax_target is not None else None,
             reasons=[], available=None))
+    balance_tasks = []
     for account in accounts:
         row, balance = group(account.currency), balances.get(account.account_uid)
+        account_reasons = []
         if balance is None:
+            account_reasons.append('No balance recorded')
             row['reasons'].append('A saved account has no balance observation.')
         else:
             row['cash'] += balance.amount_minor
             if balance.recorded_currency != account.currency:
+                account_reasons.append('Currency changed')
                 row['reasons'].append('An account currency changed. Record a new balance in its current currency.')
             if not now - timedelta(hours=24) <= balance.observed_at <= now:
+                account_reasons.append('Balance needs a fresh observation')
                 row['reasons'].append('A balance is older than 24 hours or ahead of the clock.')
             if account.currency in latest_change and balance.recorded_at < latest_change[account.currency]:
+                account_reasons.append('Check balance after payment or correction')
                 row['reasons'].append('Update balances after recording or correcting a payment.')
+        if account_reasons:
+            balance_tasks.append(dict(account=account, reasons=account_reasons))
         reserve = reserves.get(account.account_uid)
         if reserve:
             row['earmarks'] += reserve.tax_minor + reserve.ni_minor
@@ -267,4 +311,4 @@ def snapshot(session, *, as_of=None, tax_target=None, tax_year='2026-27'):
             row['available'] = row['cash'] - row['bills'] - row['protected']
     return dict(today=today, end=end, accounts=accounts, balances=balances, items=items, payments=payments,
         upcoming=sorted(upcoming,key=lambda row:(row['due'],row['item'].id)), count=total_count,
-        groups=list(groups.values()), fingerprint=fingerprint, complete=complete)
+        groups=list(groups.values()), fingerprint=fingerprint, complete=complete, balance_tasks=balance_tasks)

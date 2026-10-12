@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from flask import current_app, jsonify, redirect, request, url_for, render_template
 from flask_login import LoginManager, UserMixin, current_user
-from flask_wtf.csrf import CSRFProtect
+from services.web.signing import ClockTolerantCSRFProtect
 from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 
@@ -14,7 +14,7 @@ from services.database.connection import db
 from services.web.auth import require_api_key
 
 login_manager = LoginManager()
-csrf = CSRFProtect()
+csrf = ClockTolerantCSRFProtect()
 IDLE_TIMEOUT = timedelta(minutes=30)
 SESSION_LIFETIME = timedelta(hours=8)
 

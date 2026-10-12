@@ -335,3 +335,57 @@ class CashPlanningTests(unittest.TestCase):
         self.session.commit()
         with self.assertRaises(ValueError):
             self.pay(item,tax_credit='10')
+
+    def test_review_saves_multiple_balances_and_coverage_together(self):
+        second = sample_id(2)
+        self.session.add(Account(account_uid=second,default_category_uid=str(uuid4()),currency='GBP',name='Second account',raw_payload={}))
+        self.session.commit()
+        values = dict(action='review', **self.form(), confirm='1')
+        for identity in (self.account, second):
+            values.update({f'amount_{identity}':'1000', f'version_{identity}':'0',
+                           f'observed_{identity}':datetime.now(LOCAL_TIME).strftime('%Y-%m-%dT%H:%M')})
+        self.assertEqual(self.client.post('/dashboard/cash-planning',data=values).status_code,303)
+        self.assertTrue(self.result()['complete'])
+        self.assertEqual(self.result()['groups'][0]['available'],170000)
+        self.assertFalse(self.result()['balance_tasks'])
+        self.assertEqual(self.client.post('/dashboard/cash-planning',data=values).status_code,409)
+
+        values = dict(action='review', **self.form())
+        values.update({f'amount_{self.account}':'0', f'version_{self.account}':'1',
+                       f'observed_{self.account}':datetime.now(LOCAL_TIME).strftime('%Y-%m-%dT%H:%M')})
+        self.assertEqual(self.client.post('/dashboard/cash-planning',data=values).status_code,303)
+        self.assertEqual(self.session.get(CashBalance,self.account).amount_minor,0)
+        self.assertFalse(self.result()['complete'])
+
+    def test_review_rolls_back_all_balances_and_retains_entries_on_error(self):
+        second = sample_id(2)
+        self.session.add(Account(account_uid=second,default_category_uid=str(uuid4()),currency='GBP',name='Second account',raw_payload={}))
+        self.session.commit()
+        values = dict(action='review', **self.form(), confirm='1')
+        for identity, value in ((self.account,'1000'),(second,'unknown')):
+            values.update({f'amount_{identity}':value, f'version_{identity}':'0',
+                           f'observed_{identity}':datetime.now(LOCAL_TIME).strftime('%Y-%m-%dT%H:%M')})
+        response = self.client.post('/dashboard/cash-planning',data=values)
+        self.assertEqual(response.status_code,400)
+        self.assertIn('value="1000"',response.get_data(as_text=True))
+        self.assertIsNone(self.session.get(CashBalance,self.account))
+        self.assertIsNone(self.session.get(CashCoverage,1))
+
+    def test_blank_review_keeps_balance_age_and_does_not_unblock_stale_cash(self):
+        balance = self.balance()
+        balance.observed_at = self.now-timedelta(days=2)
+        self.session.commit()
+        before = balance.observed_at
+        self.assertEqual(self.client.post('/dashboard/cash-planning',data=dict(action='review', **self.form(), confirm='1')).status_code,303)
+        result = self.result()
+        self.assertTrue(result['complete'])
+        self.assertIsNone(result['groups'][0]['available'])
+        self.assertEqual(self.session.get(CashBalance,self.account).observed_at,before)
+        self.assertEqual(len(result['balance_tasks']),1)
+
+    def test_review_rejects_unknown_fields_and_changed_records(self):
+        values = dict(action='review', **self.form(), confirm='1', amount_unknown='0')
+        self.assertEqual(self.client.post('/dashboard/cash-planning',data=values).status_code,400)
+        values.pop('amount_unknown')
+        self.add(name='New bill')
+        self.assertEqual(self.client.post('/dashboard/cash-planning',data=values).status_code,409)

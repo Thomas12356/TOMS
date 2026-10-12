@@ -3,6 +3,50 @@
 Updated: 2026-10-12. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
+## Latest delivery — reliable forms and simpler cash review
+
+Work on `codex/reliable-forms-cash-workflow` follows the user's request for
+reliability and reduced cash-planning effort. Diagnostics reproduced an invoice
+form and background activity rejection when newly signed CSRF tokens were about
+0.3 seconds ahead of the current wall clock. The library rejects negative ages
+as expired. This establishes a clock-related failure, not proof that every older
+intermittent assertion had the same cause.
+
+`services/web/signing.py` tolerates at most two seconds ahead for verified session,
+CSRF and matching-preview signatures. Past-age limits and farther-future rejection
+remain enforced; formats are compatible with existing signatures. CSRF session
+matching/HTTPS referrer checks, owner login, server-side session revocation,
+inactivity/absolute expiry and stale business versions remain. Independent tests
+reproduce the original negative-age rejection and check the tolerance boundary,
+expiry, tampering, missing/wrong-session tokens and HTTPS referrers. A browser test
+deliberately regresses the signing clock before dataset switching and saving.
+
+Cash planning names accounts requiring updated observations and combines balance
+updates/coverage into one atomic save. Blank values retain the original observation
+and age; zero is a real entered balance. Opened-record fingerprints and revisions
+guard changes, errors roll back the whole review and retain entries. Coverage is
+optional when saving balances, never silently assumed. Unknown/stale/incomplete
+figures still remain unavailable. Payment history now links directly to finishing
+the cash review and reviewing manual earmarks. Tax/money calculation rules and
+Starling traffic are unchanged; no migration or new credential setup is required.
+
+The user chose bank-independent CSV statements for future other-bank onboarding.
+[BANK_MIGRATION_PLAN.md](BANK_MIGRATION_PLAN.md) specifies account origins/history
+coverage, CSV mapping/preview/deduplication, then transfer review at Starling
+cutover. Preserve prior-bank tax-year evidence, record opening cash separately
+and exclude transfers between owned accounts from new earnings. No other-bank
+account/import support is claimed as delivered in this change.
+
+Backend verification: 613 tests, 609 passed / four optional backup restore skips.
+The updated cash browser workflow passed four widths, including no JavaScript at
+390px; the deterministic clock-regression journey passed 320/390/1280px.
+All 24 browser scripts passed in one complete verification run. Income workspace,
+invoices, overview/dataset switching, actual login/password and usability/work
+saves then passed two additional complete rounds (42 width-specific passes).
+The final backend rerun also passed. Application and changed-test Ruff F,
+application Bandit and whitespace checks passed. No live bank verification,
+working financial edits or backup restore checks were performed. Publication is recorded below once completed.
+
 ## Latest delivery — actual HMRC charges, bills and cash planning
 
 Implemented on `codex/tax-bills-cash-planning`, following guided receipt matching.

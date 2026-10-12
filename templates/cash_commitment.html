@@ -3,6 +3,7 @@
 <div class="page-heading"><p class="eyebrow">TOMS / PLANNING</p><h1>{{ item.name }}</h1></div>
 {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
 <p>{{ 'Active' if item.active else 'Cancelled' }} · {{ format_amount(item.amount_minor,item.currency) }} per occurrence · {{ item.recurrence }}{% if item.kind=='hmrc' %} · {{ item.tax_year }} · {{ components[item.tax_component] }}{% endif %}</p><p>{{ item.notes }}</p>
+{% if payments %}<section class="checklist-step"><h2>Finish your cash review</h2><p>After recording or correcting a payment, check your account balances. Saved earmarks remain manual.</p><p><a href="{{ url_for('cash_planning.page',_anchor='balance-review') }}">Update balances and finish your cash review</a> · <a href="{{ url_for('reserves.page',_anchor='account-reserves') }}">Review tax and NI earmarks</a></p></section>{% endif %}
 {% if item.active %}<p><a href="{{ url_for('cash_planning.edit',identity=item.id) }}">Edit commitment</a></p>{% endif %}
 <section class="invoice-section"><h2>Unpaid occurrences through the next 30 days</h2>
 {% for row in rows %}<article class="checklist-step"><h3>{{ row.due.strftime('%d %b %Y') }}{{ ' · Overdue' if row.overdue else '' }}</h3><p>{{ format_amount(row.remaining,item.currency) }} outstanding</p></article>{% else %}<p>No unpaid occurrences in this window.</p>{% endfor %}</section>

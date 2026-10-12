@@ -4,6 +4,7 @@ from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest, Conflict
 from itsdangerous import URLSafeTimedSerializer, BadSignature
+from services.web.signing import ClockTolerantSigner
 
 from services.web.presentation import format_amount
 from routes.helpers import query_values
@@ -75,7 +76,7 @@ def match_payment(account_uid, category_uid, feed_item_uid):
         search = optional_text(options.get('q'), field='invoice search', maximum=100)
     except ValueError as invalid:
         raise BadRequest(str(invalid)) from None
-    signer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt='receipt-match-preview-v1')
+    signer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'], salt='receipt-match-preview-v1', signer=ClockTolerantSigner)
     error, status, preview = None, 200, None
     if request.method == 'POST':
         action = request.form.get('action')

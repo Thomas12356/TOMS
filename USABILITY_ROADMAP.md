@@ -8,6 +8,15 @@ not measured results or delivery commitments.
 
 ## Starting point
 
+12 October update: bills/HMRC/cash planning is implemented. The latest work on
+`codex/reliable-forms-cash-workflow` addresses reproduced clock-related form
+rejections and combines balance updates/coverage into one review, with named
+account tasks and post-payment return links. Current verification/deployment is
+recorded in PROJECT_STATUS.md. The other-bank onboarding design is in
+[BANK_MIGRATION_PLAN.md](BANK_MIGRATION_PLAN.md): account origins/history coverage,
+CSV preview/import, then transfer review and Starling cutover. It is proposed,
+not delivered. The earlier roadmap remains historical context.
+
 Current delivery: review-informed stages 1–3 are implemented on
 `codex/focused-system-usability`: compact notices, consistent source/matching
 labels, focused source creation, grouped mileage entry, source return context,

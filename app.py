@@ -37,10 +37,12 @@ from services.database.migration_connection import migration_engine
 from services.database.demo_schema import prepare_demo_schema
 from services.error_logging import log_failure
 from services.web.request_limits import BoundedRequest
+from services.web.signing import ClockTolerantSessionInterface
 from services.web.setup import announce_setup, create_setup_token
 
 
 app = Flask(__name__)
+app.session_interface = ClockTolerantSessionInterface()
 app.request_class = BoundedRequest
 app.config["MAX_CONTENT_LENGTH"] = 1024 * 1024  # 1 MiB for JSON options and receipt metadata.
 app.config["APP_API_KEY"] = os.getenv("APP_API_KEY", "").strip()

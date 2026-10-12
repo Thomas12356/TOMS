@@ -3,6 +3,24 @@
 Start with the feature you want to change. You do not need to understand the
 Starling importer before working on categorisation or income forms.
 
+## Reliable forms, cash review and other-bank onboarding
+
+Form/session signing uses `services/web/signing.py`. Verified signatures may be
+up to two seconds ahead after a small backward clock adjustment; older expiry
+limits, farther-future rejection, CSRF session matching and HTTPS referrer checks
+remain enforced. Sessions retain Flask's format and independent database
+revocation/idle/absolute expiry. Signed receipt previews use the same tolerance.
+`tests/test_signing.py` and `tests/form_reliability_browser_checks.py` cover the
+boundary and actual dataset-switch/save journey.
+
+Cash review now saves several observations and optional coverage in one POST,
+through `save_review` in `services/cash_planning.py`. It checks the opened record
+fingerprint and individual revisions, rolls back the whole review on an invalid
+entry and retains submitted inputs on errors. Blank amounts keep the observation
+and its age. Account-specific tasks and post-payment links guide the next step.
+See [BANK_MIGRATION_PLAN.md](BANK_MIGRATION_PLAN.md) for proposed other-bank account,
+history import and transfer-cutover work; that support is not implemented yet.
+
 ## The four parts of the app
 
 | Location | Responsibility |

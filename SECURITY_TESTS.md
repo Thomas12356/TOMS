@@ -1,5 +1,31 @@
 # Security checks — 6 October 2026
 
+## Reliable forms and cash review — 12 October 2026
+
+Private synthetic response diagnostics reproduced newly signed CSRF tokens
+rejected as expired with negative ages around 0.3 seconds after a backward
+wall-clock adjustment. A two-second future tolerance is limited to verified
+signatures for cookies, CSRF and matching previews. Original formats, past-age
+limits, server-side revocation and idle/absolute expiry remain. No production
+session/CSRF token or submitted financial value was printed in diagnostics.
+
+`test_signing.py` checks the original rejection, two-second acceptance,
+farther-future rejection, old expiry, tampering, missing/wrong-session tokens and
+HTTPS referrer enforcement. `form_reliability_browser_checks.py` deliberately
+regresses the signing clock during authenticated mode switching and saving at
+320/390/1280px; 390px disables JavaScript. Cash tests cover atomic multi-balance
+and coverage saving, rollback, retained error inputs, blank/stale observations,
+entered zero, replay and changed-record rejection. The updated cash browser
+workflow passed 320/390/768/1280px.
+
+Full backend: 613 tests, 609 passed / four optional restore skips. All 24 browser
+scripts passed in one full run. The five formerly intermittent workspace,
+invoice, overview/switch, login/password and usability/work scripts passed two
+additional rounds (42 width-specific passes). The final backend rerun, application
+and changed-test Ruff F, application Bandit and whitespace checks passed. No live
+bank verification, credential setup or backup restore was performed. The cause
+of every historical intermittent assertion is not individually established.
+
 ## HMRC/bills/cash planning — 12 October 2026
 
 `test_cash_planning.py` uses disposable real/demo schemas and mocked bank traffic.

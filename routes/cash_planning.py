@@ -49,6 +49,7 @@ def page_context(error=None):
         result = cash.snapshot(saved, tax_target=target, tax_year=estimate['tax_year'])
         return render_template('cash_planning.html', result=result, error=error,
             balance_now=datetime.now(LOCAL_TIME).strftime('%Y-%m-%dT%H:%M'), current_user=current_user,
+            review_values=request.form if error else {},
             format_amount=format_amount, display_amount=display_amount, local_time=LOCAL_TIME)
 
 
@@ -66,7 +67,13 @@ def page():
     if request.method == 'POST':
         action = request.form.get('action')
         try:
-            if action == 'balance':
+            if action == 'review':
+                changed = cash.save_review(request.form)
+                for identity in changed:
+                    record_action('cash.balance', identity)
+                if request.form.get('confirm') == '1':
+                    record_action('cash.coverage')
+            elif action == 'balance':
                 check_form({'action','account','version','amount','observed_at'})
                 cash.save_balance(request.form)
                 record_action('cash.balance', request.form['account'])
