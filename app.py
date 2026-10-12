@@ -20,6 +20,7 @@ from routes.invoices import invoices
 from routes.reserves import reserves
 from routes.checklist import checklist
 from routes.tax_export import tax_export
+from routes.evidence import evidence
 from routes.reconciliation import reconciliation
 from routes.overview import overview
 from routes.guided_review import guided_review
@@ -70,6 +71,7 @@ app.register_blueprint(invoices)
 app.register_blueprint(reserves)
 app.register_blueprint(checklist)
 app.register_blueprint(tax_export)
+app.register_blueprint(evidence)
 app.register_blueprint(reconciliation)
 app.register_blueprint(overview)
 app.register_blueprint(guided_review)
@@ -159,7 +161,7 @@ def db_upgrade():
             with engine.begin() as connection:
                 applied = upgrade_database(connection)
                 # Independent additive tables preserve existing sample edits.
-                prepare_demo_schema(connection, rebuild=any(name not in ('026_tax_profile.sql', '027_cash_planning.sql', '028_cash_balance_currency.sql', '029_cash_payment_credit.sql', '030_statement_accounts.sql', '031_cash_payment_fingerprint.sql', '032_statement_review.sql') for name in applied))
+                prepare_demo_schema(connection, rebuild=any(name not in ('026_tax_profile.sql', '027_cash_planning.sql', '028_cash_balance_currency.sql', '029_cash_payment_credit.sql', '030_statement_accounts.sql', '031_cash_payment_fingerprint.sql', '032_statement_review.sql', '033_private_evidence.sql') for name in applied))
                 connection.exec_driver_sql("REVOKE ALL ON TABLE toms.schema_migrations FROM PUBLIC, toms_app")
         finally:
             engine.dispose()

@@ -156,6 +156,41 @@ class StatementImportRow(BaseModel):
     decision = db.Column(db.Text, nullable=False)
 
 
+class EvidenceAsset(BaseModel):
+    __tablename__ = 'evidence_assets'
+    __table_args__ = (db.CheckConstraint('byte_count BETWEEN 1 AND 10485760'), {'schema':'toms'})
+    sha256 = db.Column(db.Text, primary_key=True)
+    byte_count = db.Column(db.Integer, nullable=False)
+    mime = db.Column(db.Text, nullable=False)
+    suffix = db.Column(db.Text, nullable=False)
+    data = db.deferred(db.Column(db.LargeBinary, nullable=False))
+    preview = db.deferred(db.Column(db.LargeBinary))
+    pages = db.Column(db.Integer)
+
+
+class EvidenceDocument(BaseModel):
+    __tablename__ = 'evidence_documents'
+    __table_args__ = (db.ForeignKeyConstraint(['account_uid','category_uid','feed_item_uid'],
+        ['toms.transactions.account_uid','toms.transactions.category_uid','toms.transactions.feed_item_uid']),
+        db.CheckConstraint("(kind='transaction' AND account_uid IS NOT NULL AND category_uid IS NOT NULL AND feed_item_uid IS NOT NULL AND mileage_id IS NULL) OR (kind='mileage' AND account_uid IS NULL AND category_uid IS NULL AND feed_item_uid IS NULL)"),
+        db.CheckConstraint('revision > 0 AND char_length(name) BETWEEN 1 AND 200 AND char_length(notes) <= 1000'),
+        {'schema':'toms'})
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    asset_sha256 = db.Column(db.Text, db.ForeignKey('toms.evidence_assets.sha256'), nullable=False)
+    kind = db.Column(db.Text, nullable=False)
+    account_uid = db.Column(db.Uuid(as_uuid=False))
+    category_uid = db.Column(db.Uuid(as_uuid=False))
+    feed_item_uid = db.Column(db.Uuid(as_uuid=False))
+    mileage_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.mileage_entries.id',ondelete='SET NULL'))
+    name = db.Column(db.Text, nullable=False)
+    notes = db.Column(db.Text, nullable=False, default='')
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    revision = db.Column(db.Integer, nullable=False, default=1)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
+    archived_at = db.Column(db.DateTime(timezone=True))
+    asset = db.relationship('EvidenceAsset')
+
+
 class StatementMapping(BaseModel):
     __tablename__ = 'statement_mappings'
     __table_args__ = ({'schema': 'toms'},)

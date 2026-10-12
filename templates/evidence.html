@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Supporting documents · TOMS</title><link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/evidence.css') }}"></head>
+<body><header class="site-header"><a class="brand" href="{{ url_for('dashboard.transactions_page') }}">TOMS<span>The Organised Money System</span></a>
+{% with navigation_page='deductions', navigation_owner=current_user.is_authenticated %}{% include 'navigation.html' %}{% endwith %}</header>
+<main class="checklist-page">{% include 'test_data_notice.html' %}
+<div class="page-heading"><p class="eyebrow">TOMS / RECORDS</p><h1>Supporting documents</h1></div>
+<p><a href="{{ url_for('deductions.page') }}">Expenses and mileage</a> · <a href="{{ url_for('evidence.index') }}">All supporting documents</a></p>
+{% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
+{% for message in get_flashed_messages(category_filter=['evidence']) %}<p class="message" role="status">{{ message }}</p>{% endfor %}
+{% if kind %}<h2>{{ label }}</h2>
+{% if kind == 'transaction' %}<p><a href="{{ url_for('deductions.page', expense=key) }}">Review this expense</a></p>{% endif %}
+<form method="post" enctype="multipart/form-data" class="login-form evidence-upload">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label for="evidence-file">Receipt, invoice or supporting document</label>
+<input id="evidence-file" type="file" name="file" accept="image/jpeg,image/png,image/webp,application/pdf" required>
+<p class="secondary">JPEG, PNG, WebP or unencrypted PDF · up to 10 MiB per file. Static images up to 30 megapixels; PDFs up to 100 pages.</p>
+<label for="evidence-notes">Notes · optional</label><textarea id="evidence-notes" name="notes" maxlength="1000"></textarea>
+<button>Attach document</button></form>{% endif %}
+<p>Originals stay private and are included in database backups. Adding a document does not change amounts or confirm that an expense qualifies for tax relief. Identical files share storage.</p>
+{% for doc in documents %}<article class="evidence-document">
+{% if doc.asset.mime.startswith('image/') %}<img class="evidence-preview" src="{{ url_for('evidence.preview', identity=doc.id) }}" alt="Preview of {{ doc.name }}" loading="lazy">{% endif %}
+<div><h2>{{ doc.name }}</h2><p>{{ (doc.asset.byte_count / 1024)|round(1) }} KiB{% if doc.asset.pages %} · {{ doc.asset.pages }} PDF pages{% endif %} · {{ doc.created_at.strftime('%d %b %Y') }}</p>
+{% if doc.notes %}<p class="evidence-notes">{{ doc.notes }}</p>{% endif %}
+{% if not doc.active %}<p class="secondary">Archived · excluded from tax exports</p>{% endif %}
+{% if not kind %}{% set source_key=record_key(doc) %}{% if source_key %}<p><a href="{{ url_for('evidence.attachments', kind=doc.kind, key=source_key) }}">Open linked {{ 'expense' if doc.kind == 'transaction' else 'journey' }}</a></p>{% else %}<p class="secondary">Journey removed · original retained</p>{% endif %}{% endif %}
+<p><a href="{{ url_for('evidence.download', identity=doc.id) }}">Download original</a></p>
+<details><summary>{{ 'Archive document' if doc.active else 'Restore document' }}</summary>
+<form method="post" class="login-form" action="{{ url_for('evidence.archive', identity=doc.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="version" value="{{ doc.revision }}">
+<label class="eligibility"><input type="checkbox" name="confirm" value="1" required> {{ 'Archive this link; the original stays in private storage and backups.' if doc.active else 'Restore this link to supporting evidence.' }}</label>
+<button class="secondary-button">{{ 'Archive' if doc.active else 'Restore' }}</button></form></details></div></article>
+{% else %}<p>No supporting documents here yet.</p>{% endfor %}
+{% if page %}<nav class="pagination" aria-label="Supporting document pages"><span>Page {{ page }}</span>{% if page > 1 %}<a href="{{ url_for('evidence.index', page=page-1) }}">Previous</a>{% endif %}{% if more %}<a href="{{ url_for('evidence.index', page=page+1) }}">Next</a>{% endif %}</nav>{% endif %}
+<p><a href="{{ url_for('tax_export.page') }}">Export tax-year records and supporting files</a></p>
+</main></body></html>

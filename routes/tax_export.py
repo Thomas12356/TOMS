@@ -45,9 +45,12 @@ def page():
 
 @tax_export.get('/download')
 def download():
-    query_values(set())
+    values = query_values({'documents'})
+    if values.get('documents', '1') != '1':
+        raise BadRequest('Choose documents=1 to include supporting files.')
     with export_session() as session:
-        output, manifest = package(session, include_records=False)
+        options = {'include_documents': True} if 'documents' in values else {}
+        output, manifest = package(session, include_records=False, **options)
     prefix = 'TOMS-SAMPLE' if manifest['sample_data'] else 'TOMS'
     try:
         output.seek(0, 2)

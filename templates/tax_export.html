@@ -12,5 +12,5 @@
 <p>Forecasts and actual receipts remain separate. Pending, future, stale and incomplete records stay visible for review; their presence does not mean they count towards tax. Invoice records use the issue date and include their complete payment history.</p>
 <p>This is supporting evidence and a planning estimate, not a completed tax return. Unknown amounts remain blank. Amounts are in minor units, such as pence.</p>
 <p><a class="button" href="{{ url_for('tax_export.download') }}">Download {{ tax_year }} ZIP</a></p>
-<p><a href="{{ url_for('checklist.page') }}">Review your checklist</a> · <a href="{{ url_for('dashboard.tax_estimate') }}">Tax estimate</a></p>
+<p><a class="button secondary-button" href="{{ url_for('tax_export.download', documents='1') }}">Download ZIP including supporting files</a></p><p>This option includes private original receipts and documents linked to this tax year. Archived documents and removed journeys are excluded. The standard ZIP includes the document index only.</p><p><a href="{{ url_for('checklist.page') }}">Review your checklist</a> · <a href="{{ url_for('dashboard.tax_estimate') }}">Tax estimate</a></p>
 </main></body></html>

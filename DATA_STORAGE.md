@@ -7,6 +7,29 @@ backup nor restore imports the web application, starts jobs or calls Starling.
 
 ## What is stored where?
 
+Migration 033 adds owner-only supporting files in `evidence_assets` and links in
+`evidence_documents`, in both real and sample schemas. Originals are stored as
+PostgreSQL BYTEA, deduplicated by SHA-256 within each schema; no uploads are placed
+under static URLs or in external folders. Private database bundles automatically
+include originals, metadata, previews and archived links together. A pre-change
+private backup was taken before the additive migration; existing sample edits remain.
+Each upload is at most 10 MiB, each schema has a 256 MiB budget including previews,
+and each target permits 100 links including archived history. Archiving keeps the
+original and removes the link from tax exports; it does not erase files or backups.
+Unlinking an expense retains its transaction evidence; removing a journey leaves
+its evidence in the document vault without a journey link. Restoring that link does
+not reconstruct a removed journey. No automatic tax eligibility or amount changes
+occur. Originals download through owner authentication as attachments; JPEG previews
+have metadata stripped. Resource-limited parser processes validate static JPEG,
+PNG, WebP and unencrypted PDF content; this is not antivirus or OCR.
+
+Tax ZIPs include only an allowlisted active document index for selected payments
+and journeys. A separate explicit download choice includes original files once per
+hash, with index references via `asset_sha256`; archived and orphaned journey files
+remain outside those exports. User-provided filenames/notes get normal CSV formula
+protection. These files may themselves contain private financial/client details:
+protect the downloaded ZIP as well as the database and its backups.
+
 Migration 032 adds `statement_mappings` (account-specific header/settings hashes
 and selected mapping fields) and `statement_changes` (selected financial snapshots,
 reason and time). Private backups include both; evidence exports include only the
@@ -39,8 +62,8 @@ both migrations; restore verification remains excluded by the user's instruction
 | `data/tax_rules/`, migrations, templates and source code | Reviewed tax rules and application code | Git; retain the commit used for each deployment |
 
 A database archive does not contain `.env`, application code, PostgreSQL server
-configuration or role passwords. Any separately stored attachments would need
-file backups too. Backups contain private financial data and password/session
+configuration or role passwords. Supporting documents are inside the database
+archive and require no separate file copy. Backups contain private financial data and password/session
 hashes. They are compressed, **not encrypted**. Protect them like the database.
 
 The annual tax profile is a business setting: real and sample profiles live in

@@ -23,7 +23,7 @@ from services.tax.mileage_rules import reviewed_rules as mileage_rules
 from services.transactions.classification import classification_details
 from services.transactions.review import REVIEW_FIELDS
 from tempfile import TemporaryFile
-from models import Account, AccountHistory, StatementImport, StatementImportRow, StatementChange
+from models import Account, AccountHistory, StatementImport, StatementImportRow, StatementChange, EvidenceDocument, EvidenceAsset
 
 
 @contextmanager
@@ -60,6 +60,7 @@ def csv_bytes(rows, fields):
 
 
 FIELDS = {
+    'documents': 'id asset_sha256 kind account_uid category_uid feed_item_uid mileage_id name notes revision created_at',
     'accounts': 'account_uid name bank_name provider currency opened_at cash_active closed_on',
     'account_history': 'account_uid tax_year from_on through_on complete revision confirmed_at',
     'statement_imports': 'id account_uid status row_count imported_count skipped_count created_at imported_at',
@@ -110,6 +111,8 @@ def evidence_rows(session, name, first, end, now):
             query=query.join(StatementImport,db.and_(StatementImport.id==StatementImportRow.batch_id,
                 StatementImport.account_uid==StatementImportRow.account_uid)).where(StatementImport.status=='imported')
         query=query.order_by(*model.__table__.primary_key.columns)
+    elif name == 'documents':
+        query = selected_documents(first, end, payments).order_by(EvidenceDocument.created_at, EvidenceDocument.id)
     elif name == 'streams':
         query = db.select(IncomeStream).where(IncomeStream.forecast_tax_year == reviewed_rules()['tax_year']).order_by(IncomeStream.id)
     elif name == 'work':
@@ -159,7 +162,25 @@ def evidence_rows(session, name, first, end, now):
         yield row
 
 
-def package(session, *, include_records=True):
+def selected_documents(first, end, payments=None):
+    if payments is None:
+        selected = db.and_(Invoice.issue_date >= first.date(), Invoice.issue_date < end.date())
+        linked = db.select(InvoicePayment.id).join(Invoice).where(selected,
+            InvoicePayment.account_uid == Transaction.account_uid,
+            InvoicePayment.category_uid == Transaction.category_uid,
+            InvoicePayment.feed_item_uid == Transaction.feed_item_uid).exists()
+        payments = db.or_(db.and_(Transaction.transaction_time >= first, Transaction.transaction_time < end),
+            Transaction.expense.has(db.and_(ExpenseDeduction.recorded_time >= first, ExpenseDeduction.recorded_time < end)), linked)
+    transaction = db.select(Transaction.feed_item_uid).where(payments,
+        Transaction.account_uid == EvidenceDocument.account_uid,
+        Transaction.category_uid == EvidenceDocument.category_uid,
+        Transaction.feed_item_uid == EvidenceDocument.feed_item_uid).exists()
+    journey = db.select(MileageEntry.id).where(MileageEntry.id == EvidenceDocument.mileage_id,
+        MileageEntry.journey_date >= first.date(), MileageEntry.journey_date < end.date()).exists()
+    return db.select(EvidenceDocument).where(EvidenceDocument.active.is_(True), db.or_(transaction, journey))
+
+
+def package(session, *, include_records=True, include_documents=False):
     """Build an anonymous private file; browser downloads retain only metadata.
 
     include_records supports small internal evidence inspections. Production
@@ -207,6 +228,25 @@ def package(session, *, include_records=True):
                 csv_file.seek(0)
                 tables[name] = (json_rows, csv_file)
             with ZipFile(output, 'w', compression=ZIP_DEFLATED) as archive:
+                included = set()
+                if include_documents:
+                    for doc in session.scalars(selected_documents(first, end).execution_options(yield_per=100)):
+                        if doc.asset_sha256 in included:
+                            continue
+                        asset = session.get(EvidenceAsset, doc.asset_sha256)
+                        path = 'documents/' + asset.sha256 + '.' + asset.suffix
+                        archive.writestr(path, asset.data)
+                        included.add(asset.sha256)
+                    def document_index():
+                        for doc in session.scalars(selected_documents(first, end).execution_options(yield_per=100)):
+                            asset = session.get(EvidenceAsset, doc.asset_sha256)
+                            yield dict(record(doc, FIELDS['documents']), path='documents/' + asset.sha256 + '.' + asset.suffix)
+                    template = current_app.jinja_env.get_template('supporting_documents_report.html')
+                    with archive.open('supporting_documents.html', 'w') as index:
+                        for fragment in template.generate(documents=document_index(), tax_year=rules['tax_year']):
+                            index.write(fragment.encode('utf-8'))
+                manifest['supporting_files_included'] = include_documents
+                manifest['supporting_file_count'] = len(included)
                 metadata = {key: value for key, value in manifest.items() if key != 'records'}
                 with archive.open('report.json', 'w') as report:
                     report.write(json.dumps(metadata, default=scalar, ensure_ascii=False).encode('utf-8')[:-1])
@@ -270,6 +310,15 @@ Invoices are selected by issue date, with their complete line/payment/history
 records, including cancelled invoices and removed allocations.
 
 CSV text that could run as a spreadsheet formula has an apostrophe prefix.
-Original text is preserved in report.json. Bank raw payloads and authentication
-records are excluded. This package contains private financial and client data.
+Original text is preserved in report.json.
+documents.csv is an index of active supporting documents linked to the selected
+transactions and journeys. Files included: {manifest['supporting_file_count']}.
+When requested, originals are stored once as documents/<asset_sha256>.<suffix>;
+the suffix is determined from the validated file type (jpg, png, webp or pdf).
+Open supporting_documents.html for named links to the included originals.
+Archives and evidence for removed journeys stay in private storage and backups,
+outside this package. Adding a file does not establish tax eligibility. Bank raw
+payloads and authentication records are excluded from the database record export.
+Originals are supplied by the owner and may contain additional private content.
+This package contains private financial and client data.
 """

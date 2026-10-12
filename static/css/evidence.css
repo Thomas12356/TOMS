@@ -1,0 +1,12 @@
+.evidence-upload { display: grid; gap: .7rem; margin-block: 1rem; }
+.evidence-upload input, .evidence-upload textarea { max-width: 100%; min-width: 0; }
+.evidence-upload textarea { width: 100%; min-height: 88px; padding: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+.evidence-upload textarea:focus-visible { outline: 3px solid var(--highlight); outline-offset: 3px; }
+.evidence-document summary, .evidence-document a { display: inline-block; min-height: 44px; padding-block: 10px; }
+.evidence-document summary { display: list-item; cursor: pointer; }
+.evidence-document { display: flex; gap: 1rem; padding-block: 1rem; border-top: 1px solid #405064; }
+.evidence-document > div { min-width: 0; overflow-wrap: anywhere; flex: 1; }
+.evidence-preview { width: 140px; height: 140px; object-fit: contain; align-self: flex-start; background: white; }
+.evidence-notes { white-space: pre-wrap; }
+.evidence-document form { display: grid; gap: .8rem; margin-top: .8rem; }
+@media (max-width: 500px) { .evidence-document { flex-direction: column; } .evidence-preview { width: 100%; max-width: 240px; height: 160px; } }

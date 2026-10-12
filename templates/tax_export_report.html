@@ -18,5 +18,6 @@
 {% for row in plan.rows %}<tr><td>{% for stream in manifest.records.streams %}{% if stream.id==row.income_stream_id %}{{ stream.name }}{% endif %}{% endfor %}</td><td>{% for stream in manifest.records.streams %}{% if stream.id==row.income_stream_id %}{{ money(row.gross_minor, stream.expected_gross_currency) }}{% endif %}{% endfor %}</td><td>{{ money(row.deductions_minor) }}</td></tr>{% endfor %}</tbody></table>
 {% if plan.attention %}<h2>Record review</h2><ul>{% for item in plan.attention %}<li>{{ item.title }}: {{ item.count }}</li>{% endfor %}</ul>{% endif %}
 <h2>Evidence files</h2><ul>{% for name,count in manifest.counts.items() %}<li>{{ name }}.csv: {{ count }} records</li>{% endfor %}</ul>
+{% if manifest.supporting_files_included %}<p><a href="supporting_documents.html">Open supporting documents</a> · {{ manifest.supporting_file_count }} original files.</p>{% endif %}
 <p>Read README.txt for selection rules. Unknown values remain unavailable. Pending, future, tracking-only and stale evidence stays visible but may be excluded from calculations. Invoice allocations and sending logs are supporting records, not extra income.</p>
 <p>Exact amounts, calculation bands, reviewed rules and original text are in report.json. CSV monetary amounts use minor units, such as pence; currencies must remain separate.</p></body></html>

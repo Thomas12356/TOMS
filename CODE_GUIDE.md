@@ -3,6 +3,24 @@
 Start with the feature you want to change. You do not need to understand the
 Starling importer before working on categorisation or income forms.
 
+## Private receipt and document evidence
+
+`services/evidence.py` owns bounded, deduplicated original storage and versioned
+archive/restore links to outgoing payments or mileage. It never changes deduction
+amounts or eligibility. `services/evidence_media.py` runs as a fixed subprocess with
+CPU/address-space/input/time limits, validates content and generates metadata-free
+JPEG previews. The original bytes stay unchanged in deferred `EvidenceAsset` BYTEA
+columns. `routes/evidence.py` requires owner login, CSRF for writes and sample-schema
+routing; its upload-only request limit is set before CSRF parses multipart bodies.
+Download originals as attachments, preview only generated JPEGs; no inline PDFs.
+Expense and mileage pages link to the vault without expanding top-level navigation.
+Migration 033 preserves existing sample edits. Expense unlinking retains transaction
+evidence; journey deletion retains an orphan link through ON DELETE SET NULL.
+`services/tax/export.py` adds an allowlisted active index and explicitly optional
+original files, deduplicated and selected within the same read-only snapshot.
+Private database bundles include files with records automatically. See DATA_STORAGE.md
+for caps, retention and export boundaries.
+
 ## Reliable forms, cash review and other-bank onboarding
 
 `services/statement_review.py` owns explicit transfer-pair confirmation and

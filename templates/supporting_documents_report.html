@@ -1,0 +1,8 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Supporting documents · {{ tax_year }}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:900px;margin:2rem auto;padding:1rem;line-height:1.6}article{border-top:1px solid #ccc;padding:1rem 0;overflow-wrap:anywhere}p{white-space:pre-wrap}code{word-break:break-all}</style></head>
+<body><h1>Supporting documents · {{ tax_year }}</h1><p><a href="report.html">Calculation report</a></p>
+<p>These are private originals linked to the selected records. Their presence does not confirm tax eligibility. Shared files are stored once. See documents.csv for the exact record links.</p>
+{% for doc in documents %}<article><h2><a href="{{ doc.path }}">{{ doc.name }}</a></h2>
+<p>{{ 'Expense payment' if doc.kind == 'transaction' else 'Mileage journey' }} · {{ doc.created_at }}</p>{% if doc.notes %}<p>{{ doc.notes }}</p>{% endif %}
+{% if doc.kind == 'transaction' %}<p>Payment: <code>{{ doc.account_uid }}:{{ doc.category_uid }}:{{ doc.feed_item_uid }}</code></p>{% else %}<p>Journey: <code>{{ doc.mileage_id }}</code></p>{% endif %}</article>{% else %}<p>No supporting files linked to the selected tax-year records.</p>{% endfor %}
+</body></html>

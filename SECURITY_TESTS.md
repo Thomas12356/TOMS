@@ -1,5 +1,27 @@
 # Security checks — 6 October 2026
 
+## Private supporting documents — 12 October 2026
+
+`test_evidence.py` checks owner/API separation, CSRF, strict multipart fields,
+content validation, misleading extensions, encrypted/scripted PDF rejection,
+size and storage bounds, unchanged original downloads, private JPEG previews,
+duplicate links/storage, archive/restore stale versions, expense/journey retention,
+tax ZIP opt-in, formula-safe metadata and sample-file isolation. Fixtures use
+rollback-only transactions or disposable schemas and prohibit bank traffic.
+`evidence_browser_checks.py` exercises upload, duplicate feedback, private image
+preview, exact original download, archive/restore and opt-in ZIP at 320/390/768/
+1280px (JavaScript disabled at 390px). Run with the documented development tooling:
+
+```
+.venv/bin/python scripts/verify.py --postgres --browser evidence_browser_checks
+```
+
+Parser subprocesses use a fixed Python executable/module and stdin bytes, with
+no shell or user-controlled arguments. The two narrowly documented Bandit
+suppressions cover that subprocess mechanism; they do not bypass file validation.
+Migration 033 was preceded by a private backup; restore checks remain separately
+excluded by the user's instruction. No live bank traffic or credential setup.
+
 ## Guided statement review and saved formats — 12 October 2026
 
 `test_statement_imports.py` now includes transfer amount/currency/date/manual-choice
