@@ -47,7 +47,10 @@ disabled at 390px. The mobile correction history screenshot was inspected.
 Application and changed-test Ruff F, application Bandit, whitespace and outgoing
 secret-value checks passed. Migration rerun reports the database up to date.
 No live Starling traffic, credential setup or database restore was performed.
-Publication/deployment details follow once the implementation revision is published.
+Implementation `5218e977138cb1eaeca11557e867b85af8833fdb` was committed and pushed
+to `codex/statement-review-and-transfer-matching`; the remote revision matched.
+GitHub owner `Thomas12356`, SSH remote and public visibility matched the user's
+publication authorization. Main was not changed.
 
 Next: the user's real-statement/five-task walkthrough. Remaining format differences,
 split/FX transfers and linked-evidence correction effort should guide subsequent work;
