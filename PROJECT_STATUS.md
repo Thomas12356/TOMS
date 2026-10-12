@@ -1,5 +1,11 @@
 # TOMS project status
 
+## Privacy cleanup — 2026-10-12
+
+Personal environment descriptions have been removed from the current documentation.
+The published history has also been cleaned. Keep personal deployment and machine
+details out of public handoffs.
+
 Updated: 2026-10-12. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
