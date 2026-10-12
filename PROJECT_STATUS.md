@@ -59,7 +59,10 @@ The statement/component guidance was checked against GOV.UK's
 and [payments-on-account guidance](https://www.gov.uk/understand-self-assessment-bill/payments-on-account)
 on 12 October 2026. TOMS records supplied charges rather than recalculating an
 actual HMRC statement or inferring how an unallocated payment was credited.
-Publication is recorded below once completed.
+Published implementation `6c4776c` to `codex/tax-bills-cash-planning` after
+verifying the public Thomas12356/TOMS remote, owner and branch and scanning
+outgoing content/history for secret values.
+Main remains at `577ac03`; the implementation is on its named branch.
 
 Limits: balances/statement charges/payments are manually entered, not verified
 against live providers. Cash is a 30-day record-based figure, not a funding
