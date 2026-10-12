@@ -43,8 +43,11 @@ the evidence flow includes 320/390/768/1280px and JavaScript disabled at 390px.
 The missing-filter mobile screenshot was inspected. Application and changed-test
 Ruff F, application Bandit, whitespace and outgoing secret-value checks passed.
 No live bank traffic, credential setup or database restoration was performed.
-Publishing and runtime revision should be verified against Git and service state;
-this delivery remains on its named feature branch, without a merge into main.
+Implementation `c4a8bbfb77a6812c28534baa9dd3e254bb9ccb08` was pushed with the remote
+revision verified and the running application updated. Health/database checks,
+owner-only document gates, private caching and service state passed. This delivery
+remains on its named feature branch, without a merge into main. This final handoff
+changes documentation only.
 
 ## Previous delivery — private expense and deduction evidence
 
