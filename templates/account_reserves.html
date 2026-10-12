@@ -1,5 +1,6 @@
 <section class="account-reserve-section" id="account-reserves" aria-labelledby="account-reserves-heading">
     <h2 id="account-reserves-heading">Account money</h2>
+    <p><a href="{{ url_for('statement_accounts.index') }}">Manage accounts and import earlier bank statements</a> · <a href="{{ url_for('cash_planning.page') }}#balance-review">Record available cash balances</a></p>
     <p class="secondary">Earmark money already in your accounts for tax and NI. This records your plan; it does not move money or change your bank's balance.</p>
     {% if reserve_target %}<p class="reserve-target">Suggested reserve for business income received so far: <strong>{{ format_amount(reserve_target[0], 'GBP') }} tax + {{ format_amount(reserve_target[1], 'GBP') }} NI</strong>.</p>
     {% else %}<p class="message">Suggested tax / NI reserve needs review. <a href="{{ url_for('dashboard.tax_estimate') }}">Resolve the tax estimate warnings</a>.</p>{% endif %}
@@ -12,7 +13,7 @@
     <p class="secondary">England, Wales and Northern Ireland · 2026–27. The suggestion uses your annual forecasts and only logged deductions. It is a cumulative planning target; compare it with your earmarks rather than adding it again. Direct HMRC payments are not tracked in this target.</p>
     {% include 'hmrc_payment_guidance.html' %}
     <h3>Live balances</h3>
-    <p class="secondary">Refresh explicitly to request bank balances. These values are not saved; opening this page makes no balance request. After earmarks excludes bills and other commitments, so it is not an available-to-spend figure.</p>
+    <p class="secondary">Refresh explicitly to request Starling balances only. Statement accounts use saved observations in cash planning. Live values are not saved; opening this page makes no balance request. After earmarks excludes bills and other commitments, so it is not an available-to-spend figure.</p>
     <button type="button" class="secondary-button" id="refresh-balances">Refresh bank balances</button>
     <p id="balance-freshness" class="secondary" aria-live="polite">Balance freshness unavailable until refreshed.</p>
     <noscript><p>Live balance refresh needs JavaScript. Saved earmarks can still be edited below.</p></noscript>

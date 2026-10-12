@@ -86,6 +86,9 @@ class SyncStore:
 
     def save_account(self, account):
         with self.commit():
+            existing = self.session.get(Account, str(account['uid']))
+            if existing is not None and existing.provider != 'starling':
+                raise ValueError('A statement account cannot be replaced by a bank import.')
             self.session.merge(Account(
                 account_uid=account["uid"], default_category_uid=account["category"],
                 currency=account["currency"], name=account["raw"].get("name"),

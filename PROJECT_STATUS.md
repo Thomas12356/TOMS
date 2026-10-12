@@ -3,7 +3,69 @@
 Updated: 2026-10-12. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
-## Latest delivery — reliable forms and simpler cash review
+## Latest delivery — other-bank accounts and CSV onboarding
+
+Implemented on `codex/other-bank-csv-onboarding` from `e80f592`, following the
+user's approval of stages 1–2 in `BANK_MIGRATION_PLAN.md`. Owner-only Accounts
+and statements is linked from Home, Account money and cash planning without a
+new top-level navigation item. Accounts have explicit Starling/statement origins,
+bank names, known opening dates, currency and current-cash inclusion. Statement
+accounts never enter Starling balance requests; their selected ledger has no
+automatic provider balance/sync controls. Sync rejects an account-origin collision.
+
+Bounded CSV uploads use explicit columns/date/amount/decimal formats, whole-file
+validation, totals and explicit duplicate choices. Exact same-file/same-mapping
+reimports and replayed confirmations are harmless. Overlapping/repeated rows can
+be skipped or kept as distinct payments. Confirmation is atomic, with account and
+ledger stale checks. Rows start unreviewed as Other and reuse existing guided
+classification, income/withholding and deduction workflows. Missing individual
+transactions use the same preview, with independent entry identity for legitimate
+identical payments. Unfinished uploads can be resumed or discarded from an account.
+
+Opening cash remains a balance observation, never a receipt. Separate supported-
+year history coverage must include the required account lifetime and reviewed
+settled transactions; incompleteness blocks annual/received-income planning.
+Closed accounts retain tax/history/export evidence but leave current cash. Closure
+requires a fresh zero observation, cleared earmarks and no later transactions;
+accidental closure can be corrected by reopening. Evidence exports explicitly
+allowlist account/history/confirmed batch and row provenance; raw CSV grids,
+mapping, hashes, filenames and authentication remain excluded.
+
+Migration 030 adds this data model without resetting edited sample records.
+Review also exposed reliance on wall-clock ordering for post-payment cash checks.
+Migration 031 records the payment-state fingerprint with balance observations:
+recording or voiding a payment requires a new observation even after a backward
+clock adjustment. Legacy observations with payments need a fresh check. A private
+pre-change backup was taken before both additive migrations were applied through
+the maintenance login. No working financial amounts were changed or restored.
+
+The unmocked walkthrough also caught cash planning requesting `tax_year` from a
+planning result that did not provide it. `current_plan` now supplies the reviewed
+rules' year explicitly. A real-calculator cash-page regression and the browser
+journey protect this boundary; older stubbed cash checks alone had missed it.
+
+Backend verification: 630 tests, 626 passed / four optional restore skips. New
+cases cover exact money/date/currency validation, replay, overlap decisions,
+whole-import rollback on failure, stale records, history versus cash, transfers,
+closure, owner/API/CSRF/sample isolation, private provenance exports, Windows
+encoding, discarded/expired staging and manual identical-entry identity. Cash
+checks include a correction whose timestamp precedes its balance observation.
+All 25 browser scripts passed in one final sequential run, including the new
+account/import/transfer/history/balance/closure/reopen journey at 320/390/768/1280px
+with JavaScript disabled at 390px. The mobile screenshot was inspected. Application
+and changed-test Ruff F, application Bandit, whitespace and outgoing secret-value
+checks passed. Migration rerun reports the database up to date. Earlier run
+failures and the stubbed-calculator gap are recorded in `SECURITY_TESTS.md`.
+No live bank verification, credential setup or backup restore was performed.
+Publication is recorded below after verification.
+
+Next: real-format/user walkthrough feedback, then explicit cross-account transfer
+suggestions and a focused cutover view. Mapping presets and safer bulk correction
+tools remain future work. Current imports retain committed evidence; existing
+classification/income/deduction correction workflows remain available. No universal
+CSV compatibility, bank-specific API support or live Starling verification is claimed.
+
+## Previous delivery — reliable forms and simpler cash review
 
 Work on `codex/reliable-forms-cash-workflow` follows the user's request for
 reliability and reduced cash-planning effort. Diagnostics reproduced an invoice

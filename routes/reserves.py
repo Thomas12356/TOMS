@@ -71,7 +71,7 @@ def page():
     from services.tax.reserves import received_split
     with export_session() as saved:
         estimate = current_plan(refresh_rules=False, session=saved)
-        accounts = saved.scalars(db.select(Account).order_by(Account.name, Account.account_uid)).all()
+        accounts = saved.scalars(db.select(Account).where(Account.cash_active.is_(True)).order_by(Account.name, Account.account_uid)).all()
         earmarks = {row.account_uid: row for row in saved.scalars(db.select(AccountReserve))}
         last_import = saved.scalar(db.select(db.func.max(SyncRun.finished_at)).where(
             SyncRun.status == 'completed', SyncRun.requested_options == {}))
@@ -119,7 +119,7 @@ def save():
     identity = uid(request.form.get('account', ''))
     # Lock the parent even for the first insert, preventing two initial earmarks.
     account = db.session.scalar(db.select(Account).where(Account.account_uid == identity).with_for_update())
-    if account is None:
+    if account is None or not account.cash_active:
         raise BadRequest('Choose an available account.')
     row = db.session.get(AccountReserve, identity, populate_existing=True)
     revision = str(row.revision) if row else '0'

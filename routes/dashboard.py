@@ -113,15 +113,25 @@ def account_balances():
     account_uid = requested_account(options)
     from services.transactions.account_reserves import balance_breakdown
     query = db.select(Account).options(
-        load_only(Account.account_uid, Account.name, Account.currency)
+        load_only(Account.account_uid, Account.name, Account.currency, Account.provider)
     ).order_by(Account.account_uid)
     if account_uid:
         query = query.where(Account.account_uid == account_uid)
     accounts = list(db.session.scalars(query))
     if account_uid and not accounts:
         raise BadRequest("This account is not available. Choose a saved account.")
+    statement_accounts = [item for item in accounts if item.provider=='statement']
+    if statement_accounts:
+        # Keep manual accounts out of both live and synthetic provider responses.
+        accounts = [item for item in accounts if item.provider=='starling']
+        if account_uid:
+            return jsonify(balances=[dict(name=statement_accounts[0].name or 'Statement account',amount=None,
+                error='Statement account: use saved balance observations in Bills and cash planning.')])
     if test_data_active():
         payload = sample_balances(accounts, format_amount, combined=account_uid is None, include_minor=include_reserves)
+        if statement_accounts:
+            for total in payload.get('totals',[]):
+                total['name']=total['name'].replace('All','Starling')
         if include_reserves:
             payload.update(checked_at=datetime.now(timezone.utc).isoformat(), sample=True)
         return jsonify(balance_breakdown(payload, accounts, format_amount) if include_reserves else payload)
@@ -159,7 +169,7 @@ def account_balances():
             payload.update(checked_at=datetime.now(timezone.utc).isoformat(), sample=False)
         return jsonify(balance_breakdown(payload, accounts, format_amount) if include_reserves else payload)
     combined = [{
-        "name": "Total balance · All accounts" if len(totals) == 1 else f"Total balance · All {currency} accounts",
+        "name": ("Total balance · Starling accounts" if statement_accounts else "Total balance · All accounts") if len(totals) == 1 else f"Total balance · {'Starling' if statement_accounts else 'All'} {currency} accounts",
         "amount": None if total["unavailable"] else format_amount(total["minor_units"], currency),
         "error": "Total unavailable: one or more account balances could not be loaded." if total["unavailable"] else None,
     } for currency, total in sorted(totals.items())]
@@ -177,7 +187,7 @@ def transactions_page():
     page_number = requested_page(options)
 
     accounts = list(db.session.scalars(db.select(Account).options(
-        load_only(Account.account_uid, Account.name, Account.currency)
+        load_only(Account.account_uid, Account.name, Account.currency, Account.provider)
     ).order_by(Account.account_uid)))
     selected_account = next((item for item in accounts if item.account_uid == account_uid), None)
     if account_uid and selected_account is None:
@@ -233,6 +243,7 @@ def transactions_page():
                            current_user=current_user, filter_options=return_context,
                            attention_choices=ATTENTION, classification_choices=CLASSIFICATION_TYPES,
                            review_count=review_count,
+                           can_sync=selected_account.provider=='starling' if selected_account else any(item.provider=='starling' for item in accounts) or not accounts,
                            ledger_url=lambda **changes: url_for('dashboard.transactions_page', **{**return_context, **changes}))
 
 

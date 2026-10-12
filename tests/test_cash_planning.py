@@ -51,6 +51,7 @@ class CashPlanningTests(unittest.TestCase):
         return row
 
     def balance(self,value=100000):
+        observed_payments=cash.payment_version(self.session,'GBP')
         row=self.session.get(CashBalance,self.account)
         if row is None:
             row=CashBalance(account_uid=self.account,revision=1)
@@ -59,6 +60,7 @@ class CashPlanningTests(unittest.TestCase):
             row.revision+=1
         row.amount_minor=value
         row.recorded_currency='GBP'
+        row.payment_fingerprint=observed_payments
         row.observed_at=row.recorded_at=datetime.now(timezone.utc)
         self.session.commit()
         return row
@@ -84,6 +86,24 @@ class CashPlanningTests(unittest.TestCase):
         cash.record_payment(cash.commitment(item.id,str(item.revision)),form)
         self.session.commit()
         return form
+
+    def test_correction_after_clock_regression_still_requires_new_balances(self):
+        item=self.add()
+        form=self.pay(item)
+        balance=self.balance()
+        from models import CashPayment
+        payment=self.session.get(CashPayment,form['payment_id'])
+        payment.active=False
+        payment.changed_at=balance.recorded_at-timedelta(seconds=2)
+        self.session.commit()
+        self.complete()
+        result=self.result()
+        task=next(row for row in result['balance_tasks'] if row['account'].account_uid==self.account)
+        self.assertIn('Check balance after payment or correction',task['reasons'])
+        self.assertIsNone(result['groups'][0]['available'])
+        self.balance()
+        self.complete()
+        self.assertFalse(any(row['account'].account_uid==self.account for row in self.result()['balance_tasks']))
 
     def test_month_end_and_leap_year_anchor_dates_are_preserved(self):
         item=SimpleNamespace(active=True,due_date=date(2026,1,31),end_date=None,recurrence='monthly')

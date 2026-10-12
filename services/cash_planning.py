@@ -152,11 +152,27 @@ def record_payment(item, form):
     item.revision += 1
 
 
+def payment_versions(payments, currencies):
+    grouped = defaultdict(list)
+    for payment in sorted(payments,key=lambda row:row.id):
+        grouped[currencies[payment.commitment_id]].append(payment.as_dict())
+    return {currency:hashlib.sha256(json.dumps(rows,sort_keys=True,default=str).encode()).hexdigest()
+        for currency,rows in grouped.items()}
+
+
+EMPTY_PAYMENTS = hashlib.sha256(b'[]').hexdigest()
+
+
+def payment_version(session, currency):
+    payments=session.scalars(db.select(CashPayment).join(CashCommitment).where(CashCommitment.currency==currency)).all()
+    return payment_versions(payments,{row.commitment_id:currency for row in payments}).get(currency,EMPTY_PAYMENTS)
+
+
 def save_balance(form):
     lock_writes()
     identity = uid(form.get('account', ''))
     account = db.session.get(Account, identity)
-    if account is None:
+    if account is None or not account.cash_active:
         raise ValueError('Choose a saved account.')
     balance = db.session.get(CashBalance, identity)
     if str(balance.revision if balance else 0) != form.get('version'):
@@ -173,11 +189,13 @@ def save_balance(form):
     now = datetime.now(timezone.utc)
     if observed > now:
         raise ValueError('A balance observation cannot be in the future.')
+    observed_payments = payment_version(db.session,account.currency)
     if balance is None:
         balance = CashBalance(account_uid=identity, revision=0)
         db.session.add(balance)
     balance.amount_minor = amount(form.get('amount', ''), account.currency, signed=True)
     balance.recorded_currency = account.currency
+    balance.payment_fingerprint = observed_payments
     balance.observed_at, balance.recorded_at = observed, now
     balance.revision += 1
 
@@ -222,7 +240,7 @@ def snapshot(session, *, as_of=None, tax_target=None, tax_year='2026-27'):
     now = as_of or datetime.now(timezone.utc)
     today = now.astimezone(LOCAL_TIME).date()
     end = today + timedelta(days=30)
-    accounts = session.scalars(db.select(Account).order_by(Account.account_uid)).all()
+    accounts = session.scalars(db.select(Account).where(Account.cash_active.is_(True)).order_by(Account.account_uid)).all()
     balances = {row.account_uid: row for row in session.scalars(db.select(CashBalance))}
     reserves = {row.account_uid: row for row in session.scalars(db.select(AccountReserve))}
     items = session.scalars(db.select(CashCommitment).order_by(CashCommitment.due_date, CashCommitment.id)).all()
@@ -235,8 +253,9 @@ def snapshot(session, *, as_of=None, tax_target=None, tax_year='2026-27'):
         default=lambda value:value.astimezone(timezone.utc).isoformat() if isinstance(value,datetime) else str(value),
         sort_keys=True).encode()).hexdigest()
     complete = bool(coverage and coverage.fingerprint == fingerprint)
-    paid, latest_change = defaultdict(int), {}
+    paid = defaultdict(int)
     currencies = {item.id:item.currency for item in items}
+    versions = payment_versions(payments,currencies)
     item_by_id = {item.id:item for item in items}
     direct_tax_paid = 0
     for payment in payments:
@@ -245,8 +264,6 @@ def snapshot(session, *, as_of=None, tax_target=None, tax_year='2026-27'):
             item = item_by_id[payment.commitment_id]
             if item.kind == 'hmrc' and item.tax_year == tax_year and item.tax_component != 'other':
                 direct_tax_paid += payment.tax_credit_minor
-        currency = currencies[payment.commitment_id]
-        latest_change[currency] = max(latest_change.get(currency, payment.changed_at), payment.changed_at)
     groups = {}
     def group(currency):
         return groups.setdefault(currency, dict(currency=currency, cash=0, bills=0, hmrc=0, hmrc_current=0, hmrc_other=0, earmarks=0,
@@ -268,7 +285,7 @@ def snapshot(session, *, as_of=None, tax_target=None, tax_year='2026-27'):
             if not now - timedelta(hours=24) <= balance.observed_at <= now:
                 account_reasons.append('Balance needs a fresh observation')
                 row['reasons'].append('A balance is older than 24 hours or ahead of the clock.')
-            if account.currency in latest_change and balance.recorded_at < latest_change[account.currency]:
+            if (balance.payment_fingerprint is not None or account.currency in versions) and balance.payment_fingerprint != versions.get(account.currency,EMPTY_PAYMENTS):
                 account_reasons.append('Check balance after payment or correction')
                 row['reasons'].append('Update balances after recording or correcting a payment.')
         if account_reasons:

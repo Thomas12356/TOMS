@@ -74,6 +74,7 @@ class CashBalance(BaseModel):
     account_uid = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.accounts.account_uid', ondelete='CASCADE'), primary_key=True)
     amount_minor = db.Column(db.BigInteger, nullable=False)
     recorded_currency = db.Column(db.Text, nullable=False)
+    payment_fingerprint = db.Column(db.Text)
     observed_at = db.Column(db.DateTime(timezone=True), nullable=False)
     recorded_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
     revision = db.Column(db.BigInteger, nullable=False, default=1)
@@ -89,6 +90,8 @@ class CashCoverage(BaseModel):
 
 class Account(BaseModel):
     __tablename__ = "accounts"
+    __table_args__ = (db.CheckConstraint("provider IN ('starling','statement')"),
+                      db.CheckConstraint('revision > 0'), {'schema':'toms'})
 
     account_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
     default_category_uid = db.Column(db.Uuid(as_uuid=False), nullable=False)
@@ -98,6 +101,59 @@ class Account(BaseModel):
     opened_at = db.Column(db.DateTime(timezone=True))
     raw_payload = db.Column(JSONB, nullable=False)
     fetched_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
+    provider = db.Column(db.Text, nullable=False, default='starling', server_default='starling')
+    bank_name = db.Column(db.Text)
+    cash_active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    closed_on = db.Column(db.Date)
+    revision = db.Column(db.BigInteger, nullable=False, default=1, server_default='1')
+
+
+class AccountHistory(BaseModel):
+    __tablename__ = 'account_history'
+    __table_args__ = (db.CheckConstraint("tax_year = '2026-27'"),
+        db.CheckConstraint('through_on >= from_on AND revision > 0'), {'schema':'toms'})
+    account_uid = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.accounts.account_uid'), primary_key=True)
+    tax_year = db.Column(db.Text, primary_key=True)
+    from_on = db.Column(db.Date, nullable=False)
+    through_on = db.Column(db.Date, nullable=False)
+    complete = db.Column(db.Boolean, nullable=False, default=False)
+    revision = db.Column(db.BigInteger, nullable=False, default=1)
+    confirmed_at = db.Column(db.DateTime(timezone=True))
+
+
+class StatementImport(BaseModel):
+    __tablename__ = 'statement_imports'
+    __table_args__ = (db.CheckConstraint("status IN ('mapping','preview','imported','discarded')"),
+        db.CheckConstraint('account_revision > 0 AND row_count BETWEEN 0 AND 1000'),
+        db.UniqueConstraint('id','account_uid'), {'schema':'toms'})
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    account_uid = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.accounts.account_uid'), nullable=False)
+    account_revision = db.Column(db.BigInteger, nullable=False)
+    file_hash = db.Column(db.Text, nullable=False)
+    mapping_hash = db.Column(db.Text)
+    mapping = db.Column(JSONB)
+    headers = db.Column(JSONB, nullable=False, default=list)
+    rows = db.Column(JSONB, nullable=False, default=list)
+    status = db.Column(db.Text, nullable=False, default='mapping')
+    row_count = db.Column(db.Integer, nullable=False)
+    imported_count = db.Column(db.Integer, nullable=False, default=0)
+    skipped_count = db.Column(db.Integer, nullable=False, default=0)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
+    expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    imported_at = db.Column(db.DateTime(timezone=True))
+
+
+class StatementImportRow(BaseModel):
+    __tablename__ = 'statement_import_rows'
+    __table_args__ = (db.ForeignKeyConstraint(['batch_id','account_uid'],['toms.statement_imports.id','toms.statement_imports.account_uid']),
+        db.ForeignKeyConstraint(['account_uid','category_uid','feed_item_uid'],['toms.transactions.account_uid','toms.transactions.category_uid','toms.transactions.feed_item_uid']),
+        db.CheckConstraint("decision IN ('import','skip') AND row_number > 0"), {'schema':'toms'})
+    batch_id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    row_number = db.Column(db.Integer, primary_key=True)
+    account_uid = db.Column(db.Uuid(as_uuid=False), nullable=False)
+    category_uid = db.Column(db.Uuid(as_uuid=False))
+    feed_item_uid = db.Column(db.Uuid(as_uuid=False))
+    decision = db.Column(db.Text, nullable=False)
 
 
 class Category(BaseModel):

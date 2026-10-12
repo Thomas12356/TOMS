@@ -14,7 +14,7 @@ from sqlalchemy.exc import OperationalError
 from uuid import uuid4
 from models import IncomeStream, Invoice, InvoiceItem, InvoicePayment, InvoiceDelivery, Transaction, TransactionIncome
 from services.transactions.review import payment_version
-from services.tax.export import package, csv_bytes, export_session
+from services.tax.export import package, csv_bytes, export_session, FIELDS
 from services.tax.reserves import current_plan
 from deduction_support import DeductionOwnerCase
 from support import ApiTestCase
@@ -78,7 +78,7 @@ class ExportTests(DeductionOwnerCase):
         try:
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.content_length, len(response.data))
-            self.assertEqual(len(ZipFile(io.BytesIO(response.data)).namelist()), 13)
+            self.assertEqual(len(ZipFile(io.BytesIO(response.data)).namelist()), len(FIELDS)+3)
         finally:
             response.close()
         self.assertTrue(outputs[0].closed)
@@ -98,7 +98,7 @@ class ExportTests(DeductionOwnerCase):
             self.assertNotIn('RAW-MUST-NOT-EXPORT', archive.read('report.json').decode())
             csv_rows = list(csv.DictReader(io.StringIO(archive.read('transactions.csv').decode('utf-8-sig'))))
             self.assertEqual(csv_rows[0]['counterparty_name'], "'=dangerous")
-            self.assertEqual(len(archive.namelist()), 13)
+            self.assertEqual(len(archive.namelist()), len(FIELDS)+3)
             fetch.assert_not_called()
             self.bank.assert_not_called()
 

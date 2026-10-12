@@ -23,6 +23,13 @@ def current_plan(*, refresh_rules=True, session=None, payments=None, as_of=None)
     attach_shift_totals(streams, session=session)
     records = tax_record_service.tax_records(rules, session=session, payments=payments, as_of=as_of)
     records.setdefault('issues', [])
+    from services.statement_accounts import history_issues
+    history = history_issues(session, as_of)
+    records['issues'].extend(history)
+    records.setdefault('received_issues', []).extend(history)
+    if history:
+        records.setdefault('attention', []).append(dict(title='Accounts and statements', count=len(history),
+            url='/dashboard/accounts', items=history))
     profile = current_profile(session)
     if not profile['supported']:
         records['issues'].append(profile['message'])
@@ -31,6 +38,7 @@ def current_plan(*, refresh_rules=True, session=None, payments=None, as_of=None)
     if ni_rules.cached_status(current_app.instance_path).get('status') == 'needs_review':
         records['issues'].append('National Insurance rules changed and need review.')
     estimate = estimate_streams(streams, rules, supported_jurisdiction=profile['supported'], **records)
+    estimate['tax_year'] = rules['tax_year']
     estimate['tax_profile'] = profile
     return estimate
 

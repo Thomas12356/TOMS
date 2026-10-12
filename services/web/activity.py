@@ -11,6 +11,12 @@ from services.database.connection import db
 from services.database.session import test_data_active
 
 ACTIONS = {
+    'account.create': 'Added statement account',
+    'account.edit': 'Updated statement account settings',
+    'account.history': 'Confirmed statement history coverage',
+    'account.close': 'Closed statement account; retained history',
+    'account.reopen': 'Reopened statement account',
+    'statement.import': 'Confirmed statement transaction import',
     'cash.balance': 'Saved observed account balance',
     'cash.coverage': 'Confirmed cash planning coverage',
     'cash.commitment': 'Updated bill or HMRC statement charge',

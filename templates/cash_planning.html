@@ -5,7 +5,7 @@
 {% if error %}<p class="message" role="alert">{{ error }}</p>{% endif %}
 {% if result %}
 <p>Plan through {{ result.end.strftime('%d %b %Y') }} using observed balances, overdue bills and the next 30 days of commitments. Future income and unused overdraft limits are not spending cash.</p>
-<p><a href="{{ url_for('cash_planning.edit',kind='bill') }}">Add a bill</a> · <a href="{{ url_for('cash_planning.edit',kind='hmrc') }}">Add an HMRC statement charge</a> · <a href="{{ url_for('cash_planning.export') }}">Download planning records</a></p>
+<p><a href="{{ url_for('cash_planning.edit',kind='bill') }}">Add a bill</a> · <a href="{{ url_for('cash_planning.edit',kind='hmrc') }}">Add an HMRC statement charge</a> · <a href="{{ url_for('cash_planning.export') }}">Download planning records</a> · <a href="{{ url_for('statement_accounts.index') }}">Add accounts and import statements</a></p>
 {% if result.balance_tasks %}<section class="checklist-step" aria-labelledby="cash-next-heading"><h2 id="cash-next-heading">Next: check {{ result.balance_tasks|length }} account {{ 'balance' if result.balance_tasks|length == 1 else 'balances' }}</h2><ul>{% for task in result.balance_tasks %}<li>{{ task.account.name or 'Unnamed account' }}: {{ task.reasons|join(' · ') }}</li>{% endfor %}</ul><p><a href="#balance-review">Update balances and finish your cash review</a></p></section>{% elif not result.complete and result.accounts %}<p class="message">Next: review the bills below, then <a href="#balance-review">confirm coverage</a>. Current balance observations can be kept.</p>{% endif %}
 <section class="invoice-section"><h2>Available after recorded commitments</h2>
 {% for row in result.groups %}<article class="checklist-step"><h3>{{ row.currency }}</h3>

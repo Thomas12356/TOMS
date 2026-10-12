@@ -1,0 +1,7 @@
+.statement-accounts { min-width: 0; overflow-wrap: anywhere; }
+.statement-accounts details, .statement-accounts form, .statement-accounts fieldset { min-width: 0; max-width: 100%; }
+.statement-accounts .login-form select, .statement-accounts fieldset select { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+.statement-accounts input[type=checkbox] { width: auto; min-height: auto; margin-right: 8px; }
+.statement-accounts fieldset { margin: 16px 0; }
+.statement-accounts legend { max-width: 100%; }
+.statement-accounts .table-scroll { max-width: 100%; }

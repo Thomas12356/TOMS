@@ -1,5 +1,43 @@
 # Security checks — 6 October 2026
 
+## Other-bank CSV onboarding and cash corrections — 12 October 2026
+
+`test_statement_imports.py` uses disposable real/demo schemas and forbids bank
+traffic. It covers bounded files/cells/rows, exact integer money/grouping, explicit
+date/currency mapping, Windows encoding, no partial writes on validation/DB
+failure, idempotent confirmations/files, overlapping/repeated-row decisions,
+stale account/ledger checks, expired/discarded staging, independent manual-entry
+identity, history versus opening cash, transfer exclusion, closure, provider
+identity protection, private allowlisted exports and owner/CSRF/sample isolation.
+Unmapped source columns are not exported or retained after successful mapping.
+
+The unmocked browser flow exposed a pre-existing cash-page `tax_year` contract
+error hidden by older stubs. The shared planning result now includes its reviewed
+year, with a real-calculator regression for incomplete statement history. Cash
+observations also capture payment-state fingerprints rather than relying on
+wall-clock ordering alone; a regression voids a payment with a timestamp before
+the observation and still requires a fresh balance. Original observed times and
+amounts remain intact. The targeted 25 cash tests and 16 statement-import checks
+pass as part of full backend verification: 630 tests / 626 passes / four optional
+restore skips.
+
+`statement_accounts_browser_checks.py` exercises real owner forms through account
+creation, CSV mapping, repeated-row skipping, guided transfer classification and
+confirmation, historical coverage, manual missing payment, balance observation,
+closure and reopening. It passes 320/390/768/1280px; 390px disables JavaScript.
+The mobile screenshot was visually inspected. Bank calls remain mocked, and no
+production credentials or financial records are used in the fixture. Earlier
+full-run attempts exposed missing mock account-provider/explicit sync fields,
+mobile select sizing and the real-calculator boundary; those were repaired.
+Running backend/browser suites concurrently also encountered a System storage
+timeout; final verification runs them sequentially. This does not establish every
+older intermittent assertion's cause.
+
+Migrations 030/031 were applied additively after a private pre-change backup;
+sample edits were preserved. No credential setup, live Starling verification or
+database restore was performed. Final full browser/static/publication evidence is
+recorded in `PROJECT_STATUS.md` on completion.
+
 ## Reliable forms and cash review — 12 October 2026
 
 Private synthetic response diagnostics reproduced newly signed CSRF tokens

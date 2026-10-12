@@ -55,7 +55,7 @@
             <p class="secondary">Needs attention includes unconfirmed records, incomplete settled income and changed linked expenses. Pending and future receipts do not require settled-income details yet.</p>
         </form>
 
-        <section class="balance-section" aria-labelledby="balance-heading">
+        {% if can_sync %}<section class="balance-section" aria-labelledby="balance-heading">
             <div class="balance-heading">
                 <div>
                     <h2 id="balance-heading">{{ 'Account balance' if selected_account else 'Total account balance' }}</h2>
@@ -70,7 +70,7 @@
                 <p>Loading balances…</p>
             </div>
             <noscript><p>Enable JavaScript to load {{ 'sample' if using_test_data else 'live account' }} balances.</p></noscript>
-        </section>
+        </section>{% else %}<p>Statement accounts use saved balance observations. <a href="{{ url_for('cash_planning.page') }}">Check balances and cash planning</a> · <a href="{{ url_for('statement_accounts.detail',identity=selected_account.account_uid) if selected_account else url_for('statement_accounts.index') }}">Import statements and check history</a>.</p>{% endif %}
 
         <section class="transactions-panel" aria-labelledby="table-heading">
             <div class="panel-heading">
@@ -82,9 +82,9 @@
                     {% if current_user.is_authenticated %}
                     <a class="sync-button" id="review-open" href="{{ url_for('guided_review.start', **filter_options) }}">Review {{ review_count }} transaction{{ '' if review_count == 1 else 's' }}</a>
                     <details class="expert-confirmation"><summary>Quick confirmation</summary><p class="secondary">Confirm saved details you have already checked. This does not complete missing income evidence.</p><button type="button" class="review-open secondary-button" id="quick-review" hidden>Open quick confirmation</button></details>
-                    <div class="sync-controls" data-test-data="{{ 'true' if using_test_data else 'false' }}" data-sync-url="{{ url_for('dashboard.trigger_sync') }}" data-status-url="{{ url_for('dashboard.sync_status') }}" data-csrf="{{ csrf_token() }}">
+                    {% if can_sync %}<div class="sync-controls" data-test-data="{{ 'true' if using_test_data else 'false' }}" data-sync-url="{{ url_for('dashboard.trigger_sync') }}" data-status-url="{{ url_for('dashboard.sync_status') }}" data-csrf="{{ csrf_token() }}">
                         <button type="button" id="sync-now" data-sync-now title="{{ 'Simulates a sync using sample data; no bank connection.' if using_test_data else 'Syncs transactions from your bank account provider.' }}" aria-description="{{ 'Simulates a sync using sample data; no bank connection.' if using_test_data else 'Syncs transactions from your bank account provider.' }}">{{ sync_icon() }}<span>Sync now</span></button>
-                    </div>
+                    </div>{% endif %}
                     {% endif %}
                 </div>
             </div>
@@ -146,7 +146,7 @@
                 {% if filter_options.get('q') or filter_options.get('from') or filter_options.get('to') or filter_options.get('classification', 'all') != 'all' or filter_options.get('attention', 'all') != 'all' %}
                 <h3>No matching transactions</h3><p>Change or clear the filters to browse more records.</p>
                 {% else %}<h3>No saved transactions</h3>
-                <p>Import your Starling transactions to see them on this page.</p>{% endif %}
+                <p>Import {{ 'your Starling transactions' if can_sync else 'a CSV statement from Accounts and statements' }} to see them on this page.</p>{% endif %}
                 {% else %}
                 <h3>No transactions on this page</h3>
                 <p><a href="{{ ledger_url(page=1) }}">Return to the first page</a> to browse your saved payments.</p>

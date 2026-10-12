@@ -136,8 +136,8 @@ class DashboardTests(ApiTestCase):
             bank.assert_not_called()
 
     def test_live_balances_preserve_separate_accounts_zero_and_negative_amounts(self):
-        accounts = [SimpleNamespace(account_uid="first", name="Current account", currency="GBP"),
-                    SimpleNamespace(account_uid="second", name="Euro account", currency="EUR")]
+        accounts = [SimpleNamespace(account_uid="first", name="Current account", currency="GBP",provider='starling'),
+                    SimpleNamespace(account_uid="second", name="Euro account", currency="EUR",provider='starling')]
         replies = [{"effectiveBalance": {"minorUnits": -123, "currency": "GBP"}},
                    {"effectiveBalance": {"minorUnits": 0, "currency": "EUR"}}]
         with patch.object(db.session, "scalars", return_value=accounts), \
@@ -152,7 +152,7 @@ class DashboardTests(ApiTestCase):
         self.assertEqual(response.headers["Cache-Control"], "no-store")
 
     def test_all_accounts_total_combines_signed_balances_without_mixing_currencies(self):
-        accounts = [SimpleNamespace(account_uid=str(i), name="Account", currency=currency)
+        accounts = [SimpleNamespace(account_uid=str(i), name="Account", currency=currency,provider='starling')
                     for i, currency in enumerate(("GBP", "GBP", "EUR"))]
         replies = [{"effectiveBalance": {"minorUnits": amount, "currency": currency}}
                    for amount, currency in ((1000, "GBP"), (-123, "GBP"), (500, "EUR"))]
@@ -164,7 +164,7 @@ class DashboardTests(ApiTestCase):
         ])
 
     def test_missing_account_balance_never_displays_a_partial_total(self):
-        accounts = [SimpleNamespace(account_uid=str(i), name="Account", currency="GBP") for i in range(2)]
+        accounts = [SimpleNamespace(account_uid=str(i), name="Account", currency="GBP",provider='starling') for i in range(2)]
         replies = [{"effectiveBalance": {"minorUnits": 1000, "currency": "GBP"}}, {}]
         with patch.object(db.session, "scalars", return_value=accounts), patch("routes.dashboard.starling_request", side_effect=replies):
             response = self.client.get("/dashboard/balances", headers=self.headers)
@@ -174,7 +174,7 @@ class DashboardTests(ApiTestCase):
         self.assertIn("Total unavailable", total["error"])
 
     def test_invalid_balance_is_unavailable_rather_than_zero(self):
-        account = SimpleNamespace(account_uid="first", name="Current account", currency="GBP")
+        account = SimpleNamespace(account_uid="first", name="Current account", currency="GBP",provider='starling')
         for payload in (None, {}, {"effectiveBalance": {"minorUnits": True, "currency": "GBP"}},
                         {"effectiveBalance": {"minorUnits": 500, "currency": "EUR"}}):
             with self.subTest(payload=payload), patch.object(db.session, "scalars", return_value=[account]), \
@@ -187,7 +187,7 @@ class DashboardTests(ApiTestCase):
     def test_balance_rate_limit_stops_further_requests_and_database_errors_are_safe(self):
         from services.banking.client import StarlingError
 
-        accounts = [SimpleNamespace(account_uid=str(i), name="Account", currency="GBP") for i in range(2)]
+        accounts = [SimpleNamespace(account_uid=str(i), name="Account", currency="GBP",provider='starling') for i in range(2)]
         with patch.object(db.session, "scalars", return_value=accounts), \
                 patch("routes.dashboard.starling_request", side_effect=StarlingError("Try later.", 429)) as bank:
             response = self.client.get("/dashboard/balances", headers=self.headers)
@@ -202,7 +202,7 @@ class DashboardTests(ApiTestCase):
 
     def test_account_selection_filters_transactions_and_preserves_pagination(self):
         account_uid = "11111111-1111-4111-8111-111111111111"
-        self.accounts.return_value = [SimpleNamespace(account_uid=account_uid, name="Household", currency="GBP")]
+        self.accounts.return_value = [SimpleNamespace(account_uid=account_uid, name="Household", currency="GBP",provider='starling')]
         with patch.object(db, "paginate", return_value=saved_page([], total=51)) as paginate:
             response = self.client.get("/dashboard?account=" + account_uid, headers=self.headers)
         self.assertEqual(response.status_code, 200)
@@ -228,7 +228,7 @@ class DashboardTests(ApiTestCase):
 
     def test_selected_balance_queries_only_the_selected_account(self):
         account_uid = "11111111-1111-4111-8111-111111111111"
-        self.accounts.return_value = [SimpleNamespace(account_uid=account_uid, name="Household", currency="GBP")]
+        self.accounts.return_value = [SimpleNamespace(account_uid=account_uid, name="Household", currency="GBP",provider='starling')]
         with patch("routes.dashboard.starling_request", return_value={"effectiveBalance": {"minorUnits": 1250, "currency": "GBP"}}) as bank:
             response = self.client.get("/dashboard/balances?account=" + account_uid, headers=self.headers)
         self.assertEqual(response.status_code, 200)

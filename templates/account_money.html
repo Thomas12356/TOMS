@@ -7,7 +7,7 @@
 <p><a href="{{ url_for('cash_planning.page') }}">Plan bills, HMRC payments and available cash</a></p>
 {% if error %}<p class="message" role="alert">{{ error }}</p>{% else %}
 <p>Balances, earmarks and tax targets answer different questions. Earmarks record your intentions; they do not prove the money is funded.</p>
-<p class="secondary">Latest saved full import: {{ last_import.strftime('%d %b %Y, %H:%M UTC') if last_import else 'Not recorded' }}. This is transaction-import freshness, not a bank balance timestamp.</p>
+<p class="secondary">Latest saved full Starling import: {{ last_import.strftime('%d %b %Y, %H:%M UTC') if last_import else 'Not recorded' }}. Statement-import history is shown in Accounts and statements. This is transaction-import freshness, not a bank balance timestamp.</p>
 {% include 'account_reserves.html' %}
 {% endif %}
 {% endblock %}

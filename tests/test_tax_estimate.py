@@ -132,7 +132,7 @@ class TaxEstimatePageTests(PostgreSQLTestCase):
             cookie['_user_id'] = token
 
     def page(self, rows):
-        with patch.object(self.session, 'scalars', return_value=SimpleNamespace(all=lambda: rows)), patch('services.tax.records.tax_records', return_value={}):
+        with patch.object(self.session, 'scalars', return_value=SimpleNamespace(all=lambda: rows)), patch('services.tax.records.tax_records', return_value={}), patch('services.statement_accounts.history_issues',return_value=[]):
             return self.client.get('/dashboard/tax-estimate')
 
     def test_owner_page_nav_numbers_and_no_bank_calls(self):

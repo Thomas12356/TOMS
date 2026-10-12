@@ -5,6 +5,21 @@ Starling importer before working on categorisation or income forms.
 
 ## Reliable forms, cash review and other-bank onboarding
 
+`routes/statement_accounts.py`, `services/statement_accounts.py` and
+`services/statement_imports.py` implement owner-only other-bank accounts and
+bounded CSV staging/mapping/duplicate confirmation. Imported transactions start
+unreviewed with an explicit Other classification, then use existing review,
+income and expense workflows. Tax/cash planning checks separate history coverage;
+balance observations cannot establish prior earnings. Migration 030 preserves
+Starling/sample records and adds account origins, coverage and batch provenance.
+`BANK_MIGRATION_PLAN.md` records supported file formats and remaining cutover work.
+
+Cash balance observations capture the current payment-state fingerprint. Migration
+031 adds it without changing saved amounts/times. Payment recording/voiding makes
+the fingerprint differ even if the wall clock regresses; a new observation is
+required. Legacy observations with recorded payments need a fresh check. Coverage
+confirmation or a blank amount never refreshes a balance observation.
+
 Form/session signing uses `services/web/signing.py`. Verified signatures may be
 up to two seconds ahead after a small backward clock adjustment; older expiry
 limits, farther-future rejection, CSRF session matching and HTTPS referrer checks

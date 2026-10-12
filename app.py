@@ -25,6 +25,7 @@ from routes.overview import overview
 from routes.guided_review import guided_review
 from routes.tax_profile import tax_profile
 from routes.cash_planning import cash_planning
+from routes.statement_accounts import statement_accounts
 from services.web.sessions import login_manager, csrf, SESSION_LIFETIME, lock_owner_setup, validate_owner_credentials
 from flask_wtf.csrf import CSRFError
 from werkzeug.security import generate_password_hash
@@ -62,6 +63,7 @@ login_manager.init_app(app, add_context_processor=False)
 csrf.init_app(app)
 app.register_blueprint(tax_profile)
 app.register_blueprint(cash_planning)
+app.register_blueprint(statement_accounts)
 app.register_blueprint(login)
 app.register_blueprint(system)
 app.register_blueprint(invoices)
@@ -157,7 +159,7 @@ def db_upgrade():
             with engine.begin() as connection:
                 applied = upgrade_database(connection)
                 # Independent additive tables preserve existing sample edits.
-                prepare_demo_schema(connection, rebuild=any(name not in ('026_tax_profile.sql', '027_cash_planning.sql', '028_cash_balance_currency.sql', '029_cash_payment_credit.sql') for name in applied))
+                prepare_demo_schema(connection, rebuild=any(name not in ('026_tax_profile.sql', '027_cash_planning.sql', '028_cash_balance_currency.sql', '029_cash_payment_credit.sql', '030_statement_accounts.sql', '031_cash_payment_fingerprint.sql') for name in applied))
                 connection.exec_driver_sql("REVOKE ALL ON TABLE toms.schema_migrations FROM PUBLIC, toms_app")
         finally:
             engine.dispose()

@@ -31,11 +31,12 @@
 {% else %}<p>No outstanding issued invoices.</p>{% endfor %}
 <p class="secondary">All invoice years. Invoices and logged work are separate evidence; their totals are not added to income.</p>
 <p><a href="{{ url_for('invoices.page') }}">Open invoices</a></p></section>
-<section class="balance-card" aria-labelledby="import-heading"><h2 id="import-heading">Saved import freshness</h2>
+<section class="balance-card" aria-labelledby="import-heading"><h2 id="import-heading">Starling import freshness</h2>
 {% if result.last_success %}<p>Last successful full {{ 'sample import' if using_test_data else 'import' }}: <strong>{{ local_date(result.last_success).strftime('%d %b %Y, %H:%M %Z') }}</strong></p>
 {% else %}<p>No successful full {{ 'sample import' if using_test_data else 'import' }} recorded.</p>{% endif %}
 {% if result.import_status %}<p>Most recent import: {{ result.import_status | replace('_', ' ') | title }}</p>{% endif %}
-<p class="secondary">Saved status only. Opening this page does not refresh bank records or balances.</p>
+<p class="secondary">This status covers Starling only. Opening this page does not refresh bank records or balances.</p>
+<p><a href="{{ url_for('statement_accounts.index') }}">Using another bank? Add its account and import CSV statements</a>. Statement history and coverage are checked separately.</p>
 <p><a href="{{ url_for('dashboard.transactions_page') }}">Open transactions</a> · <a href="{{ url_for('system.page') }}">Check system health</a></p></section>
 </div>
 <section id="home-actions" class="home-actions" aria-labelledby="actions-heading">

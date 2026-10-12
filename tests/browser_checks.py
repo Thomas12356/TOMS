@@ -24,10 +24,10 @@ rows = [dict(number=i + 1, date='05 Oct 2026', day='Today',
              confirm_url=f'/dashboard/transactions/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222/00000000-0000-4000-8000-{i:012d}/confirm',
              direction='IN' if i else 'OUT', amount='GBP 1,234.56', status='Settled') for i in range(3)]
 pagination = SimpleNamespace(total=3, pages=1, page=1, has_prev=False, has_next=False)
-account = SimpleNamespace(account_uid='11111111-1111-4111-8111-111111111111', name='Current account', currency='GBP')
+account = SimpleNamespace(account_uid='11111111-1111-4111-8111-111111111111', name='Current account', currency='GBP',provider='starling')
 with app.test_request_context('/dashboard'):
     html = render_template('dashboard.html', rows=rows, page=pagination, error=None,
-                           accounts=[account], selected_account=None, account_uid=None,
+                           accounts=[account], selected_account=None, account_uid=None,can_sync=True,
                            current_user=SimpleNamespace(is_authenticated=True), filter_options={'page': 1}, attention_choices=ATTENTION, classification_choices=CLASSIFICATION_TYPES, review_count=len(rows))
 
 with sync_playwright() as playwright:

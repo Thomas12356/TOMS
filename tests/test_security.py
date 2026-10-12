@@ -121,7 +121,7 @@ class SecurityBoundaryTests(ApiTestCase):
 
     def test_bank_supplied_text_is_escaped_in_dashboard(self):
         attack = '<img src=x onerror="alert(1)">'
-        account = SimpleNamespace(account_uid="11111111-1111-4111-8111-111111111111", name=attack, currency="GBP")
+        account = SimpleNamespace(account_uid="11111111-1111-4111-8111-111111111111", name=attack, currency="GBP",provider='starling')
         payment = SimpleNamespace(account_uid=account.account_uid, category_uid=account.account_uid, feed_item_uid=account.account_uid, transaction_time=datetime.now(timezone.utc), counterparty_name=attack,
                                   reference=attack, amount_minor=100, currency="GBP", direction="IN",
                                   source="FASTER_PAYMENTS_IN", status=attack, classification=None)

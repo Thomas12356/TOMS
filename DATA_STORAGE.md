@@ -7,6 +7,18 @@ backup nor restore imports the web application, starts jobs or calls Starling.
 
 ## What is stored where?
 
+Migration 030 adds statement account origins, history coverage, private CSV
+staging and import provenance in real/sample business schemas. Staged raw grids
+are removed on successful mapping or explicit discard; expired unimported batches
+are removed on the next upload. Private database backups therefore may contain
+unfinished statement grids. Evidence ZIPs exclude those grids, source mappings,
+file hashes, filenames and authentication records; they include selected account,
+history and confirmed import/row metadata with CSV formula protection. Migration
+031 records a payment-state fingerprint with balance observations for reliable
+invalidation after payment corrections. Neither migration changes saved amounts
+or restores the database. The pre-change private backup was taken before applying
+both migrations; restore verification remains excluded by the user's instructions.
+
 | Location | Contents | Backup approach |
 | --- | --- | --- |
 | PostgreSQL `toms` schema | Accounts, transactions, classifications, income details, streams, shifts, mileage, expenses, annual tax profile, sync history, owner password hash, sessions, setup state and migration history | Database bundle below |
