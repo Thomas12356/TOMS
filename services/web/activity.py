@@ -11,6 +11,9 @@ from services.database.connection import db
 from services.database.session import test_data_active
 
 ACTIONS = {
+    'account.formats': 'Cleared saved statement formats',
+    'statement.transfer': 'Confirmed own-account transfer pair',
+    'statement.correct': 'Corrected statement transaction with retained history',
     'account.create': 'Added statement account',
     'account.edit': 'Updated statement account settings',
     'account.history': 'Confirmed statement history coverage',

@@ -1,5 +1,39 @@
 # Security checks — 6 October 2026
 
+## Guided statement review and saved formats — 12 October 2026
+
+`test_statement_imports.py` now includes transfer amount/currency/date/manual-choice
+guards, two-record stale/replay protection, tax-record exclusion, both-account audit
+visibility, reversible correction history, excluded-edit semantics, historical invoice
+allocation protection, atomic bulk selection, 50-row pagination, exact account/file
+format reuse, invalid-format fallback, visible unambiguous header suggestions,
+owner/API/CSRF/private response boundaries and allowlisted evidence exports.
+Fixtures use disposable schemas and forbid bank traffic. Format preferences are
+saved only with confirmed imports; no source-grid reuse or ambiguous date guessing.
+
+`statement_review_browser_checks.py` covers repeated CSVs skipping mapping while
+retaining preview, corrected amounts, exclusion/restoration, selected exclusion,
+explicit own-account pair confirmation and readable audit history at 320/390/768/
+1280px, with JavaScript disabled at 390px. The existing onboarding script now checks
+direct guided review after import. Both current cash/history checks remain explicit.
+
+One preliminary full run began before migration 032 was installed: migration
+idempotency/export checks correctly failed for missing tables. That run is not
+passing evidence. A private backup preceded additive upgrade; the next upgrade
+reported up to date. Development/test runtime moved to an isolated worktree after
+another chat switched the original checkout to an MCP design branch. No overlapping
+design files were included.
+
+Final full backend: 641 tests / 637 passes / four optional restore skips. All 26
+browser scripts passed in the system run, followed by another full backend and
+both affected browser scripts after final exclusion/closure/read refinements.
+Explicit exclusions stay reviewed and leave Home's queue; restoration needs review.
+Excluded mistaken later records no longer prevent statement-account closure.
+Application/changed-test Ruff F, application Bandit and whitespace checks passed;
+the mobile audit screenshot was inspected. Migration rerun reports up to date.
+
+No live Starling traffic, credential setup or backup restore was performed.
+
 ## Other-bank CSV onboarding and cash corrections — 12 October 2026
 
 `test_statement_imports.py` uses disposable real/demo schemas and forbids bank

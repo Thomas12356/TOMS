@@ -156,6 +156,27 @@ class StatementImportRow(BaseModel):
     decision = db.Column(db.Text, nullable=False)
 
 
+class StatementMapping(BaseModel):
+    __tablename__ = 'statement_mappings'
+    __table_args__ = ({'schema': 'toms'},)
+    account_uid = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.accounts.account_uid'), primary_key=True)
+    signature = db.Column(db.Text, primary_key=True)
+    mapping = db.Column(JSONB, nullable=False)
+    updated_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now(), onupdate=db.func.now())
+
+
+class StatementChange(BaseModel):
+    __tablename__ = 'statement_changes'
+    __table_args__ = ({'schema': 'toms'},)
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    account_uid = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.accounts.account_uid'), nullable=False)
+    kind = db.Column(db.Text, nullable=False)
+    before = db.Column(JSONB, nullable=False)
+    after = db.Column(JSONB, nullable=False)
+    reason = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
+
+
 class Category(BaseModel):
     __tablename__ = "categories"
     __table_args__ = (

@@ -59,14 +59,17 @@ discard possible duplicates. Confirmed imports must be atomic or have a precise,
 recoverable batch state. Corrections must preserve audit/history and protect
 existing invoice allocations and deductions.
 
-**3. Cutover and transfer review.** Suggest possible counterpart transfers using
+**3. Delivered: guided transfer review and corrections.** Suggest possible counterpart transfers using
 owned accounts, currency, direction, amount and dates. Require confirmation;
 equal amounts alone are insufficient. Show the imported period and remaining
 history gaps, then let Starling continue its own account's feed. Avoid treating
 overlapping historical imports, aggregate opening earnings and individual
 receipts as separate additional income. Do not infer tax credits from balances.
 
-**4. Bank-specific presets after a real sample format.** Start with column mapping
+**4. Delivered: reusable owner mappings; bank presets remain optional.** Remember
+confirmed formats per account using exact ordered headers and file settings.
+Revalidate the entire file and retain duplicate decisions/confirmation on reuse.
+Clear remembered formats in account settings. Start with column mapping
 for ordinary CSVs, then add tested bank presets. A provider/API connection can
 follow later when its permissions and data contract are established. Do not
 promise universal CSV compatibility or an unspecified bank API integration.
@@ -104,9 +107,12 @@ promise universal CSV compatibility or an unspecified bank API integration.
 - Owner authentication, CSRF, stale versions, sample isolation, bounded uploads,
   currency/date validation and private exports pass backend and browser checks.
 
-Next is stage 3: suggested counterpart transfers and a focused cutover view.
-Existing transfer classification already works across imported accounts; matching
-suggestions and bank-specific presets remain future work.
+Account pages now point to the next import, transfer/payment review, history
+confirmation or cash task. Transfer confirmation reviews both sides together;
+corrections retain original rows and before/after evidence. Multiple mistaken
+imports can be excluded atomically, then restored individually. Linked receipts
+require their existing evidence workflows. Split/FX/longer-delay transfer matching
+and bank-specific presets remain future work, informed by real-format feedback.
 
 ## Supported files and retention
 

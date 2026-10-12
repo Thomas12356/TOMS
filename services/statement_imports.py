@@ -9,7 +9,7 @@ from uuid import UUID, uuid4, uuid5
 
 from werkzeug.exceptions import Conflict, Gone, NotFound, BadRequest
 from sqlalchemy.orm import load_only
-from models import StatementImport, StatementImportRow, Transaction, TransactionClassification
+from models import StatementImport, StatementImportRow, StatementMapping, Transaction, TransactionClassification
 from services.database.connection import db
 from services.invoices.workflow import LOCAL_TIME, lock_writes
 from services.statement_accounts import account, invalidate_history
@@ -55,9 +55,41 @@ def upload(row, data, encoding='utf-8-sig', delimiter=','):
         raise ValueError('There are 20 active previews. Finish or discard one before uploading again.')
     batch = StatementImport(id=str(uuid4()),account_uid=row.account_uid,account_revision=row.revision,
         file_hash=hashlib.sha256(data).hexdigest(),headers=grid[0],rows=grid[1:],row_count=len(grid)-1,
+        mapping={'_signature':digest([grid[0],encoding,delimiter])},
         status='mapping',expires_at=now+timedelta(minutes=30))
     db.session.add(batch)
     return batch
+
+
+def reuse_mapping(saved):
+    """Exact header/order/encoding/separator match only; always retain preview."""
+    preset=db.session.get(StatementMapping,(saved.account_uid,saved.mapping['_signature']))
+    if preset is None:
+        return saved,False
+    try:
+        return map_rows(saved,dict(preset.mapping,remember='1')),True
+    except ValueError:
+        # No mutation occurs before whole-file validation. Let the owner remap.
+        return saved,False
+
+
+def mapping_defaults(headers):
+    """Visible suggestions only; ambiguous/duplicate headers are left unmapped."""
+    aliases={'date':{'date','transaction date'},'amount':{'amount','signed amount'},
+        'credit':{'credit','money in'},'debit':{'debit','money out'},
+        'payer':{'payer','payment','name','description'},'reference':{'reference','ref'},'currency':{'currency'}}
+    result={}
+    for field,names in aliases.items():
+        matches=[str(index) for index,header in enumerate(headers) if header.strip().lower() in names]
+        if len(matches)==1:
+            result[field]=matches[0]
+    if 'amount' in result:
+        result.pop('credit',None)
+        result.pop('debit',None)
+        result['amount_mode']='signed'
+    elif 'credit' in result and 'debit' in result:
+        result['amount_mode']='separate'
+    return result
 
 
 def batch(identity):
@@ -149,7 +181,8 @@ def map_rows(saved, form):
     if previous:
         saved.rows,saved.headers,saved.status=[],[],'discarded'
         return previous
-    saved.mapping,saved.mapping_hash=mapping,mapping_hash
+    saved.mapping,saved.mapping_hash=dict(mapping,_signature=(saved.mapping or {}).get('_signature'),
+        _remember=form.get('remember')=='1'),mapping_hash
     saved.rows,saved.headers,saved.status=normalized,[],'preview'
     return saved
 
@@ -236,4 +269,14 @@ def confirm(saved, form):
     saved.imported_count,saved.skipped_count=imported,len(rows)-imported
     if imported:
         invalidate_history(row.account_uid)
+    if saved.mapping.get('_remember') and saved.mapping.get('_signature'):
+        identity=(row.account_uid,saved.mapping['_signature'])
+        preset=db.session.get(StatementMapping,identity)
+        if preset is None:
+            count=db.session.scalar(db.select(db.func.count()).select_from(StatementMapping).where(StatementMapping.account_uid==row.account_uid))
+            if count>=20:
+                raise ValueError('This account has 20 saved formats. Clear saved formats in account settings before saving another.')
+            preset=StatementMapping(account_uid=identity[0],signature=identity[1])
+            db.session.add(preset)
+        preset.mapping={field:saved.mapping[field] for field in MAP_FIELDS}
     return saved

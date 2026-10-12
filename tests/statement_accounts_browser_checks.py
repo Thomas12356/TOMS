@@ -66,7 +66,7 @@ with sync_playwright() as playwright:
             assert page.locator('.sync-controls').count()==0
             assert page.locator('#account-balances').count()==0
             # Change the classification through the existing owner workflow.
-            click(page.locator('.transaction-ledger').get_by_role('link',name='Guided review',exact=True).first)
+            assert '/review' in page.url, 'Import review should go directly to guided review.'
             page.locator('[name=type]').select_option('internal_transfer')
             click(page.get_by_role('button',name='Save classification and continue',exact=True))
             click(page.get_by_role('button',name='Confirm these saved details and continue',exact=True))

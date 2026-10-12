@@ -3,7 +3,57 @@
 Updated: 2026-10-12. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
-## Latest delivery — other-bank accounts and CSV onboarding
+## Latest delivery — reusable imports and guided statement review
+
+Implemented on `codex/statement-review-and-transfer-matching`, following approval
+of transfer matching, import corrections and saved CSV mappings.
+
+An exact account/header-order/encoding/separator match can reuse a format saved
+after import confirmation, proceeding to the mandatory validated duplicate preview.
+Header suggestions are visible defaults only; ambiguous headers and date formats
+are never inferred into saved records. Formats can be cleared in account settings.
+Failed whole-file validation returns to mapping without partial transactions.
+
+Own-account transfer suggestions require opposite settled payments with the same
+nonzero amount/currency within three days. Confirmation locks and versions both
+records, applies transfer classification and reviews them together without creating
+income. Already confirmed records, incompatible manual classifications and any
+income/expense/invoice links are excluded. Ambiguous pairs stay separate suggestions;
+split, FX and longer-delay transfers use existing review. No bank calls occur.
+
+Saved imports now have paginated correction screens (50 rows). Original normalized
+rows and provenance stay intact. Edits, exclusions, restorations and atomic selected
+exclusions retain explicit reasons and before/after snapshots. Excluded records use
+REVERSED status and leave settled totals; editing excluded details does not restore
+them implicitly. Linked income/expenses and all invoice allocations, including
+inactive history, block direct correction. Changed/restored settled payments need
+review again; explicitly excluded records stay reviewed and do not reappear on Home
+or prevent closure solely because of their mistaken dates. All corrections invalidate
+history readiness. Editing an excluded record never implicitly restores it.
+New evidence exports deliberately include allowlisted correction history, excluding
+raw statements, format signatures, mappings and authentication data.
+
+Account pages show a concrete next task. Repeat mapping and two separate transfer
+reviews are removed from common journeys; explicit financial confirmations remain.
+Existing navigation gains no top-level item. Bulk corrections validate every selected
+record before mutation, use deterministic transaction locks and reject stale pages.
+Migration 032 adds mappings/audit tables while preserving edited sample records.
+A private pre-change backup was taken; restore verification remains excluded.
+
+Final backend verification: 641 tests / 637 passes / four optional restore skips.
+All 26 browser scripts passed; both statement scripts were rerun after the final
+exclusion/closure/read-model refinements at 320/390/768/1280px, including JavaScript
+disabled at 390px. The mobile correction history screenshot was inspected.
+Application and changed-test Ruff F, application Bandit, whitespace and outgoing
+secret-value checks passed. Migration rerun reports the database up to date.
+No live Starling traffic, credential setup or database restore was performed.
+Publication/deployment details follow once the implementation revision is published.
+
+Next: the user's real-statement/five-task walkthrough. Remaining format differences,
+split/FX transfers and linked-evidence correction effort should guide subsequent work;
+no universal CSV compatibility or complete live-bank verification is claimed.
+
+## Previous delivery — other-bank accounts and CSV onboarding
 
 Implemented on `codex/other-bank-csv-onboarding` from `e80f592`, following the
 user's approval of stages 1–2 in `BANK_MIGRATION_PLAN.md`. Owner-only Accounts

@@ -5,6 +5,16 @@ Starling importer before working on categorisation or income forms.
 
 ## Reliable forms, cash review and other-bank onboarding
 
+`services/statement_review.py` owns explicit transfer-pair confirmation and
+statement corrections. It locks transaction parents in deterministic order,
+checks current evidence versions, protects linked receipts and retains
+`StatementChange` snapshots. Exclusion is reversible REVERSED status, preserving
+source rows; editing excluded details never implicitly restores them. The route
+renders 50-row correction pages and bounds candidate pairs to 200. Exact saved
+format reuse in `services/statement_imports.py` validates the whole file and still
+requires duplicate preview confirmation. Migration 032 adds business mappings and
+correction history in both real/sample schemas without resetting sample edits.
+
 `routes/statement_accounts.py`, `services/statement_accounts.py` and
 `services/statement_imports.py` implement owner-only other-bank accounts and
 bounded CSV staging/mapping/duplicate confirmation. Imported transactions start

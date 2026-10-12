@@ -7,6 +7,15 @@ backup nor restore imports the web application, starts jobs or calls Starling.
 
 ## What is stored where?
 
+Migration 032 adds `statement_mappings` (account-specific header/settings hashes
+and selected mapping fields) and `statement_changes` (selected financial snapshots,
+reason and time). Private backups include both; evidence exports include only the
+allowlisted correction history, excluding mapping settings/signatures. The original
+normalized import rows remain intact after correction. Exclusions preserve the
+transaction/provenance as REVERSED, with explicit restoration available. A private
+pre-change backup was taken before applying this additive migration; no restoration
+over the working database or credential setup is required.
+
 Migration 030 adds statement account origins, history coverage, private CSV
 staging and import provenance in real/sample business schemas. Staged raw grids
 are removed on successful mapping or explicit discard; expired unimported batches

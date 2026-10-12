@@ -7,10 +7,10 @@ import unittest
 from uuid import uuid4
 from unittest.mock import patch
 from sqlalchemy.exc import OperationalError
-from werkzeug.exceptions import Conflict, Gone
+from werkzeug.exceptions import BadRequest, Conflict, Gone
 from werkzeug.datastructures import MultiDict
-from models import Account, AccountHistory, CashBalance, StatementImport, StatementImportRow, Transaction
-from services import statement_accounts as accounts, statement_imports as imports, cash_planning as cash
+from models import Account, AccountHistory, CashBalance, StatementImport, StatementImportRow, StatementMapping, StatementChange, Transaction
+from services import statement_accounts as accounts, statement_imports as imports, cash_planning as cash, statement_review as review
 from services.database.connection import db
 from services.tax.export import evidence_rows, FIELDS
 from services.tax.reserves import current_plan
@@ -20,6 +20,12 @@ import test_test_data as sample_support
 
 
 class AmountTests(unittest.TestCase):
+    def test_header_suggestions_do_not_guess_ambiguous_columns_or_date_formats(self):
+        suggested=imports.mapping_defaults(['Date','Credit','Debit','Name'])
+        self.assertEqual(suggested,dict(date='0',credit='1',debit='2',payer='3',amount_mode='separate'))
+        self.assertNotIn('date',imports.mapping_defaults(['Date','Date','Amount']))
+        self.assertNotIn('date_format',suggested)
+        self.assertNotIn('credit',imports.mapping_defaults(['Date','Amount','Credit','Debit']))
     def test_numeric_grouping_exact_and_bounded(self):
         self.assertEqual(imports.money('1,234.56','GBP','point'),123456)
         self.assertEqual(imports.money('-1.234,56','EUR','comma'),-123456)
@@ -324,3 +330,256 @@ class StatementTests(unittest.TestCase):
         html=response.get_data(as_text=True)
         self.assertIn('Earlier bank',html)
         self.assertIn('Unavailable',html)
+
+    def transfer_pair(self):
+        saved=self.stage(b'Date,Amount,Payment,Reference\n2026-04-10,-100,Own account,transfer\n')
+        self.confirm(saved)
+        other=accounts.save(str(uuid4()),dict(category=str(uuid4()),name='Receiving bank',bank_name='CSV',currency='GBP',opened_on='2026-04-06'))
+        staged=imports.upload(other,b'Date,Amount,Payment,Reference\n2026-04-11,100,Own account,transfer\n')
+        db.session.flush()
+        staged=imports.map_rows(staged,self.mapping)
+        db.session.commit()
+        self.confirm(staged)
+        pairs,_=review.suggestions(self.id)
+        self.assertEqual(len(pairs),1)
+        pair=pairs[0]
+        return saved,pair,dict(left=pair['left_id'],right=pair['right_id'],left_version=pair['left_version'],right_version=pair['right_version'],confirm='1')
+
+    def test_transfer_pair_reviews_both_without_creating_income_and_replay_stale(self):
+        _,pair,form=self.transfer_pair()
+        review.match(self.id,form)
+        db.session.commit()
+        for tx in (pair['left'],pair['right']):
+            db.session.refresh(tx)
+            self.assertEqual(tx.classification.type,'internal_transfer')
+            self.assertIsNotNone(tx.confirmed_at)
+            self.assertIsNone(tx.income)
+        self.assertEqual(review.suggestions(self.id)[0],[])
+        change=db.session.scalar(db.select(StatementChange))
+        self.assertEqual(len(change.before),2)
+        self.assertEqual(change.before[0]['classification']['type'],'other')
+        self.assertEqual(change.after[0]['classification']['type'],'internal_transfer')
+        from routes.statement_accounts import recent_changes
+        self.assertEqual(recent_changes(pair['right'].account_uid,transfers_only=True)[0].id,change.id)
+        from services.tax.records import tax_records
+        from services.tax.rules import reviewed_rules
+        figures=tax_records(reviewed_rules(),payments=[pair['left'],pair['right']])
+        for name in ('credits','deductions','received','ni_paid'):
+            self.assertEqual(figures[name],{},f'Transfer pair must not create {name}.')
+        with self.assertRaises(Conflict):
+            review.match(self.id,form)
+        db.session.rollback()
+        self.assertEqual(db.session.scalar(db.select(db.func.count()).select_from(StatementChange)),1)
+
+    def test_transfer_guard_currency_amount_dates_confirmation_and_manual_choice(self):
+        _,pair,form=self.transfer_pair()
+        with self.assertRaises(ValueError):
+            review.match(self.id,dict(form,confirm=''))
+        db.session.rollback()
+        right=review.transaction(pair['right_id'])
+        for field,value in [('currency','EUR'),('amount_minor',10001),('transaction_time',right.transaction_time+timedelta(days=5))]:
+            with self.subTest(field=field):
+                tx=review.transaction(pair['right_id'])
+                setattr(tx,field,value)
+                db.session.commit()
+                self.assertEqual(review.suggestions(self.id)[0],[])
+                with self.assertRaises(ValueError):
+                    review.match(self.id,dict(form,right_version=review.version(tx)))
+                db.session.rollback()
+                setattr(tx,field,dict(currency='GBP',amount_minor=10000,transaction_time=datetime(2026,4,10,23,tzinfo=timezone.utc))[field])
+                db.session.commit()
+        right=review.transaction(pair['right_id'])
+        save_classification(right,'income','User chose income')
+        db.session.commit()
+        self.assertEqual(review.suggestions(self.id)[0],[])
+        with self.assertRaises(ValueError):
+            review.match(self.id,dict(form,right_version=review.version(right)))
+
+    def correction_form(self,saved):
+        item=review.imported_rows(saved.id)[0]
+        return item['tx'],dict(transaction=item['identity'],version=item['version'],action='edit',
+            date='2026-04-12',amount='125.25',direction='IN',payer='Corrected payer',reference='Corrected reference',reason='Checked statement',confirm='1')
+
+    def test_correction_retains_original_audit_and_invalidates_review(self):
+        saved=self.confirm(self.stage())
+        original=list(saved.rows)
+        tx,form=self.correction_form(saved)
+        tx.confirmed_at=datetime.now(timezone.utc)
+        db.session.commit()
+        with self.assertRaises(Conflict):
+            review.correct(saved,form)
+        db.session.rollback()
+        form['version']=review.version(tx)
+        review.correct(saved,form)
+        db.session.commit()
+        self.assertEqual(tx.amount_minor,12525)
+        self.assertIsNone(tx.confirmed_at)
+        self.assertEqual(saved.rows,original)
+        history=db.session.scalar(db.select(StatementChange))
+        self.assertEqual(history.before[0]['amount_minor'],10050)
+        self.assertEqual(history.after[0]['amount_minor'],12525)
+        with self.assertRaises(Conflict):
+            review.correct(saved,form)
+        db.session.rollback()
+        self.assertEqual(self.count(),2)
+
+    def test_exclude_restore_reversible_and_linked_evidence_protected(self):
+        saved=self.confirm(self.stage())
+        tx,form=self.correction_form(saved)
+        review.correct(saved,dict(form,action='exclude'))
+        db.session.commit()
+        self.assertEqual(tx.status,'REVERSED')
+        self.assertIsNotNone(tx.confirmed_at)
+        self.assertEqual(tx.amount_minor,10050)
+        self.assertEqual(accounts.coverage_view(accounts.account(self.id),db.session)['unreviewed'],1)
+        review.correct(saved,dict(form,action='restore',version=review.version(tx)))
+        db.session.commit()
+        self.assertEqual(tx.status,'SETTLED')
+        self.assertIsNone(tx.confirmed_at)
+        from models import TransactionIncome
+        tx.income=TransactionIncome(income_type='employment',tax_treatment='no_tax_deducted',gross_minor=10050,recorded_currency='GBP',needs_review=False)
+        db.session.commit()
+        with self.assertRaises(ValueError):
+            review.correct(saved,dict(form,version=review.version(tx)))
+        db.session.rollback()
+        self.assertEqual(tx.amount_minor,10050)
+        self.assertEqual(db.session.scalar(db.select(db.func.count()).select_from(StatementChange)),2)
+
+    def test_correction_rejects_foreign_rows_dates_bad_amounts_reason_and_no_confirm(self):
+        saved=self.confirm(self.stage())
+        tx,form=self.correction_form(saved)
+        for changes in (dict(date='2027-05-01'),dict(amount='-2'),dict(amount='1.234'),dict(reason=''),dict(confirm=''),dict(transaction='not/a/uuid')):
+            with self.subTest(changes=changes),self.assertRaises((ValueError,BadRequest)):
+                review.correct(saved,dict(form,**changes))
+            db.session.rollback()
+            self.assertEqual(review.transaction(form['transaction']).amount_minor,10050)
+        another=self.confirm(self.stage(b'Date,Amount,Payment,Reference\n2026-04-13,2,Other,other\n'))
+        _,foreign=self.correction_form(another)
+        with self.assertRaises(ValueError):
+            review.correct(saved,foreign)
+
+    def test_saved_mapping_exact_format_account_isolation_and_invalid_fallback(self):
+        saved=imports.upload(accounts.account(self.id),self.data)
+        db.session.flush()
+        saved=imports.map_rows(saved,dict(self.mapping,remember='1'))
+        db.session.commit()
+        self.assertEqual(db.session.scalar(db.select(db.func.count()).select_from(StatementMapping)),0)
+        self.confirm(saved)
+        self.assertEqual(db.session.scalar(db.select(db.func.count()).select_from(StatementMapping)),1)
+        fresh=imports.upload(accounts.account(self.id),self.data.replace(b'100.50',b'101.50'))
+        db.session.flush()
+        reused,found=imports.reuse_mapping(fresh)
+        self.assertTrue(found)
+        self.assertEqual(reused.status,'preview')
+        self.assertEqual(self.count(),2)
+        renamed=imports.upload(accounts.account(self.id),self.data.replace(b'Amount',b'Value'))
+        db.session.flush()
+        self.assertFalse(imports.reuse_mapping(renamed)[1])
+        invalid=imports.upload(accounts.account(self.id),self.data.replace(b'100.50',b'not-money'))
+        db.session.flush()
+        self.assertFalse(imports.reuse_mapping(invalid)[1])
+        self.assertEqual(invalid.status,'mapping')
+        self.assertEqual(invalid.headers[0],'Date')
+        other=accounts.save(str(uuid4()),dict(category=str(uuid4()),name='Other',bank_name='CSV',currency='GBP',opened_on='2026-04-06'))
+        separate=imports.upload(other,self.data)
+        db.session.flush()
+        self.assertFalse(imports.reuse_mapping(separate)[1])
+
+    def test_review_pages_csrf_bounds_owner_and_allowlisted_export(self):
+        saved,_,_=self.transfer_pair()
+        for path in (f'/dashboard/accounts/{self.id}/transfers',f'/dashboard/accounts/imports/{saved.id}/corrections'):
+            response=self.client.get(path)
+            self.assertEqual(response.status_code,200,response.get_data(as_text=True))
+            self.assertIn('no-store',response.headers['Cache-Control'])
+            self.assertEqual(self.client.post(path,data={}).status_code,400)
+            self.assertEqual(self.client.get(path,headers={'Authorization':'Bearer test-key'}).status_code,302)
+            from app import app
+            self.assertEqual(app.test_client().get(path).status_code,302)
+        correction=f'/dashboard/accounts/imports/{saved.id}/corrections'
+        for suffix in ('?page=0','?page=21','?page=1&page=2','?unknown=1'):
+            self.assertEqual(self.client.get(correction+suffix).status_code,400)
+        _,form=self.correction_form(saved)
+        review.correct(saved,form)
+        db.session.commit()
+        evidence=list(evidence_rows(db.session,'statement_changes',datetime(2026,4,6,tzinfo=timezone.utc),datetime(2027,4,6,tzinfo=timezone.utc),datetime.now(timezone.utc)))
+        self.assertEqual(len(evidence),1)
+        self.assertEqual(set(evidence[0]),set(FIELDS['statement_changes'].split()))
+        self.assertNotIn('raw_payload',str(evidence))
+
+    def test_bulk_exclusion_is_atomic_stale_guarded_and_preserves_rows(self):
+        saved=self.confirm(self.stage())
+        records=review.imported_rows(saved.id)
+        selected=[item['identity'] for item in records]
+        form=dict(selection_version=review.selection_version(records),reason='Duplicate statement records',confirm='1')
+        with self.assertRaises(ValueError):
+            review.bulk_exclude(saved,form,selected+[str(uuid4())],1)
+        db.session.rollback()
+        self.assertTrue(all(item['tx'].status=='SETTLED' for item in review.imported_rows(saved.id)))
+        review.bulk_exclude(saved,form,selected,1)
+        db.session.commit()
+        self.assertTrue(all(item['tx'].status=='REVERSED' for item in review.imported_rows(saved.id)))
+        self.assertEqual(self.count(),2)
+        self.assertEqual(len(saved.rows),2)
+        self.assertEqual(accounts.coverage_view(accounts.account(self.id),db.session)['unreviewed'],0)
+        change=db.session.scalar(db.select(StatementChange))
+        self.assertEqual(change.kind,'bulk-exclude')
+        self.assertEqual(len(change.before),2)
+        with self.assertRaises(Conflict):
+            review.bulk_exclude(saved,form,selected,1)
+        db.session.rollback()
+        tx,edit=self.correction_form(saved)
+        review.correct(saved,edit)
+        db.session.commit()
+        self.assertEqual(tx.status,'REVERSED','Editing excluded details must not restore the payment implicitly.')
+        large=self.confirm(self.stage(('Date,Amount,Payment,Reference\n'+''.join(
+            f'2026-04-13,{number}.01,Payment {number},reference\n' for number in range(1,61))).encode()))
+        self.assertEqual(len(review.imported_rows(large.id,1)),50)
+        self.assertEqual(len(review.imported_rows(large.id,2)),10)
+        first=review.imported_rows(large.id,1)
+        second=review.imported_rows(large.id,2)
+        with self.assertRaises(ValueError):
+            review.bulk_exclude(large,dict(form,selection_version=review.selection_version(first)),[second[0]['identity']],1)
+        db.session.rollback()
+
+    def test_invoice_allocations_even_inactive_block_correction_and_pairing(self):
+        from models import IncomeStream, Invoice, InvoicePayment
+        saved,pair,form=self.transfer_pair()
+        right=review.transaction(pair['right_id'])
+        stream=IncomeStream(id=str(uuid4()),name='Synthetic invoiced source',kind='self_employed')
+        db.session.add(stream)
+        db.session.flush()
+        invoice=Invoice(id=str(uuid4()),income_stream_id=stream.id,stream_name=stream.name,
+            client_name='Synthetic client',issue_date=datetime(2026,4,10).date(),due_date=datetime(2026,4,20).date(),currency='GBP',total_minor=10000)
+        db.session.add(invoice)
+        db.session.flush()
+        allocation=InvoicePayment(id=str(uuid4()),invoice_id=invoice.id,account_uid=right.account_uid,
+            category_uid=right.category_uid,feed_item_uid=right.feed_item_uid,cash_minor=10000,
+            payment_version='original-version',payment_label='Original receipt',active=False)
+        db.session.add(allocation)
+        db.session.commit()
+        self.assertEqual(review.suggestions(self.id)[0],[])
+        with self.assertRaises(ValueError):
+            review.match(self.id,dict(form,right_version=review.version(right)))
+        db.session.rollback()
+        # Protect original allocations even after the active allocation is removed.
+        provenance=db.session.scalar(db.select(StatementImportRow).where(StatementImportRow.feed_item_uid==right.feed_item_uid))
+        receipt_batch=db.session.get(StatementImport,provenance.batch_id)
+        _,correction=self.correction_form(receipt_batch)
+        with self.assertRaises(ValueError):
+            review.correct(receipt_batch,correction)
+        db.session.rollback()
+        self.assertEqual(db.session.get(InvoicePayment,allocation.id).payment_label,'Original receipt')
+        self.assertEqual(review.transaction(pair['right_id']).amount_minor,10000)
+
+    def test_excluded_mistaken_later_rows_do_not_block_account_closure(self):
+        saved=self.confirm(self.stage())
+        records=review.imported_rows(saved.id)
+        review.bulk_exclude(saved,dict(selection_version=review.selection_version(records),
+            reason='Imported into wrong account; retain evidence',confirm='1'),[item['identity'] for item in records],1)
+        db.session.add(CashBalance(account_uid=self.id,amount_minor=0,recorded_currency='GBP',revision=1,
+            observed_at=datetime.now(timezone.utc),recorded_at=datetime.now(timezone.utc)))
+        db.session.commit()
+        accounts.close(accounts.account(self.id),dict(closed_on='2026-04-06',confirm='1'))
+        db.session.commit()
+        self.assertEqual(self.count(),2)
+        self.assertEqual(accounts.account(self.id).closed_on.isoformat(),'2026-04-06')

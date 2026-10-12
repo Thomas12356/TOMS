@@ -74,7 +74,8 @@ def close(row, form):
         raise ValueError('Check this account’s zero balance again after the recorded payment or correction.')
     end = datetime.combine(closed+timedelta(days=1),time.min,LOCAL_TIME)
     if db.session.scalar(db.select(Transaction.feed_item_uid).where(
-            Transaction.account_uid==row.account_uid,Transaction.transaction_time>=end).limit(1)):
+            Transaction.account_uid==row.account_uid,Transaction.transaction_time>=end,
+            Transaction.status!='REVERSED').limit(1)):
         raise ValueError('The closure date precedes saved transactions. Check the statement first.')
     if (closed>today or (opened and closed<opened) or form.get('confirm')!='1' or
             balance is None or balance.amount_minor!=0 or balance.recorded_currency!=row.currency or

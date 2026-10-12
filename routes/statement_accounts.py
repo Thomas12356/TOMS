@@ -3,12 +3,12 @@ from uuid import uuid4
 from datetime import datetime, timezone
 import csv
 import io
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest, Conflict
-from models import Account, StatementImport
-from services import statement_accounts as accounts, statement_imports as imports
+from models import Account, StatementImport, StatementMapping, StatementChange
+from services import statement_accounts as accounts, statement_imports as imports, statement_review as review
 from services.database.connection import db
 from services.error_logging import log_failure
 from services.web.sessions import require_dashboard_login
@@ -40,7 +40,16 @@ def check(fields):
 
 def page(mode,**values):
     return render_template('statement_accounts.html',mode=mode,current_user=current_user,
-        values=request.form,format_amount=format_amount,local_time=LOCAL_TIME,**values)
+        values=values.pop('form_values',request.form),format_amount=format_amount,local_time=LOCAL_TIME,
+        history_date=lambda value:datetime.fromisoformat(value).astimezone(LOCAL_TIME).strftime('%d %b %Y'),**values)
+
+
+def recent_changes(identity, *, transfers_only=False):
+    query=db.select(StatementChange).where(db.or_(StatementChange.account_uid==identity,
+        StatementChange.after.contains([{'account_uid':identity}])))
+    if transfers_only:
+        query=query.where(StatementChange.kind=='transfer')
+    return db.session.scalars(query.order_by(StatementChange.created_at.desc()).limit(20)).all()
 
 
 @statement_accounts.errorhandler(SQLAlchemyError)
@@ -98,6 +107,8 @@ def detail(identity):
                 row.closed_on,row.cash_active=None,True
                 row.revision+=1
                 accounts.invalidate_history(row.account_uid)
+            elif action=='formats' and request.form.get('confirm')=='1':
+                db.session.execute(db.delete(StatementMapping).where(StatementMapping.account_uid==row.account_uid))
             else:
                 raise BadRequest('Choose an account action.')
             record_action('account.'+action,row.account_uid)
@@ -125,14 +136,17 @@ def upload(identity):
     error,status=None,200
     if request.method=='POST':
         try:
-            check({'encoding','delimiter','version'})
+            check({'encoding','delimiter','version','use_saved'})
             if set(request.files)!={'statement'} or len(request.files.getlist('statement'))!=1:
                 raise ValueError('Choose one CSV statement.')
             row=accounts.account(identity,request.form.get('version',''))
             saved=imports.upload(row,request.files['statement'].stream.read(imports.MAX_BYTES+1),
                 request.form.get('encoding',''),request.form.get('delimiter',''))
+            db.session.flush()
+            if request.form.get('use_saved')=='1':
+                saved,_=imports.reuse_mapping(saved)
             db.session.commit()
-            return redirect(url_for('.mapping',identity=saved.id),code=303)
+            return redirect(url_for('.mapping' if saved.status=='mapping' else '.preview',identity=saved.id),code=303)
         except (ValueError,BadRequest,Conflict) as failure:
             db.session.rollback()
             error=failure.description if isinstance(failure,(BadRequest,Conflict)) else str(failure)
@@ -184,7 +198,7 @@ def mapping(identity):
     error,status=None,200
     if request.method=='POST':
         try:
-            check(imports.MAP_FIELDS)
+            check(imports.MAP_FIELDS|{'remember'})
             saved=imports.map_rows(saved,request.form)
             db.session.commit()
             return redirect(url_for('.preview',identity=saved.id),code=303)
@@ -193,7 +207,8 @@ def mapping(identity):
             saved=imports.batch(identity)
             error=failure.description if isinstance(failure,(BadRequest,Conflict)) else str(failure)
             status=409 if isinstance(failure,Conflict) else 400
-    return page('mapping',saved=saved,row=accounts.account(saved.account_uid),error=error),status
+    return page('mapping',saved=saved,row=accounts.account(saved.account_uid),error=error,
+        form_values=request.form if request.method=='POST' else imports.mapping_defaults(saved.headers)),status
 
 
 @statement_accounts.route('/imports/<uuid:identity>/preview',methods=['GET','POST'])
@@ -219,6 +234,66 @@ def preview(identity):
             status=409 if isinstance(failure,Conflict) else 400
     rows,fingerprint=imports.preview(saved) if saved.status=='preview' else ([],None)
     return page('preview',saved=saved,row=accounts.account(saved.account_uid),rows=rows,fingerprint=fingerprint,error=error),status
+
+
+@statement_accounts.route('/<uuid:identity>/transfers',methods=['GET','POST'])
+def transfers(identity):
+    query_values(set())
+    row=accounts.account(identity)
+    error,status=None,200
+    if request.method=='POST':
+        try:
+            check({'left','right','left_version','right_version','confirm'})
+            review.match(row.account_uid,request.form)
+            record_action('statement.transfer',row.account_uid)
+            db.session.commit()
+            flash('Transfer confirmed. Both payments are reviewed as an own-account transfer.','statement')
+            return redirect(url_for('.transfers',identity=identity),code=303)
+        except (ValueError,BadRequest,Conflict) as failure:
+            db.session.rollback()
+            error=failure.description if isinstance(failure,(BadRequest,Conflict)) else str(failure)
+            status=409 if isinstance(failure,Conflict) else 400
+    pairs,truncated=review.suggestions(row.account_uid)
+    return page('transfers',row=row,pairs=pairs,truncated=truncated,
+        changes=recent_changes(row.account_uid,transfers_only=True),error=error),status
+
+
+@statement_accounts.route('/imports/<uuid:identity>/corrections',methods=['GET','POST'])
+def corrections(identity):
+    query=query_values({'page'})
+    number=query.get('page','1')
+    if not number.isdigit() or not 1<=int(number)<=20:
+        raise BadRequest('Choose a correction page from 1 through 20.')
+    number=int(number)
+    saved=imports.batch(identity)
+    if saved.status!='imported':
+        raise BadRequest('Import the statement before correcting its saved records.')
+    error,status=None,200
+    if request.method=='POST':
+        try:
+            # The validated page is a read/navigation context, never a write scope.
+            bulk=request.form.get('action')=='bulk-exclude'
+            allowed={'csrf_token','action','selected','selection_version','reason','confirm'} if bulk else {'csrf_token','transaction','version','action','date','amount','direction','payer','reference','reason','confirm'}
+            if set(request.form)-allowed or any(len(request.form.getlist(key))!=1 for key in request.form if key!='selected'):
+                raise BadRequest('Supply each correction field once.')
+            if bulk:
+                review.bulk_exclude(saved,request.form,request.form.getlist('selected'),number)
+            else:
+                review.correct(saved,request.form)
+            record_action('statement.correct',saved.id)
+            db.session.commit()
+            flash('Correction saved with its history. Changed or restored settled payments need review again.','statement')
+            return redirect(url_for('.corrections',identity=identity,page=number),code=303)
+        except (ValueError,BadRequest,Conflict) as failure:
+            db.session.rollback()
+            error=failure.description if isinstance(failure,(BadRequest,Conflict)) else str(failure)
+            status=409 if isinstance(failure,Conflict) else 400
+    changes=recent_changes(saved.account_uid)
+    from services.transactions.income_form import display_amount
+    records=review.imported_rows(saved.id,number)
+    return page('corrections',saved=saved,row=accounts.account(saved.account_uid),
+        records=records,selection_version=review.selection_version(records),changes=changes,display_amount=display_amount,
+        page_number=number,page_count=(saved.row_count+49)//50,error=error),status
 
 
 @statement_accounts.post('/imports/<uuid:identity>/discard')

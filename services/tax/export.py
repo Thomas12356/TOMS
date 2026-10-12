@@ -23,7 +23,7 @@ from services.tax.mileage_rules import reviewed_rules as mileage_rules
 from services.transactions.classification import classification_details
 from services.transactions.review import REVIEW_FIELDS
 from tempfile import TemporaryFile
-from models import Account, AccountHistory, StatementImport, StatementImportRow
+from models import Account, AccountHistory, StatementImport, StatementImportRow, StatementChange
 
 
 @contextmanager
@@ -64,6 +64,7 @@ FIELDS = {
     'account_history': 'account_uid tax_year from_on through_on complete revision confirmed_at',
     'statement_imports': 'id account_uid status row_count imported_count skipped_count created_at imported_at',
     'statement_import_rows': 'batch_id row_number account_uid category_uid feed_item_uid decision',
+    'statement_changes': 'id account_uid kind before after reason created_at',
     'streams': 'id name kind income_mode archived expected_gross_minor expected_gross_period expected_gross_currency unpaid_holiday_weeks unpaid_holiday_unit forecast_tax_year forecast_starts_on forecast_ends_on mileage_pool_id',
     'work': 'id income_stream_id starts_at ends_at unpaid_break_minutes payment_mode is_overtime hourly_rate_minor gross_minor currency notes',
     'transactions': 'account_uid category_uid feed_item_uid amount_minor currency direction status transaction_time confirmed_at source counterparty_name reference',
@@ -99,9 +100,9 @@ def evidence_rows(session, name, first, end, now):
         Transaction.expense.has(db.and_(ExpenseDeduction.recorded_time >= first, ExpenseDeduction.recorded_time < end)), linked)
     quiet_invoice = (lazyload(Invoice.items), lazyload(Invoice.payments), lazyload(Invoice.deliveries))
     payment_columns = tuple(dict.fromkeys((*FIELDS['transactions'].split(), *REVIEW_FIELDS)))
-    if name in ('accounts','account_history','statement_imports','statement_import_rows'):
+    if name in ('accounts','account_history','statement_imports','statement_import_rows','statement_changes'):
         model=dict(accounts=Account,account_history=AccountHistory,statement_imports=StatementImport,
-            statement_import_rows=StatementImportRow)[name]
+            statement_import_rows=StatementImportRow,statement_changes=StatementChange)[name]
         query=db.select(model).options(load_only(*(getattr(model,field) for field in FIELDS[name].split())))
         if name=='statement_imports':
             query=query.where(StatementImport.status=='imported')
