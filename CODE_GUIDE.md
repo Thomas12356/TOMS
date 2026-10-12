@@ -5,6 +5,18 @@ Starling importer before working on categorisation or income forms.
 
 ## Private receipt and document evidence
 
+`services/evidence_review.py` owns explicit additional-proof requests, batched
+active-document counts and SQL predicates for the deduction history filter. Empty
+attachments alone never create a reminder: a claimed expense needs a saved reason,
+and mileage needs an explicit extra-proof request beyond its existing log. Tracking
+expenses are excluded. Requests use owner/CSRF protection, parent locks and existing
+record versions; clearing a request covers proof already held elsewhere. Upload or
+archive changes the reminder via active counts, without confirming legal sufficiency
+or changing financial calculations. Filters run before pagination; annual mileage
+relief still uses all journeys. Migration 034 adds nullable reasons to real/sample
+expense and mileage records without resetting sample edits. Export allowlists include
+these reasons as ordinary formula-protected financial metadata.
+
 `services/evidence.py` owns bounded, deduplicated original storage and versioned
 archive/restore links to outgoing payments or mileage. It never changes deduction
 amounts or eligibility. `services/evidence_media.py` runs as a fixed subprocess with

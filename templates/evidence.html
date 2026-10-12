@@ -11,6 +11,15 @@
 {% for message in get_flashed_messages(category_filter=['evidence']) %}<p class="message" role="status">{{ message }}</p>{% endfor %}
 {% if kind %}<h2>{{ label }}</h2>
 {% if kind == 'transaction' %}<p><a href="{{ url_for('deductions.page', expense=key) }}">Review this expense</a></p>{% endif %}
+<p>{{ evidence_count }} active supporting {{ 'document' if evidence_count == 1 else 'documents' }}.</p>
+{% if missing_evidence %}<p class="message">Missing evidence · {{ evidence_record.evidence_needed_reason }}</p>{% elif evidence_record and evidence_record.evidence_needed_reason and evidence_count %}<p>Additional proof requested: {{ evidence_record.evidence_needed_reason }}. Check that the attached document answers this request.</p>{% endif %}
+{% if evidence_record %}<details class="evidence-request"><summary>Additional evidence needed?</summary>
+<p>A missing attachment is not automatically missing evidence. Bank records and business details may support an expense; a saved journey log supports mileage. Only request an extra document when those records do not provide the proof you need. Clear the request if existing records or evidence held elsewhere already provide that proof. Documents for tracking-only expenses are optional.</p>
+<form class="login-form evidence-upload" method="post" action="{{ url_for('evidence.requirement', kind=kind, key=key) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="version" value="{{ evidence_version }}">
+<label for="evidence-reason">Why additional proof is needed · leave blank to clear the request</label><textarea id="evidence-reason" name="reason" maxlength="1000">{{ evidence_record.evidence_needed_reason or '' }}</textarea>
+<button>Save evidence request</button></form>
+<p><a href="https://www.gov.uk/self-employed-records/what-records-to-keep" target="_blank" rel="noopener noreferrer">HMRC record-keeping guidance</a></p></details>{% endif %}
 <form method="post" enctype="multipart/form-data" class="login-form evidence-upload">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 <label for="evidence-file">Receipt, invoice or supporting document</label>

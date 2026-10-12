@@ -8,6 +8,7 @@ from werkzeug.exceptions import BadRequest, Conflict, RequestEntityTooLarge
 from models import EvidenceDocument
 from routes.helpers import query_values
 from services import evidence as storage
+from services import evidence_review
 from services.database.connection import db
 from services.error_logging import log_failure
 from services.web.sessions import require_dashboard_login
@@ -95,8 +96,28 @@ def attachments(kind, key):
             db.session.rollback()
             error = failure.description if isinstance(failure, BadRequest) else str(failure)
             status = 400
-    return view(documents=storage.documents(kind, fields), kind=kind, key=key, label=label,
+    rows = storage.documents(kind, fields)
+    record, version = evidence_review.request_record(kind, key)
+    count = sum(doc.active for doc in rows)
+    return view(documents=rows, kind=kind, key=key, label=label, evidence_record=record,
+        evidence_version=version, evidence_count=count,
+        missing_evidence=evidence_review.missing(record, count) if record else False,
         error=error, record_key=record_key), status
+
+
+@evidence.post('/attach/<kind>/<key>/requirement')
+def requirement(kind, key):
+    try:
+        check({'version', 'reason'})
+        if request.files:
+            raise BadRequest('Unexpected file.')
+        evidence_review.save_request(kind, key, request.form)
+        db.session.commit()
+        flash('Evidence request updated.', 'evidence')
+        return redirect(url_for('.attachments', kind=kind, key=key), code=303)
+    except (ValueError, BadRequest, Conflict) as failure:
+        db.session.rollback()
+        return view(documents=[], error=failure.description if isinstance(failure, (BadRequest, Conflict)) else str(failure)), 409 if isinstance(failure, Conflict) else 400
 
 
 @evidence.post('/<uuid:identity>/archive')

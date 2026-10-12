@@ -17,6 +17,7 @@ from services.web.sessions import require_dashboard_login
 from services.web.test_data import activate_test_data
 from services.tax.deduction_forms import expense_fields, expense_version, mileage_fields, mileage_version, payment_key
 from services.tax.records import expense_current
+from services import evidence_review
 from services.tax.mileage import LOCATIONS, VEHICLES, mileage_allowances
 from services.tax.mileage_rules import cached_status, reviewed_rules
 from services.transactions.classification import classification_details
@@ -46,9 +47,13 @@ def page():
         return redirect(url_for('login.sign_in'))
     from services.tax.rules import start_rule_check
     start_rule_check(current_app.instance_path)
-    options = query_values({'expense', 'type', 'shift', 'return_to', 'reuse', 'source'} | FILTERS | HISTORY_FIELDS,
-                           empty_ignored={'q', 'from', 'to', 'history_source', 'history_from', 'history_to'})
+    options = query_values({'expense', 'type', 'shift', 'return_to', 'reuse', 'source', 'history_evidence'} | FILTERS | HISTORY_FIELDS,
+                           empty_ignored={'q', 'from', 'to', 'history_source', 'history_from', 'history_to', 'history_evidence'})
     history = history_options(options)
+    if options.get('history_evidence'):
+        if options['history_evidence'] != 'missing':
+            raise BadRequest('Choose All evidence or Missing evidence.')
+        history['history_evidence'] = 'missing'
     return_url = source_return(options)
     source_context = {'return_to': 'source', 'source': options['source']} if return_url else {}
     if options.get('return_to') == 'ledger':
@@ -172,6 +177,9 @@ def page():
     expense_query = filter_history(db.select(ExpenseDeduction).options(selectinload(ExpenseDeduction.transaction)),
                                   ExpenseDeduction, ExpenseDeduction.recorded_time, history, timestamp=True)
     journey_query = filter_history(db.select(MileageEntry), MileageEntry, MileageEntry.journey_date, history)
+    if history.get('history_evidence') == 'missing':
+        expense_query = expense_query.where(evidence_review.missing_condition(ExpenseDeduction))
+        journey_query = journey_query.where(evidence_review.missing_condition(MileageEntry))
     expense_page = db.paginate(expense_query.order_by(ExpenseDeduction.recorded_time.desc(), ExpenseDeduction.feed_item_uid,
                                                     ExpenseDeduction.account_uid, ExpenseDeduction.category_uid),
                                page=int(history.get('history_page', '1')), per_page=20, error_out=False)
@@ -222,6 +230,8 @@ def page():
         current_user=current_user, return_url=return_url, reused=bool(options.get('reuse') and not error),
         return_context=ledger_options(options) if options.get('return_to') == 'ledger' else {},
         source_context=source_context, history=history, expense_page=expense_page, journey_page=journey_page,
+        evidence_filter=True, evidence_counts=evidence_review.counts(expenses, journeys, selected),
+        missing_evidence=evidence_review.missing,
         history_pages=max(expense_page.pages, journey_page.pages),
         history_url=lambda number: url_for('deductions.page', **source_context, **{**history, 'history_page': number}, _anchor='entry-history')), 400 if error else 200
 

@@ -1,5 +1,17 @@
 # Security checks — 6 October 2026
 
+## Explicit evidence needs — 12 October 2026
+
+`test_evidence_review.py` covers no blanket receipt requirement for claimed costs,
+tracking or mileage, explicit reasons, active counts, upload/archive/restore/clear,
+stale writes, CSRF, strict fields/filter values, source/date/pagination preservation,
+export metadata and unchanged tax/allowance amounts. The evidence browser script
+also exercises the missing filter and request flow at 320/390/768/1280px, including
+JavaScript disabled at 390px. Tracking-only sample expenses first leave the filter
+empty; only an explicitly requested claimed expense is flagged. Files and requests
+stay in the sample schema. Migration 034 is additive with a pre-change private backup;
+optional database restore tests remain excluded. No live bank traffic.
+
 ## Private supporting documents — 12 October 2026
 
 `test_evidence.py` checks owner/API separation, CSRF, strict multipart fields,

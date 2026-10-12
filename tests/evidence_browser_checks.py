@@ -42,11 +42,34 @@ with sync_playwright() as playwright:
                     locator.click()
                 layout()
             page.goto(origin+'/dashboard/deductions')
+            assert page.locator('[data-evidence-status]').count() == 0
+            page.locator('#history-evidence').select_option('missing')
+            click(page.get_by_role('button', name='Filter history', exact=True))
+            assert '0 expenses / 0 journeys' in page.locator('main').inner_text()
+            click(page.get_by_role('link', name='Clear history filters', exact=True))
+            click(page.get_by_role('link', name='Edit expense', exact=True).first)
+            page.locator('#expense-tax-status').select_option('deduction')
+            page.locator('#expense-eligibility [name=eligible]').check()
+            click(page.get_by_role('button', name='Save expense', exact=True))
+            click(page.get_by_role('link', name='Supporting documents', exact=True).first)
+            attachment_url = page.url
+            page.get_by_text('Additional evidence needed?', exact=True).click()
+            page.locator('#evidence-reason').fill('Itemised invoice needed for the business purchase')
+            click(page.get_by_role('button', name='Save evidence request', exact=True))
+            assert 'Missing evidence · Itemised invoice' in page.locator('main').inner_text()
+            assert fixture.live_value('SELECT count(*) FROM SCHEMA.expense_deductions') == 0
+            page.goto(origin+'/dashboard/deductions?history_evidence=missing')
+            layout()
+            assert '1 expenses / 0 journeys' in page.locator('main').inner_text()
+            assert page.locator('[data-evidence-status]').count() == 1
+            if width == 390:
+                page.screenshot(path='/tmp/toms-missing-evidence-mobile.png', full_page=True)
             click(page.get_by_role('link', name='Supporting documents', exact=True).first)
             page.locator('#evidence-file').set_input_files({'name': 'synthetic-receipt.png', 'mimeType': 'image/png', 'buffer': buffer.getvalue()})
             page.locator('#evidence-notes').fill('Synthetic receipt <example>')
             click(page.get_by_role('button', name='Attach document', exact=True))
             assert 'Document attached.' in page.locator('main').inner_text()
+            assert 'Missing evidence ·' not in page.locator('main').inner_text()
             page.locator('img.evidence-preview').wait_for(state='visible')
             assert page.locator('img.evidence-preview').evaluate('image => image.complete && image.naturalWidth > 0')
             with page.expect_download() as downloaded:
@@ -59,10 +82,19 @@ with sync_playwright() as playwright:
             page.locator('[name=confirm]').check()
             click(page.get_by_role('button', name='Archive', exact=True))
             assert 'Archived' in page.locator('main').inner_text()
+            assert 'Missing evidence ·' in page.locator('main').inner_text()
             page.get_by_text('Restore document', exact=True).click()
             page.locator('[name=confirm]').check()
             click(page.get_by_role('button', name='Restore', exact=True))
             assert 'Archived' not in page.locator('main').inner_text()
+            assert 'Missing evidence ·' not in page.locator('main').inner_text()
+            page.goto(origin+'/dashboard/deductions?history_evidence=missing')
+            layout()
+            assert '0 expenses / 0 journeys' in page.locator('main').inner_text()
+            page.goto(attachment_url)
+            page.get_by_text('Additional evidence needed?', exact=True).click()
+            page.locator('#evidence-reason').fill('')
+            click(page.get_by_role('button', name='Save evidence request', exact=True))
             if width == 390:
                 page.screenshot(path='/tmp/toms-evidence-mobile.png', full_page=True)
             page.goto(origin+'/dashboard/tax-export')
@@ -77,7 +109,7 @@ with sync_playwright() as playwright:
             assert not errors, errors
             fixture.bank.assert_not_called()
             page.close()
-            print(f'PASS {width}px: evidence upload, duplicate detection, preview, download, archive/restore and ZIP')
+            print(f'PASS {width}px: explicit evidence needs/filter/counts, upload, duplicate detection, preview, download, archive/restore and ZIP')
         finally:
             fixture.doCleanups()
     browser.close()

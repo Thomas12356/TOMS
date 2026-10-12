@@ -462,6 +462,7 @@ class ExpenseDeduction(BaseModel):
         db.CheckConstraint("char_length(trim(purpose)) BETWEEN 1 AND 1000"),
         db.CheckConstraint("category IN ('general','vehicle_running','parking_tolls')"),
         db.CheckConstraint("char_length(vehicle_key) <= 40 AND (category <> 'vehicle_running' OR char_length(trim(vehicle_key)) > 0)"),
+        db.CheckConstraint('evidence_needed_reason IS NULL OR char_length(trim(evidence_needed_reason)) BETWEEN 1 AND 1000'),
         {'schema': 'toms'},
     )
     account_uid = db.Column(db.Uuid(as_uuid=False), primary_key=True)
@@ -477,6 +478,7 @@ class ExpenseDeduction(BaseModel):
     recorded_amount_minor = db.Column(db.BigInteger, nullable=False)
     recorded_currency = db.Column(db.Text, nullable=False)
     recorded_time = db.Column(db.DateTime(timezone=True), nullable=False)
+    evidence_needed_reason = db.Column(db.Text)
     transaction = db.relationship('Transaction', back_populates='expense')
 
 
@@ -493,6 +495,7 @@ class MileageEntry(BaseModel):
         db.CheckConstraint("char_length(trim(purpose)) BETWEEN 1 AND 1000"),
         db.CheckConstraint("char_length(trim(start_postcode)) BETWEEN 1 AND 12 AND char_length(trim(end_postcode)) BETWEEN 1 AND 12"),
         db.CheckConstraint('reimbursed_minor >= 0'),
+        db.CheckConstraint('evidence_needed_reason IS NULL OR char_length(trim(evidence_needed_reason)) BETWEEN 1 AND 1000'),
         {'schema': 'toms'},
     )
     id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
@@ -508,6 +511,7 @@ class MileageEntry(BaseModel):
     start_postcode = db.Column(db.Text, nullable=False)
     end_postcode = db.Column(db.Text, nullable=False)
     reimbursed_minor = db.Column(db.BigInteger, nullable=False, server_default='0')
+    evidence_needed_reason = db.Column(db.Text)
 
 
 class IncomeShift(BaseModel):

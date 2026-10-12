@@ -3,6 +3,7 @@
 {% if streams is defined %}<label for="history-source">Income source</label><select id="history-source" name="history_source"><option value="">All sources</option>{% for source in streams %}<option value="{{ source.id }}"{{ ' selected' if history.get('history_source') == source.id else '' }}>{{ source.name }}</option>{% endfor %}</select>{% endif %}
 <label for="history-from">From (London date)</label><input id="history-from" type="date" name="history_from" value="{{ history.get('history_from', '') }}">
 <label for="history-to">To (London date)</label><input id="history-to" type="date" name="history_to" value="{{ history.get('history_to', '') }}">
+{% if evidence_filter is defined %}<label for="history-evidence">Supporting evidence</label><select id="history-evidence" name="history_evidence"><option value="">All evidence</option><option value="missing"{{ ' selected' if history.get('history_evidence') == 'missing' else '' }}>Missing evidence</option></select>{% endif %}
 <button type="submit">Filter history</button>
 <a href="{{ history_url(1).split('?')[0] }}{% if source_context %}?return_to=source&amp;source={{ source_context.source }}{% endif %}#entry-history">Clear history filters</a>
 </form>

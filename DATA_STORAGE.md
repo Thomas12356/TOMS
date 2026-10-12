@@ -7,6 +7,12 @@ backup nor restore imports the web application, starts jobs or calls Starling.
 
 ## What is stored where?
 
+Migration 034 adds nullable `evidence_needed_reason` fields to expense and mileage
+records in real/sample schemas. Existing records have no additional-document request.
+Reasons are limited to 1,000 characters, included in private backups and allowlisted
+tax exports, and can be cleared when proof is already available. A pre-change private
+backup was taken. Existing samples, files and financial amounts are preserved.
+
 Migration 033 adds owner-only supporting files in `evidence_assets` and links in
 `evidence_documents`, in both real and sample schemas. Originals are stored as
 PostgreSQL BYTEA, deduplicated by SHA-256 within each schema; no uploads are placed

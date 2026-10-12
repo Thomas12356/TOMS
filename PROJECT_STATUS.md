@@ -9,7 +9,44 @@ details out of public handoffs.
 Updated: 2026-10-12. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
-## Latest delivery — private expense and deduction evidence
+## Latest delivery — evidence reminders only when additional proof is needed
+
+Implemented on `codex/evidence-needed-review`, following the requirement to avoid
+blanket missing-receipt warnings. Expense and mileage history now shows active
+supporting-document counts and an optional Missing evidence filter. Zero attached
+files is neutral: an expense only enters the filter when it is claimed for tax,
+has an explicit additional-proof request with a reason, and has no active document.
+Mileage requires an explicit extra-proof request beyond its saved journey log.
+Tracking-only expenses stay out of the filter. No record is marked complete or
+legally sufficient merely because a file exists.
+
+The supporting-document page includes a collapsed additional-evidence request
+form. Clearing the reason covers existing records or proof held elsewhere. Adding
+a document removes the missing warning; archiving the last active document brings
+it back while the request remains. Requests use owner-only CSRF-protected writes,
+parent/advisory locks, strict fields, 1,000-character limits and current record
+versions. They do not change amounts, tax eligibility or financial calculations.
+Counts use bounded batch queries without loading file blobs. Missing predicates
+run before history pagination and preserve source/date context; annual mileage
+calculations continue to use all saved journeys.
+
+Migration 034 adds nullable request reasons to real/sample expense and mileage
+records, defaulting existing records to no request. A private pre-change backup
+was taken, the additive migration preserves edited samples, and its rerun reports
+up to date. Tax-export allowlists include the reasons with CSV formula protection.
+HMRC record-keeping guidance supports retaining several forms of proof, including
+bank statements, rather than treating every absent upload as a missing receipt.
+
+Validation: 657 backend tests / 653 passes / four optional restore skips. Evidence,
+tax-export and usability-workflow browser scripts passed at mobile/desktop widths;
+the evidence flow includes 320/390/768/1280px and JavaScript disabled at 390px.
+The missing-filter mobile screenshot was inspected. Application and changed-test
+Ruff F, application Bandit, whitespace and outgoing secret-value checks passed.
+No live bank traffic, credential setup or database restoration was performed.
+Publishing and runtime revision should be verified against Git and service state;
+this delivery remains on its named feature branch, without a merge into main.
+
+## Previous delivery — private expense and deduction evidence
 
 Implemented on `codex/private-deduction-evidence`. Expenses and mileage now link to owner-only supporting
 documents without adding a top-level navigation item. Upload JPEG, PNG, WebP or
