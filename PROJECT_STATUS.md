@@ -3,7 +3,48 @@
 Updated: 2026-10-12. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
-## Latest delivery — reusable imports and guided statement review
+## Latest delivery — private expense and deduction evidence
+
+Implemented on `codex/private-deduction-evidence`. Expenses and mileage now link to owner-only supporting
+documents without adding a top-level navigation item. Upload JPEG, PNG, WebP or
+unencrypted static PDFs, with optional notes. Validated content determines the
+saved extension, originals stay byte-for-byte unchanged and private, and images
+receive correctly oriented JPEG previews with metadata removed.
+
+Originals live in deferred PostgreSQL BYTEA storage, deduplicated per real/sample
+schema by SHA-256. They are included with their links in private database backups;
+there are no public upload directories or external storage credentials. Uploads
+are limited to 10 MiB each, 30 megapixels / 100 PDF pages, 256 MiB per schema
+including previews, and 100 links per record including archived history. Parsing
+runs in a fixed subprocess with input, CPU, memory and timeout limits. This is
+validation, not antivirus or OCR. Scripted/embedded/interactive PDFs and unsupported
+file content are rejected with generic messages rather than parser diagnostics.
+
+Archiving requires confirmation and a current version, excludes the link from tax
+exports, and retains the original in private storage/backups. Unlinking an expense
+retains transaction evidence. Removing a journey leaves its files in the vault as
+orphaned evidence; restore does not reconstruct that journey. Attachments never
+infer tax eligibility, alter financial amounts or confirm a payment.
+
+Standard tax ZIPs add a formula-safe, allowlisted active document index. An explicit
+second download includes original supporting files once per hash, with named
+links in supporting_documents.html and the calculation report. Selection, indexes,
+originals and financial records share the existing read-only repeatable snapshot.
+Archived and orphaned journey files are excluded. Raw bank/API payloads and auth
+records remain excluded from database exports; uploaded originals can contain
+additional private content and are deliberately opt-in.
+
+Migration 033 adds the evidence tables. The additive tables preserve edited samples. Full final backend verification:
+652 tests / 648 passes / four optional restore skips. All 27 browser scripts
+passed; evidence and tax-export scripts were repeated after final refinements.
+Mobile evidence screenshots were inspected. Application and changed-test Ruff F,
+application Bandit, whitespace and outgoing secret-value checks passed. Fixed
+parser subprocess suppressions have narrow documented reasons. No live Starling
+traffic, credential setup or database restoration was performed.
+
+Implementation `bf5cf3f785751a55686d534884669ba65c04075d` was pushed to the named branch and its remote revision was verified. This delivery was not merged into main.
+
+## Previous delivery — reusable imports and guided statement review
 
 Implemented on `codex/statement-review-and-transfer-matching`, following approval
 of transfer matching, import corrections and saved CSV mappings.
