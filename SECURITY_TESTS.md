@@ -35,8 +35,10 @@ older intermittent assertion's cause.
 
 Migrations 030/031 were applied additively after a private pre-change backup;
 sample edits were preserved. No credential setup, live Starling verification or
-database restore was performed. Final full browser/static/publication evidence is
-recorded in `PROJECT_STATUS.md` on completion.
+database restore was performed. All 25 browser scripts passed in one final
+sequential run. Application/changed-test Ruff F, application Bandit, whitespace
+and outgoing secret checks passed; migration rerun reports up to date.
+Publication is recorded in `PROJECT_STATUS.md`.
 
 ## Reliable forms and cash review — 12 October 2026
 

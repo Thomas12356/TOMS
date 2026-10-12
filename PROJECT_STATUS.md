@@ -57,7 +57,9 @@ and changed-test Ruff F, application Bandit, whitespace and outgoing secret-valu
 checks passed. Migration rerun reports the database up to date. Earlier run
 failures and the stubbed-calculator gap are recorded in `SECURITY_TESTS.md`.
 No live bank verification, credential setup or backup restore was performed.
-Publication is recorded below after verification.
+Implementation `0916da648794d4478d1a2a8e9a28cc4926e82041` was committed and pushed
+to `codex/other-bank-csv-onboarding`; the remote revision matched. GitHub owner,
+SSH remote and public visibility matched the user's publication authorization.
 
 Next: real-format/user walkthrough feedback, then explicit cross-account transfer
 suggestions and a focused cutover view. Mapping presets and safer bulk correction
