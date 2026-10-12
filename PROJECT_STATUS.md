@@ -1,9 +1,34 @@
 # TOMS project status
 
-Updated: 2026-10-11. This is a handoff snapshot, not a live system report.
+Updated: 2026-10-12. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
-## Latest review — performance as history grows
+## Latest delivery — bounded financial evidence loading
+
+Completed requested steps 2–5 on `codex/bounded-financial-reads`: Home loading,
+incremental tax exports, reconciliation loading/shorter invoice choices, and
+review of the linear completed branch history for merging into main. See
+[PERFORMANCE_REVIEW.md](PERFORMANCE_REVIEW.md) for the final baseline comparison.
+
+Home shares compact streamed payment evidence and retains 20 priority invoice
+actions with complete counts/totals. Reconciliation retains 50 details and five
+recent invoice choices per receipt, with complete summaries and an all-invoices
+link. Exports use anonymous private temporary files and incremental JSON/CSV/ZIP
+generation; every failure and completed response closes files. Financial rules,
+cross-year evidence, stale versions, snapshots and currency separation remain.
+
+Validation: 574 backend tests, 570 passes / four optional backup restore skips;
+all 22 browser scripts; Ruff F, Bandit and git whitespace checks passed. Final
+10k/50k synthetic benchmark passed without working financial writes or bank
+requests. No credentials, schema migration or backup restore was performed.
+Publication is recorded below after completion.
+
+Outstanding: owner five-task walkthrough and optional backup restore verification
+with the previously excluded credential setup. Ledger ordering/index work should
+be evaluated separately using measured plans. Full summary calculations still
+read relevant evidence; this delivery bounds detail objects and archive memory.
+
+## Previous review — performance as history grows
 
 Measured on `codex/performance-review`; see [PERFORMANCE_REVIEW.md](PERFORMANCE_REVIEW.md)
 and the opt-in `tests/performance_review.py` harness. Application behaviour is

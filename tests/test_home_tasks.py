@@ -56,6 +56,27 @@ class HomeTaskTests(DeductionOwnerCase):
         self.session.flush()
         return saved_overview(self.session, task_filter=category, as_of=self.now)
 
+    def test_invoice_totals_and_priority_survive_batch_and_display_limits(self):
+        invoices = []
+        for index in range(225):
+            invoice = Invoice(id=str(uuid4()), income_stream_id=self.stream, stream_name='Business',
+                state='issued', number='BATCH-' + str(index), client_name='Client', currency='GBP',
+                total_minor=1000, issue_date=date(2026, 4, 12), due_date=date(2026, 4, 30), issued_at=self.now)
+            self.session.add(invoice)
+            invoices.append(invoice)
+        priority = invoices[-1]
+        priority.issue_date = priority.due_date = date(2026, 10, 10)
+        self.session.flush()
+        self.session.add(InvoicePayment(id=str(uuid4()), invoice_id=priority.id,
+            account_uid=self.account, category_uid=self.category, feed_item_uid=self.incoming,
+            cash_minor=100, tax_minor=0, ni_minor=0, payment_version='stale', payment_label='Changed receipt'))
+        result = self.result('invoices')
+        group = self.groups(result)['invoices']
+        self.assertEqual(group['count'], 225)
+        self.assertEqual(len(group['items']), 20)
+        self.assertEqual(group['items'][0]['key'], 'invoice:' + priority.id)
+        self.assertEqual(result['invoices']['GBP'], dict(count=225, outstanding=225000, review=1))
+
     def groups(self, result):
         return {group['key']: group for group in result['inbox']['categories']}
 

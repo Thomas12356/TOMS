@@ -713,3 +713,7 @@ statement link beside planning/account targets and in the exported report. It
 does not calculate payments on account or record HMRC payments. The profile form
 is linked from the estimate and adds no permanent top-level navigation item.
 Tests: `test_tax_profile.py` and `tax_profile_browser_checks.py`.
+
+## Bounded evidence reads
+
+Home (`services/web/overview.py`) shares compact payment evidence from `services/tax/payment_evidence.py` between planning and checklist review. Invoice evidence is processed in batches; only 20 priority actions are retained, with full counts and separate currency totals. Reconciliation streams payments/work and batches invoices, retains numeric allocation budgets and compact links, caps detail sections at 50 and repeated invoice choices at five while exposing complete counts. Tax evidence `package(..., include_records=False)` streams allowlisted table rows and ZIP content using the caller’s snapshot. The compatibility default retains records for small internal inspections; browser downloads explicitly disable it.

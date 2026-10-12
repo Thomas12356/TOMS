@@ -137,6 +137,7 @@ def measure(fixture, path, repeats):
         # Warm compilation/templates/cache first, then measure without tracing.
         response = fixture.client.get(path)
         fixture.assertEqual(response.status_code, 200, path)
+        response.close()
         for _ in range(repeats):
             families.clear()
             sql_times.clear()
@@ -146,6 +147,7 @@ def measure(fixture, path, repeats):
             response.get_data()
             durations.append(perf_counter() - started)
             queries.append(sum(families.values()))
+            response.close()
         last_sql = sum(sql_times)
     finally:
         event.remove(fixture.runtime, 'before_cursor_execute', before)
@@ -174,6 +176,7 @@ def measure(fixture, path, repeats):
         fixture.assertEqual(response.status_code, 200, path)
         size = len(response.get_data())
         _, peak = tracemalloc.get_traced_memory()
+        response.close()
     finally:
         tracemalloc.stop()
     fixture.bank.assert_not_called()

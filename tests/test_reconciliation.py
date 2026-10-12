@@ -248,6 +248,38 @@ class ReconciliationTests(DeductionOwnerCase):
         self.assertEqual(len(result['unbilled']), LIMIT)
         self.assertEqual(result['summaries'][0]['work_minor'], 100000+LIMIT*100)
 
+    def test_receipt_display_limit_keeps_all_gross_and_logged_withholding(self):
+        for index in range(60):
+            stamp = datetime(2026, 4, 15, 12, tzinfo=timezone.utc)
+            receipt = Transaction(account_uid=self.account, category_uid=self.category, feed_item_uid=str(uuid4()),
+                amount_minor=100, currency='GBP', direction='IN', status='SETTLED', transaction_time=stamp,
+                source_updated_at=stamp, source='FASTER_PAYMENTS_IN', confirmed_at=stamp, raw_payload={})
+            receipt.income = TransactionIncome(income_stream_id=self.stream, income_type='other', tax_treatment='cis',
+                gross_minor=120, tax_deducted_minor=20, ni_deducted_minor=0, adjustment_minor=0,
+                recorded_currency='GBP', needs_review=False)
+            self.session.add(receipt)
+        self.session.commit()
+        result = self.result(stream_id=self.stream)
+        self.assertEqual(result['counts']['receipts'], 61)
+        self.assertEqual(len(result['receipts']), LIMIT)
+        self.assertEqual(result['summaries'][0]['received_minor'], 107200)
+        self.assertEqual(result['summaries'][0]['unallocated_minor'], 107200)
+
+    def test_invoice_suggestions_are_bounded_without_hiding_total_choices(self):
+        for index in range(8):
+            shift = IncomeShift(id=str(uuid4()), income_stream_id=self.stream,
+                starts_at=datetime(2026, 4, 20, 8, tzinfo=timezone.utc),
+                ends_at=datetime(2026, 4, 20, 9, tzinfo=timezone.utc), payment_mode='total',
+                gross_minor=1000, currency='GBP', notes='Extra work')
+            self.session.add(shift)
+            self.session.commit()
+            self.invoice(shifts=[shift], issue_date='2026-04-21')
+        result = self.result(stream_id=self.stream)
+        self.assertEqual(result['receipts'][0]['candidate_count'], 8)
+        self.assertEqual(len(result['receipts'][0]['invoices']), 5)
+        self.assertEqual(result['counts']['invoices'], 8)
+        self.assertEqual(result['summaries'][0]['received_minor'], 100000)
+
     def test_safe_database_failure_and_query_validation(self):
         error = OperationalError('SQL',{},Exception('PRIVATE-DETAILS'))
         with patch('routes.reconciliation.export_session',side_effect=error), patch('routes.reconciliation.log_failure'):

@@ -27,8 +27,8 @@ def income(**changes):
 
 class ReadinessTests(unittest.TestCase):
     def records(self, payments):
-        with app.app_context(), patch('services.tax.records.db.session.scalars', side_effect=[
-                SimpleNamespace(all=lambda: payments), SimpleNamespace(all=lambda: [])]):
+        with app.app_context(), patch('services.tax.records.planning_payments', return_value=iter(payments)), patch(
+                'services.tax.records.db.session.scalars', return_value=SimpleNamespace(all=lambda: [])):
             return tax_records(reviewed_rules(), as_of=datetime(2026, 10, 8, tzinfo=timezone.utc))
 
     def test_complete_confirmed_receipt_counts_once(self):

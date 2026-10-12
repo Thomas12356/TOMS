@@ -10,6 +10,7 @@ from services.transactions.classification import classification_details
 from services.tax.mileage import mileage_allowances
 from services.tax.mileage_rules import cached_status
 from flask import current_app
+from services.tax.payment_evidence import compact_payments
 from services.tax.readiness import add_attention, check_income
 
 
@@ -23,13 +24,16 @@ def expense_current(record):
             and record.amount_minor <= payment.amount_minor)
 
 
-def planning_payments(rules, session):
+def planning_payments(rules, session, *, stream=False):
     """Load shared payment/claim evidence once, including claims moved between years."""
     first = datetime.fromisoformat(rules['starts_on']).replace(tzinfo=ZoneInfo('Europe/London'))
     end = (datetime.fromisoformat(rules['ends_on']) + timedelta(days=1)).replace(tzinfo=ZoneInfo('Europe/London'))
-    return session.scalars(db.select(Transaction).outerjoin(Transaction.expense).where(db.or_(
+    predicate = db.or_(
         db.and_(Transaction.transaction_time >= first, Transaction.transaction_time < end),
-        db.and_(ExpenseDeduction.recorded_time >= first, ExpenseDeduction.recorded_time < end))).options(
+        db.and_(ExpenseDeduction.recorded_time >= first, ExpenseDeduction.recorded_time < end))
+    if stream:
+        return compact_payments(session, predicate, descending=True)
+    return session.scalars(db.select(Transaction).outerjoin(Transaction.expense).where(predicate).options(
         load_only(Transaction.amount_minor, Transaction.currency, Transaction.direction, Transaction.status,
                   Transaction.source, Transaction.transaction_time, Transaction.confirmed_at, Transaction.counterparty_name),
         joinedload(Transaction.income), joinedload(Transaction.expense), joinedload(Transaction.classification))
@@ -41,7 +45,7 @@ def tax_records(rules, *, as_of=None, session=None, payments=None):
     session = session if session is not None else db.session
     first = datetime.fromisoformat(rules['starts_on']).replace(tzinfo=ZoneInfo('Europe/London'))
     end = (datetime.fromisoformat(rules['ends_on']) + timedelta(days=1)).replace(tzinfo=ZoneInfo('Europe/London'))
-    payments = planning_payments(rules, session) if payments is None else payments
+    payments = planning_payments(rules, session, stream=True) if payments is None else payments
     credits, deductions, issues = defaultdict(int), defaultdict(int), []
     received, ni_paid, attention = defaultdict(int), defaultdict(int), {}
     received_issues = []

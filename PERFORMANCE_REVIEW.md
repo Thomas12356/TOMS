@@ -2,6 +2,39 @@
 
 Branch: `codex/performance-review`. Application behaviour is unchanged.
 
+## Delivered follow-up — 12 October 2026
+
+Implemented on `codex/bounded-financial-reads`. Home now shares a single streamed
+payment pass between planning and readiness, batches invoice evidence, and retains
+20 priority invoice actions while counting all actions and currency totals.
+Reconciliation streams evidence, keeps full totals/counts with 50 detail rows,
+and offers five recent invoice choices per source/currency with a link to all
+invoices. It retains compact allocation/work maps, so memory is not constant for
+every possible workload. Tax downloads stream allowlisted evidence through
+private anonymous temporary files rather than keeping the complete ZIP and all
+records in memory. Snapshot isolation, cross-year allocations, stale versions,
+unknown amounts, currency separation and CSV formula protection are preserved.
+
+Final rerun uses the same synthetic 10k/50k workloads and three-request warm
+medians as the baseline below. These are Python allocation peaks, not process
+RSS; timings exclude browser rendering/network transfer.
+
+| 50k request | Baseline → delivered time | Baseline → delivered peak | Delivered SQL count |
+| --- | ---: | ---: | ---: |
+| Home | 2009.5 → 1492.2 ms | 84.8 → 6.5 MiB | 60 |
+| Reconciliation | 2905.7 → 1409.8 ms | 103.3 → 6.9 MiB | 42 |
+| Tax ZIP | 5354.8 → 3392.2 ms | 239.6 → 6.2 MiB | 17 |
+
+All 574 backend tests completed: 570 passed, four optional backup restore checks
+skipped. All 22 browser scripts passed, including matching, invoices, Home,
+exports, tax profile, failure recovery and five-width usability checks. Ruff F,
+Bandit and whitespace checks passed. New regression tests cover complete totals
+beyond visible limits, late-batch stale invoice priority, candidate counts,
+streamed/archive parity, private temporary files and failure/response cleanup.
+No live bank traffic, credential setup, migration or backup restore was performed.
+The owner five-task walkthrough remains outstanding. A ledger ordering index is
+still a separate measured follow-up; this change adds no index.
+
 ## What was measured
 
 The actual owner GET routes were exercised through Flask's test client using

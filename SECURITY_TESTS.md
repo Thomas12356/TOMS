@@ -1185,3 +1185,7 @@ Ruff F, Bandit for application code and the harness, and whitespace checks passe
 No browser interface, application logic or schema migration changed; no new
 credentials, live bank calls or working restore. Measurements and limitations
 are recorded in [PERFORMANCE_REVIEW.md](PERFORMANCE_REVIEW.md).
+
+## Bounded financial reads verification — 12 October 2026
+
+Run `RUN_POSTGRES_TESTS=1 .venv/bin/python -m unittest discover -s tests -q` and the repository browser verification runner across all 22 scripts. This delivery completed 574 backend tests (570 passed; four optional backup restore checks skipped), all 22 browser scripts, Ruff F, Bandit and `git diff --check`. `RUN_POSTGRES_TESTS=1 .venv/bin/python tests/performance_review.py` completed both disposable 10k/50k workloads. Regression coverage includes complete totals beyond visible limits, stale evidence prioritisation, compact payment parity, five-choice invoice counts, archive/CSV parity and temporary file cleanup on failure/response closure. Credential setup and backup restore checks remain excluded by the user.

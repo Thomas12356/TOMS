@@ -32,9 +32,11 @@ class ChecklistTests(DeductionOwnerCase):
         self.receipt.transaction_time = datetime(2027, 3, 1, tzinfo=timezone.utc)
         self.session.commit()
         shared = planning_payments(reviewed_rules(), self.session)
+        compact = list(planning_payments(reviewed_rules(), self.session, stream=True))
         independent = current_plan(refresh_rules=False, session=self.session, as_of=now)
         reused = current_plan(refresh_rules=False, session=self.session, as_of=now, payments=shared)
         self.assertEqual(independent, reused)
+        self.assertEqual(independent, current_plan(refresh_rules=False, session=self.session, as_of=now, payments=compact))
         self.assertEqual(guided_checklist(independent, as_of=now, session=self.session),
                          guided_checklist(reused, as_of=now, session=self.session, payments=shared))
         checks = guided_checklist(reused, as_of=now, session=self.session, payments=shared)

@@ -48,7 +48,7 @@ def payment_task(payment, now):
                 reason=' '.join(reasons), url=url, action='Review this payment')
 
 
-def task_inbox(session, checks, invoice_rows, *, last_success, latest, latest_full, now, selected='all'):
+def task_inbox(session, checks, invoice_rows, *, last_success, latest, latest_full, now, selected='all', invoice_count=None):
     groups = {key: dict(key=key, title=title, count=0, items=[], url=url)
               for key, title, url in (
                   ('imports', 'Imports', '/dashboard/system'),
@@ -115,6 +115,8 @@ def task_inbox(session, checks, invoice_rows, *, last_success, latest, latest_fu
             add(groups['invoices'], key='invoice:' + invoice.id, title='Review invoice evidence',
                 label=(invoice.number or 'Draft invoice') + ' · ' + invoice.client_name,
                 reason=' '.join(reasons), url='/dashboard/invoices/' + invoice.id, action='Review this invoice')
+    if invoice_count is not None:
+        groups['invoices']['count'] = invoice_count
     steps = {step['key']: step for step in checks['steps']}
     forecasts = groups['forecasts']
     forecasts['count'] = steps['forecasts']['count']

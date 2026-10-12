@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timezone
 import os
 import unittest
+from tempfile import TemporaryFile
 from unittest.mock import patch
 from zipfile import ZipFile
 
@@ -35,6 +36,53 @@ class ExportAuthTests(ApiTestCase):
 
 
 class ExportTests(DeductionOwnerCase):
+    def test_streamed_file_matches_complete_evidence_and_is_private(self):
+        original, expected = package(self.session)
+        streamed, metadata = package(self.session, include_records=False)
+        with original, streamed:
+            archive = ZipFile(streamed)
+            report = json.loads(archive.read('report.json'))
+            self.assertEqual(report['records'], expected['records'])
+            self.assertEqual(report['counts'], expected['counts'])
+            self.assertNotIn('records', metadata)
+            self.assertEqual(os.fstat(streamed.fileno()).st_mode & 0o777, 0o600)
+            for name in expected['records']:
+                self.assertEqual(archive.read(name + '.csv'), ZipFile(original).read(name + '.csv'))
+
+    def test_failed_streamed_export_closes_all_private_files(self):
+        opened = []
+        def private_file(*args, **kwargs):
+            handle = TemporaryFile(*args, **kwargs)
+            opened.append(handle)
+            return handle
+        with patch('services.tax.export.TemporaryFile', side_effect=private_file):
+            with patch('services.tax.export.evidence_rows', side_effect=OperationalError('SQL', {}, Exception('private'))):
+                with self.assertRaises(OperationalError):
+                    package(self.session, include_records=False)
+        self.assertTrue(opened)
+        self.assertTrue(all(handle.closed for handle in opened))
+
+    def test_download_length_and_response_close_release_output(self):
+        from contextlib import contextmanager
+        from services.tax import export
+        @contextmanager
+        def snapshot():
+            yield self.session
+        outputs = []
+        def create(*args, **kwargs):
+            output, manifest = export.package(*args, **kwargs)
+            outputs.append(output)
+            return output, manifest
+        with patch('routes.tax_export.export_session', snapshot), patch('routes.tax_export.package', side_effect=create):
+            response = self.client.get('/dashboard/tax-export/download')
+        try:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.content_length, len(response.data))
+            self.assertEqual(len(ZipFile(io.BytesIO(response.data)).namelist()), 13)
+        finally:
+            response.close()
+        self.assertTrue(outputs[0].closed)
+
     def test_package_agrees_with_plan_and_excludes_raw_payload(self):
         self.payment().counterparty_name = '=dangerous'
         self.payment().raw_payload = {'secret': 'RAW-MUST-NOT-EXPORT'}
@@ -171,6 +219,7 @@ class ExportIsolationTests(unittest.TestCase):
     # records and must never route sample evidence to the owner's schema.
     def test_real_and_sample_downloads(self):
         real = self.client.get('/dashboard/tax-export/download')
+        self.addCleanup(real.close)
         self.assertEqual(real.status_code, 200)
         self.assertEqual(real.headers['Cache-Control'], 'no-store')
         data = json.loads(ZipFile(io.BytesIO(real.data)).read('report.json'))
@@ -178,6 +227,7 @@ class ExportIsolationTests(unittest.TestCase):
         self.assertIn('REAL-INCOME-SENTINEL', json.dumps(data))
         self.toggle(True)
         sample = self.client.get('/dashboard/tax-export/download')
+        self.addCleanup(sample.close)
         self.assertEqual(sample.status_code, 200)
         self.assertIn('TOMS-SAMPLE', sample.headers['Content-Disposition'])
         data = json.loads(ZipFile(io.BytesIO(sample.data)).read('report.json'))

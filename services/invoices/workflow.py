@@ -218,9 +218,10 @@ def payment_current(payment, invoice):
             and payment.payment_version == payment_version(payment.transaction))
 
 
-def settlement(invoice):
+def settlement(invoice, *, payment_states=None):
     active = [payment for payment in invoice.payments if payment.active]
-    valid = [payment for payment in active if payment_current(payment, invoice)]
+    valid = [payment for payment in active if (payment_current(payment, invoice)
+             if payment_states is None else payment_states[payment.id])]
     credited = sum(payment.cash_minor + payment.tax_minor + payment.ni_minor for payment in valid)
     outstanding = max(0, invoice.total_minor - credited)
     stale = len(valid) != len(active)

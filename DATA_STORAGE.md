@@ -327,3 +327,7 @@ Reconciliation creates no additional income, matching records or stored state.
 It derives the review from shifts, invoice snapshots, payment allocations and
 classified receipts in a read-only snapshot. Removing or adding a payment uses
 the existing invoice history tables. No schema change is required.
+
+## Temporary evidence export files
+
+Browser evidence downloads spool allowlisted JSON/CSV and the final ZIP to anonymous operating-system temporary files with restrictive file permissions. These files contain selected private financial/client evidence, never authentication records or raw bank payloads. Spools close on completion/failure; the final file closes with the response or on response preparation failure. They are ephemeral export material, not retained backups. Generation stays inside the existing read-only consistent snapshot; all financial allowlists and CSV formula protection remain in force. Disk capacity can limit large exports even though Python memory use is reduced.

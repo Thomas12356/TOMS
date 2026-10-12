@@ -41,6 +41,7 @@ class TaxProfileTests(unittest.TestCase):
 
     def plan(self):
         response = self.client.get('/dashboard/tax-export/download')
+        self.addCleanup(response.close)
         self.assertEqual(response.status_code, 200)
         with ZipFile(io.BytesIO(response.data)) as archive:
             return json.loads(archive.read('report.json'))['calculation']

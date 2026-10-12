@@ -47,7 +47,17 @@ def page():
 def download():
     query_values(set())
     with export_session() as session:
-        output, manifest = package(session)
+        output, manifest = package(session, include_records=False)
     prefix = 'TOMS-SAMPLE' if manifest['sample_data'] else 'TOMS'
-    return send_file(output, mimetype='application/zip', as_attachment=True,
-        download_name=f"{prefix}-tax-{manifest['tax_year']}.zip", max_age=0)
+    try:
+        output.seek(0, 2)
+        size = output.tell()
+        output.seek(0)
+        response = send_file(output, mimetype='application/zip', as_attachment=True,
+            download_name=f"{prefix}-tax-{manifest['tax_year']}.zip", max_age=0)
+        response.content_length = size
+        response.call_on_close(output.close)
+        return response
+    except BaseException:
+        output.close()
+        raise
