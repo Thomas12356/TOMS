@@ -11,6 +11,7 @@ from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 from app import app
 from test_test_data import TestDataTests
+from browser_owner import install_owner_cookie
 
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 with sync_playwright() as playwright:
@@ -29,8 +30,7 @@ with sync_playwright() as playwright:
             fixture.addCleanup(server.shutdown)
             origin = f'http://127.0.0.1:{server.server_port}'
             page = browser.new_page(viewport={'width': width, 'height': 900})
-            cookie = fixture.client.get_cookie(app.config['SESSION_COOKIE_NAME'])
-            page.context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+            install_owner_cookie(page.context, fixture, origin)
             requests, errors = [], []
             page.on('request', lambda request: requests.append(request.url))
             page.on('pageerror', lambda error: errors.append(str(error)))
@@ -64,7 +64,7 @@ with sync_playwright() as playwright:
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.transactions WHERE confirmed_at IS NOT NULL') == 0
             # Category filtering is a plain GET form, with no JavaScript needed.
             context = browser.new_context(java_script_enabled=False, viewport={'width': width, 'height': 900})
-            context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+            install_owner_cookie(context, fixture, origin)
             plain = context.new_page()
             plain.goto(origin + '/dashboard/overview')
             plain.locator('#home-task-filter').select_option('imports')

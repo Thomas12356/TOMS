@@ -62,8 +62,11 @@ with sync_playwright() as playwright:
             page.get_by_label('Current password', exact=True).fill('test-pass-123')
             page.locator('#password').fill('updated-pass-123')
             page.get_by_label('Confirm password', exact=True).fill('updated-pass-123')
-            with page.expect_navigation():
+            with page.expect_navigation() as changed:
                 page.get_by_role('button', name='Change password', exact=True).click()
+            if changed.value.status >= 400:
+                Path('/tmp/toms-password-browser-submit-error.html').write_text(page.content())
+                raise AssertionError(('Password submission rejected', width, changed.value.status))
             assert page.url.endswith('/login')
             # The fixture's original session must also be revoked.
             assert fixture.client.get('/dashboard').status_code == 302

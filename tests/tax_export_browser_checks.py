@@ -13,6 +13,7 @@ from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 from app import app
 from test_test_data import TestDataTests
+from browser_owner import install_owner_cookie
 
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 fixture = TestDataTests()
@@ -26,12 +27,11 @@ try:
     fixture.addCleanup(worker.join)
     fixture.addCleanup(server.shutdown)
     origin = f'http://127.0.0.1:{server.server_port}'
-    cookie = fixture.client.get_cookie('session')
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
         for width in (320, 390, 768, 1280):
             context = browser.new_context(viewport={'width': width, 'height': 900}, accept_downloads=True)
-            context.add_cookies([{'name': 'session', 'value': cookie.value, 'url': origin}])
+            install_owner_cookie(context, fixture, origin)
             page = context.new_page()
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))

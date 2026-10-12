@@ -11,6 +11,10 @@ from services.database.connection import db
 from services.database.session import test_data_active
 
 ACTIONS = {
+    'cash.balance': 'Saved observed account balance',
+    'cash.coverage': 'Confirmed cash planning coverage',
+    'cash.commitment': 'Updated bill or HMRC statement charge',
+    'cash.payment': 'Recorded or corrected commitment payment',
     'tax-profile.save': 'Updated annual tax jurisdiction',
     'reserve.save': 'Updated account tax and NI earmarks',
     'login': 'Signed in', 'logout': 'Signed out', 'setup': 'Created owner account',

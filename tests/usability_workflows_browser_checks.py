@@ -17,6 +17,7 @@ from models import IncomeShift, MileageEntry, Transaction, TransactionClassifica
 from services.database.connection import db
 from services.web.test_data import sample_id
 from test_test_data import TestDataTests
+from browser_owner import install_owner_cookie
 
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 with sync_playwright() as playwright:
@@ -53,8 +54,7 @@ with sync_playwright() as playwright:
             fixture.addCleanup(server.shutdown)
             origin = f'http://127.0.0.1:{server.server_port}'
             context = browser.new_context(viewport={'width': width, 'height': 900}, java_script_enabled=width != 390)
-            cookie = fixture.client.get_cookie(app.config['SESSION_COOKIE_NAME'])
-            context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+            install_owner_cookie(context, fixture, origin)
             page = context.new_page()
             errors, requests = [], []
             page.on('pageerror', lambda error: errors.append(str(error)))
@@ -65,8 +65,11 @@ with sync_playwright() as playwright:
                 page.goto(origin + path)
                 layout()
             def submit(button):
-                with page.expect_navigation():
+                with page.expect_navigation() as navigation:
                     button.click()
+                if navigation.value and navigation.value.status >= 400:
+                    Path('/tmp/toms-usability-browser-submit-error.html').write_text(page.content())
+                    raise AssertionError(('Owner submission rejected', width, navigation.value.status))
                 layout()
             go('/dashboard/account-money')
             assert not any('/dashboard/balances' in request for request in requests)

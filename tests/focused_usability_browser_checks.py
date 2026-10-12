@@ -1,5 +1,5 @@
 """Focused entry, compact attention, complete history and accessible disclosures."""
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import logging
 from pathlib import Path
@@ -15,6 +15,7 @@ from app import app
 from models import IncomeShift, MileageEntry
 from services.web.test_data import sample_id
 from test_test_data import TestDataTests
+from browser_owner import install_owner_cookie
 
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 with sync_playwright() as p:
@@ -41,8 +42,7 @@ with sync_playwright() as p:
             fixture.addCleanup(server.server_close);fixture.addCleanup(worker.join,5);fixture.addCleanup(server.shutdown)
             origin=f'http://127.0.0.1:{server.server_port}'
             context=browser.new_context(viewport={'width':width,'height':900},java_script_enabled=width!=390)
-            cookie=fixture.client.get_cookie(app.config['SESSION_COOKIE_NAME'])
-            context.add_cookies([dict(name=cookie.key,value=cookie.value,url=origin)])
+            install_owner_cookie(context, fixture, origin)
             page=context.new_page();errors=[]
             page.on('pageerror',lambda error:errors.append(str(error)))
             def layout():

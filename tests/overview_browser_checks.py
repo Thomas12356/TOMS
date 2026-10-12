@@ -13,6 +13,7 @@ from sqlalchemy import text
 from werkzeug.serving import make_server
 from app import app
 from test_test_data import TestDataTests
+from browser_owner import install_owner_cookie
 
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 with sync_playwright() as playwright:
@@ -30,13 +31,14 @@ with sync_playwright() as playwright:
             fixture.addCleanup(server.shutdown)
             origin = f'http://127.0.0.1:{server.server_port}'
             page = browser.new_page(viewport={'width': width, 'height': 900})
-            cookie = fixture.client.get_cookie(app.config['SESSION_COOKIE_NAME'])
-            page.context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+            install_owner_cookie(page.context, fixture, origin)
             errors, requests = [], []
             page.on('pageerror', lambda error: errors.append(str(error)))
             page.on('request', lambda request: requests.append(request.url))
-            page.goto(origin + '/')
-            assert page.url.endswith('/dashboard/overview')
+            opening = page.goto(origin + '/')
+            if not page.url.endswith('/dashboard/overview'):
+                Path('/tmp/toms-overview-opening-error.html').write_text(page.content())
+                raise AssertionError(('Overview opening failed', width, page.url, opening.status))
             assert page.get_by_role('heading', name='Your money overview', exact=True).is_visible()
             assert 'Unavailable' in page.locator('#main-content').inner_text()
             assert 'No successful full import recorded.' in page.locator('#main-content').inner_text()
@@ -57,7 +59,9 @@ with sync_playwright() as playwright:
             page.wait_for_load_state('networkidle')
             requests.clear()
             page.goto(origin + '/dashboard/overview')
-            assert page.get_by_role('complementary', name='Test mode', exact=True).is_visible()
+            if not page.get_by_role('complementary', name='Test mode', exact=True).is_visible():
+                Path('/tmp/toms-overview-switch-error.html').write_text(page.content())
+                raise AssertionError(('Dataset switch failed', width))
             assert 'sample' in page.locator('#import-heading').locator('..').inner_text()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), width
             page.screenshot(path=f'/tmp/toms-overview-{width}.png', full_page=True)
@@ -122,7 +126,7 @@ with sync_playwright() as playwright:
             page.close()
             # Native details remain usable with JavaScript disabled.
             context = browser.new_context(java_script_enabled=False, viewport={'width': width, 'height': 900})
-            context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+            install_owner_cookie(context, fixture, origin)
             plain = context.new_page()
             plain.goto(origin + '/dashboard/overview')
             plain.locator('#main-navigation summary').filter(has_text='Work & income').click()

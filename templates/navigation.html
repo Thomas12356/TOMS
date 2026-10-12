@@ -12,10 +12,11 @@
     {% if navigation_owner %}<a href="{{ url_for('reconciliation.page') }}"{% if navigation_page == 'reconciliation' %} aria-current="page"{% endif %}>Work and payment matching</a>{% endif %}
     {% if navigation_owner %}<a href="{{ url_for('invoices.page') }}"{% if navigation_page == 'invoices' %} aria-current="page"{% endif %}>Invoices</a>{% endif %}
     </div></details>
-    <details class="navigation-group{% if navigation_page in ['tax-estimate', 'checklist'] %} current-section{% endif %}" role="group" aria-label="Planning">
+    <details class="navigation-group{% if navigation_page in ['tax-estimate', 'checklist', 'cash-planning'] %} current-section{% endif %}" role="group" aria-label="Planning">
     <summary>Planning</summary><div class="navigation-menu">
     <a href="{{ url_for('dashboard.tax_estimate') }}"{% if navigation_page == 'tax-estimate' %} aria-current="page"{% endif %}>Tax estimate</a>
     {% if navigation_owner %}
+    <a href="{{ url_for('cash_planning.page') }}"{% if navigation_page == 'cash-planning' %} aria-current="page"{% endif %}>Bills and cash planning</a>
     <a href="{{ url_for('checklist.page') }}"{% if navigation_page == 'checklist' %} aria-current="page"{% endif %}>Checklist</a>
     {% endif %}</div></details>
     <details class="navigation-group{% if navigation_page in ['tax-rules', 'system', 'settings'] %} current-section{% endif %}" role="group" aria-label="Settings">

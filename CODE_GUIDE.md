@@ -718,6 +718,29 @@ Tests: `test_tax_profile.py` and `tax_profile_browser_checks.py`.
 
 Home (`services/web/overview.py`) shares compact payment evidence from `services/tax/payment_evidence.py` between planning and checklist review. Invoice evidence is processed in batches; only 20 priority actions are retained, with full counts and separate currency totals. Reconciliation streams payments/work and batches invoices, retains numeric allocation budgets and compact links, and caps detail sections at 50. Receipt actions open guided matching rather than repeating invoice choices on the summary. Tax evidence `package(..., include_records=False)` streams allowlisted table rows and ZIP content using the caller’s snapshot. The compatibility default retains records for small internal inspections; browser downloads explicitly disable it.
 
+## Bills, actual HMRC charges and cash planning
+
+`routes/cash_planning.py` owns the CSRF-protected owner forms, snapshot GET and
+private export. `services/cash_planning.py` owns recurrence dates, amount/version
+validation, actual occurrence payment budgets, fresh observed balances,
+record/day coverage fingerprints and currency-separated available-cash formulas.
+`services/cash_export.py` streams allowlisted planning CSVs in a separate ZIP;
+tax evidence and tax calculations are unchanged. Models are CashCommitment,
+CashPayment, CashBalance and CashCoverage; all use DataSession routing. Migrations
+027–029 create/add business data without rebuilding existing samples.
+
+Recurring dates use their original month/day anchor. Full overdue/30-day totals
+are calculated even when only 100 occurrences are shown; individual schedules
+have their own details. Cancel/void keeps payment history. HMRC amounts come from
+explicit remaining statement charges; mixed/unknown charges use Other. Only the
+owner's explicit supported current-year payment portion reduces the cash
+provision, never the tax calculation or withholding. Different-year and Other
+charges add to current-year provision; overlapping current-year amounts/earmarks
+use maxima. Balances expire at 24 hours and retain recorded currency; coverage
+invalidates when records/day change. Unsupported or insufficient evidence yields
+None, not zero. Core regression tests are `test_cash_planning.py`, with isolated
+real/sample browser workflows in `cash_planning_browser_checks.py`.
+
 ## Guided receipt matching
 
 `routes/reconciliation.py:match_payment` is owner-only and CSRF protected. GET

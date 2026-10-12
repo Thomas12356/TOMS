@@ -12,6 +12,7 @@ from sqlalchemy import text
 from werkzeug.serving import make_server
 from app import app
 from test_test_data import TestDataTests
+from browser_owner import install_owner_cookie
 from services.web.test_data import sample_id
 
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
@@ -33,8 +34,7 @@ with sync_playwright() as playwright:
             origin = f'http://127.0.0.1:{server.server_port}'
             page = browser.new_page(viewport={'width': width, 'height': 900})
             page.clock.install()
-            cookie = fixture.client.get_cookie(app.config['SESSION_COOKIE_NAME'])
-            page.context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+            install_owner_cookie(page.context, fixture, origin)
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             def layout():
@@ -45,7 +45,10 @@ with sync_playwright() as playwright:
                 page.goto(origin + path)
                 layout()
             def submit(button):
-                with page.expect_navigation(): button.click()
+                with page.expect_navigation() as navigation: button.click()
+                if navigation.value and navigation.value.status >= 400:
+                    Path('/tmp/toms-income-workspace-submit-error.html').write_text(page.content())
+                    raise AssertionError(f'Owner form returned {navigation.value.status} at {width}px; see temporary sample HTML')
                 layout()
             go('/dashboard/income-streams?setup=1')
             page.locator('#source-name').fill('Browser staged source <img src=x>')
@@ -108,7 +111,9 @@ with sync_playwright() as playwright:
             page.locator('#expense-purpose').fill('Tools <img src=x onerror=alert(1)>')
             submit(page.get_by_role('button', name='Save expense', exact=True))
             go('/dashboard/income-streams?view=deductions&stream=' + sample_id(22))
-            assert 'Tools <img src=x onerror=alert(1)>' in page.locator('#stream-deductions-dialog').inner_text()
+            if 'Tools <img src=x onerror=alert(1)>' not in page.locator('#stream-deductions-dialog').inner_text():
+                Path('/tmp/toms-income-workspace-record-error.html').write_text(page.content())
+                raise AssertionError(f'Saved sample expense missing at {width}px; see temporary sample HTML')
             assert page.locator('#stream-deductions-dialog img').count() == 0
             page.keyboard.press('Escape')
             go('/dashboard/deductions?expense=' + key)
@@ -190,7 +195,7 @@ with sync_playwright() as playwright:
             assert fixture.live_value('SELECT count(*) FROM SCHEMA.income_streams') == original_sources
             if width == 390:
                 html_context = browser.new_context(java_script_enabled=False, viewport={'width': width, 'height': 900})
-                html_context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+                install_owner_cookie(html_context, fixture, origin)
                 html_page = html_context.new_page()
                 html_page.goto(origin + '/dashboard/income-streams?setup=1')
                 html_page.locator('#source-name').fill('Source without JavaScript')

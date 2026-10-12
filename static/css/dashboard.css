@@ -1378,6 +1378,8 @@ td.amount {
 .system-filter select:focus-visible, .system-filter button:focus-visible { outline: 3px solid var(--highlight); outline-offset: 3px; }
 
 /* Invoice tracking: work, issued details and actual settlement. */
+.cash-planning { overflow-wrap: anywhere; }
+.cash-planning .login-form textarea { width: 100%; min-width: 0; max-width: 100%; }
 .invoice-section { margin-top: 32px; }
 .invoice-list-row { display: flex; flex-wrap: wrap; gap: 16px; justify-content: space-between; align-items: start; padding: 20px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
 .invoice-list-row > div { min-width: 0; }

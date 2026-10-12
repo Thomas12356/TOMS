@@ -11,6 +11,7 @@ from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 from app import app
 from test_test_data import TestDataTests
+from browser_owner import install_owner_cookie
 from services.web.test_data import sample_id
 
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
@@ -30,8 +31,7 @@ with sync_playwright() as playwright:
             fixture.addCleanup(server.shutdown)
             origin = f'http://127.0.0.1:{server.server_port}'
             context = browser.new_context(viewport={'width': width, 'height': 900})
-            cookie = fixture.client.get_cookie(app.config['SESSION_COOKIE_NAME'])
-            context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+            install_owner_cookie(context, fixture, origin)
             first, older = context.new_page(), context.new_page()
             identity = sample_id(22)
             path = f'{origin}/dashboard/income-streams?configure={identity}'

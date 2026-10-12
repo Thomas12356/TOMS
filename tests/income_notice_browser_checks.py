@@ -11,6 +11,7 @@ from playwright.sync_api import sync_playwright
 from werkzeug.serving import make_server
 from app import app
 from test_test_data import TestDataTests
+from browser_owner import install_owner_cookie
 
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 with sync_playwright() as playwright:
@@ -32,8 +33,7 @@ with sync_playwright() as playwright:
             page.clock.install()
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
-            cookie = fixture.client.get_cookie(app.config['SESSION_COOKIE_NAME'])
-            page.context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+            install_owner_cookie(page.context, fixture, origin)
             notice_url = origin + '/dashboard/income-notifications'
             fail = lambda route: route.fulfill(status=503, json={'error': 'Unavailable'})
             page.route(notice_url, fail)

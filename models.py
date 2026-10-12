@@ -29,6 +29,64 @@ class TaxProfile(BaseModel):
     confirmed_at = db.Column(db.DateTime(timezone=True))
 
 
+class CashCommitment(BaseModel):
+    __tablename__ = 'cash_commitments'
+    __table_args__ = (db.CheckConstraint("kind IN ('bill','hmrc')"),
+        db.CheckConstraint('amount_minor >= 0 AND revision > 0'),
+        db.CheckConstraint("recurrence IN ('once','weekly','monthly','yearly')"),
+        db.CheckConstraint('end_date IS NULL OR end_date >= due_date'),
+        db.CheckConstraint("kind = 'bill' OR (recurrence = 'once' AND currency = 'GBP' AND tax_year IS NOT NULL AND tax_component IS NOT NULL)"),
+        db.CheckConstraint("kind = 'hmrc' OR (tax_year IS NULL AND tax_component IS NULL)"), {'schema':'toms'})
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    kind = db.Column(db.Text, nullable=False)
+    name = db.Column(db.Text, nullable=False)
+    currency = db.Column(db.Text, nullable=False)
+    amount_minor = db.Column(db.BigInteger)
+    due_date = db.Column(db.Date, nullable=False)
+    recurrence = db.Column(db.Text, nullable=False)
+    end_date = db.Column(db.Date)
+    tax_year = db.Column(db.Text)
+    tax_component = db.Column(db.Text)
+    notes = db.Column(db.Text, nullable=False, default='')
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    revision = db.Column(db.BigInteger, nullable=False, default=1)
+
+
+class CashPayment(BaseModel):
+    __tablename__ = 'cash_payments'
+    __table_args__ = (db.CheckConstraint('amount_minor > 0'),
+        db.CheckConstraint('tax_credit_minor >= 0 AND tax_credit_minor <= amount_minor'), {'schema':'toms'})
+    id = db.Column(db.Uuid(as_uuid=False), primary_key=True)
+    commitment_id = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.cash_commitments.id'), nullable=False)
+    occurrence_date = db.Column(db.Date, nullable=False)
+    amount_minor = db.Column(db.BigInteger, nullable=False)
+    tax_credit_minor = db.Column(db.BigInteger, nullable=False, default=0, server_default='0')
+    paid_on = db.Column(db.Date, nullable=False)
+    reference = db.Column(db.Text, nullable=False, default='')
+    active = db.Column(db.Boolean, nullable=False, default=True)
+    recorded_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
+    changed_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
+
+
+class CashBalance(BaseModel):
+    __tablename__ = 'cash_balances'
+    __table_args__ = (db.CheckConstraint('revision > 0'), {'schema':'toms'})
+    account_uid = db.Column(db.Uuid(as_uuid=False), db.ForeignKey('toms.accounts.account_uid', ondelete='CASCADE'), primary_key=True)
+    amount_minor = db.Column(db.BigInteger, nullable=False)
+    recorded_currency = db.Column(db.Text, nullable=False)
+    observed_at = db.Column(db.DateTime(timezone=True), nullable=False)
+    recorded_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
+    revision = db.Column(db.BigInteger, nullable=False, default=1)
+
+
+class CashCoverage(BaseModel):
+    __tablename__ = 'cash_coverage'
+    __table_args__ = (db.CheckConstraint('id = 1'), {'schema':'toms'})
+    id = db.Column(db.Integer, primary_key=True)
+    fingerprint = db.Column(db.Text, nullable=False)
+    confirmed_at = db.Column(db.DateTime(timezone=True), nullable=False, server_default=db.func.now())
+
+
 class Account(BaseModel):
     __tablename__ = "accounts"
 

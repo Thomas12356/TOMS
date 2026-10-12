@@ -1,5 +1,31 @@
 # Security checks — 6 October 2026
 
+## HMRC/bills/cash planning — 12 October 2026
+
+`test_cash_planning.py` uses disposable real/demo schemas and mocked bank traffic.
+It covers calendar anchors, complete totals beyond display limits, missing/old/
+future/changed-currency balances, null charges, separate currencies/negative
+shortfalls, overlapping tax provisions, distinct-year/penalty charges, explicit
+payment credits, duplicate writes, stale versions, payment void/cancellation
+history, coverage invalidation, owner/API/CSRF protection, literal text escaping
+and private formula-protected CSV exports. All 603 backend tests completed:
+599 passes / four optional backup restore skips. No live bank verification or
+credential setup was performed. Cash-planning browser checks cover actual forms,
+payments/corrections, balances and complete coverage at four widths; 390px also
+disables JavaScript. All 23 browser scripts completed successfully across focused
+runs. Application/browser-test Ruff F, application Bandit and git diff --check
+passed. Full-run attempts stopped at intermittent older expense, invoice,
+dataset-switch, password or work-save assertions; final focused reruns passed.
+Their cause remains unestablished. Failure captures/status checks use synthetic
+test pages, never working records. Passing reruns do not establish a permanent fix.
+
+`tests/browser_owner.py` binds fixture cookies to the Chromium user-agent/address
+using Flask-Login's actual identifier generator and preserves production session
+protection. The independent regression shows an unbound initial fixture cookie
+can be rewritten on a background read, while the bound browser session stays
+unchanged. This improves fixture fidelity; it does not prove all previously
+intermittent browser assertions have a single cause or are permanently resolved.
+
 ## Guided receipt matching — 12 October 2026
 
 `test_receipt_matching.py` covers read-only previews, signed/expired/tampered

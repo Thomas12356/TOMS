@@ -15,6 +15,7 @@ from app import app
 from models import MileageEntry, TaxProfile
 from services.web.test_data import sample_id
 from test_test_data import TestDataTests
+from browser_owner import install_owner_cookie
 
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
 with sync_playwright() as playwright:
@@ -39,8 +40,7 @@ with sync_playwright() as playwright:
             fixture.addCleanup(server.shutdown)
             origin = f'http://127.0.0.1:{server.server_port}'
             context = browser.new_context(viewport={'width': width, 'height': 900}, java_script_enabled=width != 390)
-            cookie = fixture.client.get_cookie(app.config['SESSION_COOKIE_NAME'])
-            context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+            install_owner_cookie(context, fixture, origin)
             page = context.new_page()
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
@@ -65,7 +65,8 @@ with sync_playwright() as playwright:
             assert page.locator('.tax-totals').is_visible()
             original = page.locator('.tax-totals').inner_text()
             assert page.locator('.hmrc-payment-guidance').is_visible()
-            assert page.locator('.hmrc-payment-guidance a').get_attribute('href') == 'https://www.gov.uk/understand-self-assessment-bill/payments-on-account'
+            assert page.get_by_role('link', name='Check payments on account and your HMRC statement').get_attribute('href') == 'https://www.gov.uk/understand-self-assessment-bill/payments-on-account'
+            assert page.get_by_role('link', name='Record actual HMRC statement charges and payments').get_attribute('href') == '/dashboard/cash-planning'
             go('/dashboard/tax-profile')
             assert page.get_by_role('complementary', name='Test mode', exact=True).is_visible()
             save('wales', confirm=False)

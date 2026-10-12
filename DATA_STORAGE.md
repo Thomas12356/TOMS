@@ -30,6 +30,26 @@ still rebuild sample tables. Tax evidence exports include the selected profile's
 explicit jurisdiction, confirmation time and revision with the calculation,
 using the same read-only snapshot as the financial evidence.
 
+## Cash planning records (12 October 2026)
+
+`cash_commitments`, `cash_payments`, `cash_balances` and `cash_coverage` are
+business tables in both real/sample schemas. Migrations 027–029 preserve existing
+sample records. Commitments retain schedule, explicit HMRC year/component,
+unknown/known integer amounts and revisions. Payments preserve occurrence date,
+paid date, reference, explicit supported cash-provision credit and void history.
+Balances retain their observed currency/time separately from account metadata.
+Coverage stores only a record fingerprint and confirmation time.
+
+The existing backup discovers and fingerprints all four tables automatically.
+A private backup was created before migration; no restore over working data or
+new credential setup was performed. The separate planning export includes
+allowlisted commitments, payments and current balance observations (with both
+recorded/current currency), streamed to an anonymous private ZIP within the
+existing consistent read-only snapshot. Coverage's internal hash, auth records
+and raw bank data are excluded; CSV formula protection remains in force. The
+final file closes with the response or on failure. Cancelled schedules and voided
+payments are retained. Exports are evidence, not import/restore mechanisms.
+
 ## Requirements
 
 Install PostgreSQL client tools (`pg_dump` and `pg_restore`) on the machine

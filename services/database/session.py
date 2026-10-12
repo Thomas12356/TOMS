@@ -9,7 +9,7 @@ from sqlalchemy.sql import visitors
 from sqlalchemy.sql.schema import Table
 from sqlalchemy.sql.elements import TextClause
 
-DATA_TABLES = frozenset({'tax_profiles', 'accounts', 'categories', 'transactions', 'transaction_classifications',
+DATA_TABLES = frozenset({'cash_commitments', 'cash_payments', 'cash_balances', 'cash_coverage', 'tax_profiles', 'accounts', 'categories', 'transactions', 'transaction_classifications',
                          'transaction_income', 'income_streams', 'income_shifts', 'expense_deductions', 'mileage_entries', 'sync_runs', 'sync_targets', 'invoices', 'invoice_items', 'invoice_payments', 'invoice_sequences', 'invoice_deliveries', 'account_reserves', 'income_notice_reads'})
 
 

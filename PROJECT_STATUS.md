@@ -3,6 +3,71 @@
 Updated: 2026-10-12. This is a handoff snapshot, not a live system report.
 Stable working instructions are in [AGENTS.md](AGENTS.md).
 
+## Latest delivery — actual HMRC charges, bills and cash planning
+
+Implemented on `codex/tax-bills-cash-planning`, following guided receipt matching.
+Planning now has one Bills and cash planning page for manual statement charges,
+one-off/weekly/monthly/yearly bills, dated available balance observations and a
+30-day cash view. Overdue occurrences remain included; month-end and leap-year
+anchors are preserved. Payments consume an occurrence's actual outstanding
+budget; corrections void records instead of deleting history. Revision checks,
+idempotent creation/payment IDs, owner login and CSRF protect writes.
+
+Actual statement charges retain explicit tax year/component and due date. Start
+from the remaining statement charge after existing credits, enter each once,
+and record only subsequent direct payments. Mixed/unknown charges use Other;
+balancing/on-account entries require confirmation of income-tax/Class 4 scope.
+Only an explicitly entered supported 2026–27 portion of a direct payment reduces
+the cash provision. Blank claims no credit. This never changes the tax estimate,
+deductible expenses, logged withholding or bank records and sends no payment.
+
+Cash uses observed available balances, unpaid bills and protected tax provision.
+The current-year provision is the larger of the received-income target after
+explicit direct credits and current-year supported HMRC charges due; other-year
+and Other charges due are added separately. Protect at least the saved aggregate
+tax/NI earmarks. This avoids overlapping provisions and preserves distinct-year
+liabilities. Future income and unused overdraft facilities are excluded. Negative
+results remain shortfalls. Unknown due amounts, missing/stale/future or changed-
+currency observations, unsupported/incomplete tax targets, payment corrections
+without updated balances, or unconfirmed coverage withhold the figure. Coverage
+is tied to the actual records and day, and observations expire after 24 hours.
+
+Migrations 027–029 add independent business tables/fields in real/sample schemas
+without rebuilding sample edits. A private pre-migration database backup was
+created; restore verification remains excluded. Existing applied SQL was not
+edited. New records are included by backup table discovery and have a separate
+snapshot-consistent private CSV ZIP export with explicit field allowlists,
+currency labels and spreadsheet formula protection. Raw bank/auth data is excluded.
+
+Final backend: 603 tests, 599 passed / four optional backup restore skips. The
+new browser flow passed 320/390/768/1280px, including no JavaScript at 390px.
+All 23 browser scripts completed successfully across focused runs, including
+responsive layouts, actual login/password revocation, invoices/PDFs, navigation,
+review, tax/export and cash planning. Ruff F (application and browser tests),
+application Bandit and whitespace checks passed. The first full browser run
+stopped at an intermittent expense assertion; later runs also exposed intermittent
+invoice, dataset-switch, login/password and work-save assertions. Final reruns
+passed. Their underlying cause is not established; successful reruns do not prove
+they are permanently resolved. Synthetic failure captures and rejected-response
+checks were retained for diagnosis. No working financial records were changed.
+Browser fixture cookies now use the browser's real Flask-Login identifier rather
+than an incomplete copied session; authentication is not weakened in production.
+An independent regression covers identifier binding and background cookie writes.
+
+The statement/component guidance was checked against GOV.UK's
+[statement explanation](https://www.gov.uk/understand-self-assessment-bill/self-assessment-statement)
+and [payments-on-account guidance](https://www.gov.uk/understand-self-assessment-bill/payments-on-account)
+on 12 October 2026. TOMS records supplied charges rather than recalculating an
+actual HMRC statement or inferring how an unallocated payment was credited.
+Publication is recorded below once completed.
+
+Limits: balances/statement charges/payments are manually entered, not verified
+against live providers. Cash is a 30-day record-based figure, not a funding
+guarantee; include everyday spending allowances and review earmarks after paying
+tax. Figures in unsupported currencies remain unavailable. No tax-return
+submission, bank transfer, tax-rate expansion or excluded relief calculation was
+added. Owner walkthrough and optional restore checks remain outstanding.
+
 ## Latest delivery — guided receipt matching
 
 Implemented on `codex/guided-receipt-matching`. Available receipts now lead to

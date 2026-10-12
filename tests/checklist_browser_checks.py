@@ -12,6 +12,7 @@ from sqlalchemy import text
 from werkzeug.serving import make_server
 from app import app
 from test_test_data import TestDataTests
+from browser_owner import install_owner_cookie
 from services.web.test_data import sample_id
 
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
@@ -38,8 +39,7 @@ with sync_playwright() as playwright:
             fixture.addCleanup(server.shutdown)
             origin = f'http://127.0.0.1:{server.server_port}'
             page = browser.new_page(viewport={'width': width, 'height': 900})
-            cookie = fixture.client.get_cookie(app.config['SESSION_COOKIE_NAME'])
-            page.context.add_cookies([dict(name=cookie.key, value=cookie.value, url=origin)])
+            install_owner_cookie(page.context, fixture, origin)
             errors = []
             page.on('pageerror', lambda error: errors.append(str(error)))
             def layout():
