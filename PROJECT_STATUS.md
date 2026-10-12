@@ -45,7 +45,12 @@ invoices, overview/dataset switching, actual login/password and usability/work
 saves then passed two additional complete rounds (42 width-specific passes).
 The final backend rerun also passed. Application and changed-test Ruff F,
 application Bandit and whitespace checks passed. No live bank verification,
-working financial edits or backup restore checks were performed. Publication is recorded below once completed.
+working financial edits or backup restore checks were performed.
+
+Published implementation `071dabf` on `codex/reliable-forms-cash-workflow` after
+verifying the public Thomas12356/TOMS remote/owner/branch and scanning outgoing
+files/history for secret values.
+Main remains at `577ac03`. The handoff documentation commit follows the implementation.
 
 ## Latest delivery — actual HMRC charges, bills and cash planning
 
