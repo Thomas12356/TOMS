@@ -72,3 +72,6 @@ features. Keep changes within the supported scope unless the user expands it.
 - Follow existing user authorization without repeated approval questions. Explain
   material blockers. Report changes, validation and limitations; update
   PROJECT_STATUS.md when completed work or outstanding decisions change.
+
+- Keep personal OS usernames, absolute checkout paths, private IP addresses and
+  owner-specific computer/deployment configuration out of published files and history.
