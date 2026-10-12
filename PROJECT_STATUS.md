@@ -21,7 +21,11 @@ Validation: 574 backend tests, 570 passes / four optional backup restore skips;
 all 22 browser scripts; Ruff F, Bandit and git whitespace checks passed. Final
 10k/50k synthetic benchmark passed without working financial writes or bank
 requests. No credentials, schema migration or backup restore was performed.
-Publication is recorded below after completion.
+Published implementation `3630fde` to `codex/bounded-financial-reads` and
+fast-forwarded/pushed `main`, incorporating the completed calculation audit, tax
+profile/payment guidance, failure recovery review and performance review history.
+Repository owner/remote and public visibility were verified against the user's
+publication preference; outgoing content/history passed the secret-value scan.
 
 Outstanding: owner five-task walkthrough and optional backup restore verification
 with the previously excluded credential setup. Ledger ordering/index work should
